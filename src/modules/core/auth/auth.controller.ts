@@ -1,0 +1,120 @@
+import type { FastifyRequest, FastifyReply } from "fastify";
+import type { LoginBody } from "./auth.schema.js";
+import { loginUser, refreshAccessToken, logoutUser, getMe, parseExpiresIn } from "./auth.service.js";
+import { ok, accepted } from "../../../common/types/index.js";
+import { COOKIE_NAMES } from "../../../common/constants/index.js";
+import { UnauthorizedError } from "../../../common/errors/index.js";
+import { env } from "../../../config/env.js";
+import { publishAuditUserLogin, publishAuditUserLogout } from "../../../workers/producers/audit.producer.js";
+
+// ─── Refresh Cookie ───────────────────────────────────────────────────────────
+const REFRESH_COOKIE_PATH = "/api/v1/auth/refresh";
+
+function refreshCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: env.NODE_ENV === "production",
+    sameSite: "strict" as const,
+    path: REFRESH_COOKIE_PATH,
+    maxAge: parseExpiresIn(env.JWT_REFRESH_EXPIRES),
+  };
+}
+
+// ─── Login ────────────────────────────────────────────────────────────────────
+export async function handleLogin(
+  request: FastifyRequest<{ Body: LoginBody }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const { identity, password } = request.body;
+  const appCode = request.appCode;
+
+  const result = await loginUser(
+    request.server,
+    identity,
+    password,
+    appCode,
+    request.ip,
+    request.headers["user-agent"],
+  );
+
+  // Set refresh token as HttpOnly cookie
+  reply.setCookie(COOKIE_NAMES.REFRESH_TOKEN, result.refreshToken, refreshCookieOptions());
+
+  // Publish audit event (non-blocking)
+  void publishAuditUserLogin({
+    userId: result.user.id,
+    appCode,
+    ipAddress: request.ip,
+    userAgent: request.headers["user-agent"],
+  });
+
+  void reply.status(200).send(
+    ok(
+      {
+        accessToken: result.accessToken,
+        expiresIn: result.expiresIn,
+        user: result.user,
+      },
+      "Login successful",
+    ),
+  );
+}
+
+// ─── Refresh ──────────────────────────────────────────────────────────────────
+export async function handleRefresh(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const rawRefreshToken = request.cookies[COOKIE_NAMES.REFRESH_TOKEN];
+
+  if (!rawRefreshToken) {
+    throw new UnauthorizedError("No refresh token provided");
+  }
+
+  const result = await refreshAccessToken(
+    request.server,
+    rawRefreshToken,
+    request.appCode,
+    request.ip,
+    request.headers["user-agent"],
+  );
+
+  // Rotation: the old token was revoked, so replace the cookie too.
+  reply.setCookie(COOKIE_NAMES.REFRESH_TOKEN, result.refreshToken, refreshCookieOptions());
+
+  void reply.status(200).send(
+    ok({ accessToken: result.accessToken, expiresIn: result.expiresIn }, "Token refreshed"),
+  );
+}
+
+// ─── Logout ───────────────────────────────────────────────────────────────────
+export async function handleLogout(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const rawRefreshToken = request.cookies[COOKIE_NAMES.REFRESH_TOKEN];
+  const user = request.user;
+
+  if (rawRefreshToken) {
+    await logoutUser(rawRefreshToken, user.sub, request.appCode);
+
+    void publishAuditUserLogout({
+      userId: user.sub,
+      appCode: request.appCode,
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"],
+    });
+  }
+
+  reply.clearCookie(COOKIE_NAMES.REFRESH_TOKEN, { path: REFRESH_COOKIE_PATH });
+  void reply.status(200).send(accepted("Logged out successfully"));
+}
+
+// ─── Me ───────────────────────────────────────────────────────────────────────
+export async function handleMe(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const profile = await getMe(request.user.sub, request.appCode);
+  void reply.status(200).send(ok(profile));
+}

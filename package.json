@@ -1,0 +1,51 @@
+{
+  "name": "seloko-api",
+  "version": "1.0.0",
+  "description": "SELOKO Centralized Core API — Bapenda Jambi",
+  "author": "Bapenda Jambi",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "dev:worker:audit": "tsx watch src/workers/consumers/audit.consumer.ts",
+    "db:generate": "prisma generate",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx src/modules/core/auth/auth.check.ts"
+  },
+  "dependencies": {
+    "fastify": "^5",
+    "@fastify/jwt": "^9",
+    "@fastify/cookie": "^11",
+    "@fastify/cors": "^10",
+    "fastify-plugin": "^5",
+    "fastify-type-provider-zod": "^4",
+    "zod": "^3",
+    "ioredis": "^5",
+    "amqplib": "^0.10",
+    "argon2": "^0.43",
+    "prisma": "^6",
+    "@prisma/client": "^6"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "tsx": "^4",
+    "@types/node": "^22",
+    "@types/amqplib": "^0.10",
+    "pino-pretty": "^13"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "argon2@0.43.1": true,
+    "esbuild@0.28.2": true,
+    "prisma@6.19.3": true
+  }
+}

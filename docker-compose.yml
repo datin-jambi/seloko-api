@@ -1,0 +1,66 @@
+# ─── SELOKO API — Local Development Infrastructure ─────────────────────────────
+# Provides: PostgreSQL 16, Redis 7, RabbitMQ 3 with Management UI
+# Usage: docker compose up -d
+
+version: "3.9"
+
+services:
+  # ─── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: seloko_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: seloko_user
+      POSTGRES_PASSWORD: seloko_pass
+      POSTGRES_DB: seloko_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - seloko_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seloko_user -d seloko_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: seloko_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass seloko_redis_pass
+    ports:
+      - "6379:6379"
+    volumes:
+      - seloko_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "seloko_redis_pass", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── RabbitMQ ───────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: seloko_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: seloko_user
+      RABBITMQ_DEFAULT_PASS: seloko_pass
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Management UI
+    volumes:
+      - seloko_rmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  seloko_pg_data:
+  seloko_redis_data:
+  seloko_rmq_data:

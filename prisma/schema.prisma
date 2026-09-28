@@ -1,0 +1,201 @@
+// ─── Prisma Schema ─────────────────────────────────────────────────────────────
+// SELOKO API — Bapenda Provinsi Jambi
+// Multi-Application Centralized RBAC.
+//
+// Bentuk tabel & kolom mengikuti referensi SQL (snake_case, uuid VARCHAR(36)),
+// dengan tiga tambahan yang dibutuhkan kode berjalan:
+//   1. multi-role per aplikasi  → unique (user, app, role), bukan (user, app)
+//   2. refresh_tokens           → rotasi JWT
+//   3. audit_logs               → jejak audit asinkron via RabbitMQ
+// ────────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Applications ──────────────────────────────────────────────────────────────
+/// Aplikasi terdaftar di ekosistem SELOKO — internal maupun publik.
+/// `code` dipakai pada header X-App-Code.
+model Application {
+  id          String   @id @default(uuid(7)) @db.VarChar(36)
+  code        String   @unique @db.VarChar(50) // 'seloko', 'lapak-jambi-web', …
+  name        String   @db.VarChar(100)
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  permissions  Permission[]
+  roles        Role[]
+  userAppRoles UserAppRole[]
+
+  @@map("applications")
+}
+
+// ─── Permissions ───────────────────────────────────────────────────────────────
+/// Aksi spesifik dalam lingkup satu aplikasi.
+/// `code` adalah kunci otoritatif yang dicek guard: "user:read", "product:approve".
+/// `module` hanya pengelompokan untuk tampilan CMS.
+model Permission {
+  id            String   @id @default(uuid(7)) @db.VarChar(36)
+  applicationId String   @map("app_id") @db.VarChar(36)
+  code          String   @db.VarChar(100) // 'user:read'
+  name          String   @db.VarChar(150) // 'Melihat Daftar Pengguna'
+  module        String   @db.VarChar(50) // 'User', 'Produk', 'Banner'
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  application     Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  rolePermissions RolePermission[]
+
+  @@unique([applicationId, code], map: "uq_app_permission")
+  @@index([applicationId], map: "idx_permissions_app_id")
+  @@map("permissions")
+}
+
+// ─── Roles ─────────────────────────────────────────────────────────────────────
+/// Jabatan akses spesifik per aplikasi. Bukan enum — murni data.
+model Role {
+  id            String   @id @default(uuid(7)) @db.VarChar(36)
+  applicationId String   @map("app_id") @db.VarChar(36)
+  name          String   @db.VarChar(50) // 'superadmin', 'editor', 'verifikator'
+  description   String?
+  /// Role bawaan sistem — tidak boleh dihapus lewat CMS.
+  isSystemRole  Boolean  @default(false) @map("is_system_role")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  application     Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  rolePermissions RolePermission[]
+  userAppRoles    UserAppRole[]
+
+  @@unique([applicationId, name], map: "uq_app_role_name")
+  @@index([applicationId], map: "idx_roles_app_id")
+  @@map("roles")
+}
+
+// ─── Role Permissions (Pivot) ──────────────────────────────────────────────────
+model RolePermission {
+  roleId       String @map("role_id") @db.VarChar(36)
+  permissionId String @map("permission_id") @db.VarChar(36)
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ─── Users ─────────────────────────────────────────────────────────────────────
+/// Identitas tunggal untuk seluruh ekosistem. Role diberikan per aplikasi
+/// lewat user_app_roles — tidak ada kolom role di sini.
+model User {
+  id              String    @id @default(uuid(7)) @db.VarChar(36)
+  /// NIP ASN/pegawai — kosong untuk pengguna non-ASN.
+  nip             String?   @unique @db.VarChar(30)
+  username        String    @unique @db.VarChar(50)
+  email           String    @unique @db.VarChar(100)
+  fullName        String    @map("full_name") @db.VarChar(150)
+  phoneNumber     String?   @map("phone_number") @db.VarChar(20)
+  passwordHash    String    @map("password_hash") @db.VarChar(255) // Argon2id
+  avatarUrl       String?   @map("avatar_url")
+  /// Melewati SELURUH pengecekan permission di semua aplikasi.
+  isSuperAdmin    Boolean   @default(false) @map("is_super_admin")
+  isActive        Boolean   @default(true) @map("is_active")
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz()
+  lastLoginAt     DateTime? @map("last_login_at") @db.Timestamptz()
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz() // Soft delete
+
+  userAppRoles  UserAppRole[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+
+  @@index([deletedAt], map: "idx_users_deleted_at")
+  @@map("users")
+}
+
+// ─── User App Roles (Pivot) ────────────────────────────────────────────────────
+/// Inti multi-aplikasi: satu user boleh punya BEBERAPA role di tiap aplikasi.
+/// (Referensi membatasi satu role per aplikasi; di sini sengaja dilonggarkan
+/// agar mis. seorang verifikator juga bisa merangkap editor.)
+model UserAppRole {
+  id            String    @id @default(uuid(7)) @db.VarChar(36)
+  userId        String    @map("user_id") @db.VarChar(36)
+  applicationId String    @map("app_id") @db.VarChar(36)
+  roleId        String    @map("role_id") @db.VarChar(36)
+  /// userId admin yang menugaskan.
+  assignedBy    String?   @map("assigned_by") @db.VarChar(36)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  /// Penugasan berbatas waktu — null berarti permanen.
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz()
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  role        Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, applicationId, roleId], map: "uq_user_app_role")
+  @@index([userId], map: "idx_user_app_roles_user")
+  @@index([applicationId], map: "idx_user_app_roles_app")
+  @@index([userId, applicationId])
+  @@map("user_app_roles")
+}
+
+// ─── Refresh Tokens ────────────────────────────────────────────────────────────
+/// Penyimpanan hash refresh token untuk pola rotasi JWT.
+model RefreshToken {
+  id        String   @id @default(uuid(7)) @db.VarChar(36)
+  userId    String   @map("user_id") @db.VarChar(36)
+  tokenHash String   @unique @map("token_hash") @db.VarChar(64) // SHA-256 hex
+  appCode   String   @map("app_code") @db.VarChar(50)
+  userAgent String?  @map("user_agent")
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_refresh_tokens_user")
+  @@index([expiresAt], map: "idx_refresh_tokens_expires_at")
+  @@map("refresh_tokens")
+}
+
+// ─── Audit Logs ────────────────────────────────────────────────────────────────
+/// Jejak audit tak-termutasi. Diisi worker RabbitMQ — jangan pernah sinkron.
+model AuditLog {
+  id         String        @id @default(uuid(7)) @db.VarChar(36)
+  userId     String?       @map("user_id") @db.VarChar(36)
+  appCode    String        @map("app_code") @db.VarChar(50)
+  action     String        @db.VarChar(100) // 'user.login', 'article.publish'
+  entityType String?       @map("entity_type") @db.VarChar(50)
+  entityId   String?       @map("entity_id") @db.VarChar(36)
+  metadata   Json?
+  ipAddress  String?       @map("ip_address") @db.VarChar(45)
+  userAgent  String?       @map("user_agent")
+  severity   AuditSeverity @default(INFO)
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId], map: "idx_audit_logs_user")
+  @@index([appCode], map: "idx_audit_logs_app_code")
+  @@index([action], map: "idx_audit_logs_action")
+  @@index([createdAt], map: "idx_audit_logs_created_at")
+  @@map("audit_logs")
+}
+
+enum AuditSeverity {
+  INFO
+  WARN
+  ERROR
+  CRITICAL
+
+  @@map("audit_severity")
+}
