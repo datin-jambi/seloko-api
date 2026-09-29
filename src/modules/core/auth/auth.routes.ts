@@ -15,7 +15,7 @@ import {
   handleLogoutAll,
   handleMe,
 } from "./auth.controller.js";
-import { RATE_LIMIT } from "../../../common/constants/index.js";
+import { RATE_LIMIT } from "~/common/constants/index.js";
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>();

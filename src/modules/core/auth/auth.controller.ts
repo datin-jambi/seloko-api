@@ -1,12 +1,12 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import type { LoginBody } from "./auth.schema.js";
 import { loginUser, refreshAccessToken, logoutUser, logoutAllSessions, getMe, parseExpiresIn } from "./auth.service.js";
-import { ok, accepted } from "../../../common/types/index.js";
-import { COOKIE_NAMES } from "../../../common/constants/index.js";
-import { UnauthorizedError } from "../../../common/errors/index.js";
-import { env } from "../../../config/env.js";
-import { publishAuditUserLogin, publishAuditUserLogout, publishAuditEvent } from "../../../workers/producers/audit.producer.js";
-import { ROUTING_KEYS } from "../../../workers/queue-names/index.js";
+import { ok, accepted } from "~/common/types/index.js";
+import { COOKIE_NAMES } from "~/common/constants/index.js";
+import { UnauthorizedError } from "~/common/errors/index.js";
+import { env } from "~/config/env.js";
+import { publishAuditUserLogin, publishAuditUserLogout, publishAuditEvent } from "~/workers/producers/audit.producer.js";
+import { ROUTING_KEYS } from "~/workers/queue-names/index.js";
 
 // ─── Refresh Cookie ───────────────────────────────────────────────────────────
 // Path harus mencakup /logout juga, bukan hanya /refresh: cookie dengan

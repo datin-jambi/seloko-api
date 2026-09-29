@@ -1,11 +1,11 @@
 import fp from "fastify-plugin";
 import crypto from "node:crypto";
 import type { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
-import { getCachedPermissions, isAccessTokenBlocked } from "../../config/redis.js";
-import { prisma } from "../../config/database.js";
-import { setCachedPermissions } from "../../config/redis.js";
-import { ForbiddenError, UnauthorizedError } from "../errors/index.js";
-import type { JwtPayload } from "../types/index.js";
+import { getCachedPermissions, isAccessTokenBlocked } from "~/config/redis.js";
+import { prisma } from "~/config/database.js";
+import { setCachedPermissions } from "~/config/redis.js";
+import { ForbiddenError, UnauthorizedError } from "~/common/errors/index.js";
+import type { JwtPayload } from "~/common/types/index.js";
 
 
 // ─── Module Augmentation: Add requirePermission to Fastify ────────────────────

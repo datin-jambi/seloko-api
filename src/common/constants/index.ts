@@ -1,4 +1,4 @@
-import { env } from "../../config/env.js";
+import { env } from "~/config/env.js";
 
 // ─── App Codes ────────────────────────────────────────────────────────────────
 // Harus sama persis dengan kolom applications.code di database.

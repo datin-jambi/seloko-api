@@ -8,12 +8,12 @@
  * 4. Start HTTP listener
  * 5. Register SIGTERM/SIGINT handlers for graceful shutdown
  */
-import { env } from "./config/env.js";
-import { disconnectDatabase } from "./config/database.js";
-import { getRedisClient, closeRedisClient } from "./config/redis.js";
-import { connectRabbitMQ, closeRabbitMQ } from "./config/rabbitmq.js";
-import { runPreflight } from "./config/preflight.js";
-import { buildApp } from "./app.js";
+import { env } from "~/config/env.js";
+import { disconnectDatabase } from "~/config/database.js";
+import { getRedisClient, closeRedisClient } from "~/config/redis.js";
+import { connectRabbitMQ, closeRabbitMQ } from "~/config/rabbitmq.js";
+import { runPreflight } from "~/config/preflight.js";
+import { buildApp } from "~/app.js";
 
 async function bootstrap(): Promise<void> {
   console.info("╔══════════════════════════════════════════════════╗");

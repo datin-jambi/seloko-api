@@ -1,7 +1,7 @@
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from "fastify";
-import { HEADERS } from "../constants/index.js";
-import { BadRequestError } from "../errors/index.js";
+import { HEADERS } from "~/common/constants/index.js";
+import { BadRequestError } from "~/common/errors/index.js";
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 // App code: huruf kecil, angka, underscore ATAU tanda hubung, 2–50 karakter.

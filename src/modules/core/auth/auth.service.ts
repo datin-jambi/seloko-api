@@ -1,19 +1,19 @@
 import argon2 from "argon2";
 import crypto from "node:crypto";
-import { prisma } from "../../../config/database.js";
+import { prisma } from "~/config/database.js";
 import {
   invalidatePermissionCache,
   invalidateAllUserPermissionCaches,
   blockAccessToken,
-} from "../../../config/redis.js";
-import { resolveUserPermissions } from "../../../common/guards/permission.guard.js";
-import { env } from "../../../config/env.js";
+} from "~/config/redis.js";
+import { resolveUserPermissions } from "~/common/guards/permission.guard.js";
+import { env } from "~/config/env.js";
 import {
   UnauthorizedError,
   NotFoundError,
   ForbiddenError,
-} from "../../../common/errors/index.js";
-import type { JwtPayload } from "../../../common/types/index.js";
+} from "~/common/errors/index.js";
+import type { JwtPayload } from "~/common/types/index.js";
 import type { FastifyInstance } from "fastify";
 
 // ─── Token Helpers ────────────────────────────────────────────────────────────

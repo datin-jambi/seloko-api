@@ -8,10 +8,10 @@
  */
 import type { ConsumeMessage } from "amqplib";
 import { Prisma } from "@prisma/client";
-import { getConsumerChannel, connectRabbitMQ } from "../../config/rabbitmq.js";
-import { connectDatabase, prisma } from "../../config/database.js";
-import { QUEUES, ROUTING_KEYS } from "../queue-names/index.js";
-import { env } from "../../config/env.js";
+import { getConsumerChannel, connectRabbitMQ } from "~/config/rabbitmq.js";
+import { connectDatabase, prisma } from "~/config/database.js";
+import { QUEUES, ROUTING_KEYS } from "~/workers/queue-names/index.js";
+import { env } from "~/config/env.js";
 
 // ─── Audit Event Shape ────────────────────────────────────────────────────────
 interface AuditEventPayload {

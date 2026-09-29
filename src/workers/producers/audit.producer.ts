@@ -1,5 +1,5 @@
-import { publishToExchange } from "../../config/rabbitmq.js";
-import { ROUTING_KEYS } from "../queue-names/index.js";
+import { publishToExchange } from "~/config/rabbitmq.js";
+import { ROUTING_KEYS } from "~/workers/queue-names/index.js";
 
 // ─── Audit Event Payload Types ────────────────────────────────────────────────
 // Optional fields are explicitly `| undefined`: with exactOptionalPropertyTypes

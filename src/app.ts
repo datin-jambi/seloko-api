@@ -6,14 +6,14 @@ import fastifyCors from "@fastify/cors";
 import fastifyRateLimit from "@fastify/rate-limit";
 import fastifyPlugin from "fastify-plugin";
 
-import { env } from "./config/env.js";
-import { getRedisClient, pingRedis } from "./config/redis.js";
-import { pingDatabase } from "./config/database.js";
-import { isRabbitMQConnected } from "./config/rabbitmq.js";
-import { appCodeMiddleware } from "./common/middlewares/index.js";
-import { permissionGuard } from "./common/guards/index.js";
-import { RATE_LIMIT } from "./common/constants/index.js";
-import { sendError, AppError, HttpStatus, TooManyRequestsError } from "./common/errors/index.js";
+import { env } from "~/config/env.js";
+import { getRedisClient, pingRedis } from "~/config/redis.js";
+import { pingDatabase } from "~/config/database.js";
+import { isRabbitMQConnected } from "~/config/rabbitmq.js";
+import { appCodeMiddleware } from "~/common/middlewares/index.js";
+import { permissionGuard } from "~/common/guards/index.js";
+import { RATE_LIMIT } from "~/common/constants/index.js";
+import { sendError, AppError, HttpStatus, TooManyRequestsError } from "~/common/errors/index.js";
 
 // ─── Application Factory ──────────────────────────────────────────────────────
 export async function buildApp(): Promise<FastifyInstance> {
