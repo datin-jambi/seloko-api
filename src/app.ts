@@ -98,11 +98,23 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.setErrorHandler((error: FastifyError, request, reply) => {
     // Fastify validation errors (from Zod) have statusCode 400
     if (error.validation) {
+      // Transform array Zod errors → { field: "pesan pertama" }
+      // instancePath: "/username" → field: "username"
+      // Ambil hanya satu pesan per field (yang pertama muncul) agar respons ringkas.
+      const fields: Record<string, string> = {};
+      for (const issue of error.validation) {
+        const raw = (issue as { instancePath?: string }).instancePath ?? "";
+        // Hilangkan leading "/" dan ganti "/" berikutnya dengan "." (nested path)
+        const field = raw.replace(/^\//, "").replace(/\//g, ".") || "_root";
+        if (!(field in fields)) {
+          fields[field] = (issue as { message?: string }).message ?? "Invalid value";
+        }
+      }
       void reply.status(HttpStatus.BAD_REQUEST).send({
         statusCode: HttpStatus.BAD_REQUEST,
         code: "VALIDATION_ERROR",
         message: "Request validation failed",
-        details: error.validation,
+        details: fields,
         timestamp: new Date().toISOString(),
       });
       return;
@@ -184,9 +196,12 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(
     async (api) => {
       // Core modules
-      const { authRoutes } = await import("./modules/core/auth/auth.routes.js");
+      const { authRoutes } = await import("~/modules/core/auth/auth.routes.js");
       await api.register(authRoutes, { prefix: "/auth" });
-      // await api.register(usersRoutes, { prefix: "/users" });
+
+      const { usersRoutes } = await import("~/modules/core/users/users.routes.js");
+      await api.register(usersRoutes, { prefix: "/users" });
+
       // await api.register(rbacRoutes, { prefix: "/rbac" });
 
       // Bapenda modules
