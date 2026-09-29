@@ -17,14 +17,16 @@ async function appCodeMiddlewarePlugin(
    * Global onRequest hook: extracts and validates the X-App-Code header.
    * Populates request.appCode for downstream handlers and guards.
    *
-   * Skips validation for the health-check endpoint so uptime monitors
-   * can function without setting the header.
+   * Hanya route di bawah /api yang dijaga. Membalik logika (jaga /api)
+   * ketimbang mendaftar pengecualian mencegah endpoint publik baru —
+   * health, metrics, docs — tanpa sengaja ikut terkunci.
    */
   fastify.addHook(
     "onRequest",
     async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
-      // Allow health check without the header
-      if (request.url === "/health" || request.url === "/health/") return;
+      // request.url memuat query string, jadi cocokkan hanya bagian path.
+      const path = request.url.split("?")[0] ?? "";
+      if (!path.startsWith("/api/")) return;
 
       const rawCode = request.headers[HEADERS.APP_CODE];
 

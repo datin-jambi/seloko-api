@@ -45,6 +45,15 @@ export const LogoutResponseSchema = z.object({
   data: z.null(),
 });
 
+// ─── Logout Semua Sesi ────────────────────────────────────────────────────────
+export const LogoutAllResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  data: z.object({
+    revokedSessions: z.number().describe("Jumlah sesi yang dicabut"),
+  }),
+});
+
 // ─── Me ───────────────────────────────────────────────────────────────────────
 export const MeResponseSchema = z.object({
   success: z.boolean(),

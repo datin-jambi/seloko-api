@@ -1,14 +1,15 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import type { LoginBody } from "./auth.schema.js";
-import { loginUser, refreshAccessToken, logoutUser, getMe, parseExpiresIn } from "./auth.service.js";
+import { loginUser, refreshAccessToken, logoutUser, logoutAllSessions, getMe, parseExpiresIn } from "./auth.service.js";
 import { ok, accepted } from "../../../common/types/index.js";
 import { COOKIE_NAMES } from "../../../common/constants/index.js";
 import { UnauthorizedError } from "../../../common/errors/index.js";
 import { env } from "../../../config/env.js";
-import { publishAuditUserLogin, publishAuditUserLogout } from "../../../workers/producers/audit.producer.js";
+import { publishAuditUserLogin, publishAuditUserLogout, publishAuditEvent } from "../../../workers/producers/audit.producer.js";
+import { ROUTING_KEYS } from "../../../workers/queue-names/index.js";
 
 // ─── Refresh Cookie ───────────────────────────────────────────────────────────
-const REFRESH_COOKIE_PATH = "/api/v1/auth/refresh";
+const REFRESH_COOKIE_PATH = "/api/auth/refresh";
 
 function refreshCookieOptions() {
   return {
@@ -108,6 +109,29 @@ export async function handleLogout(
 
   reply.clearCookie(COOKIE_NAMES.REFRESH_TOKEN, { path: REFRESH_COOKIE_PATH });
   void reply.status(200).send(accepted("Logged out successfully"));
+}
+
+// ─── Logout Semua Sesi ────────────────────────────────────────────────────────
+export async function handleLogoutAll(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const user = request.user;
+  const revokedSessions = await logoutAllSessions(user.sub);
+
+  void publishAuditEvent(ROUTING_KEYS.AUDIT_USER_LOGOUT, {
+    action: "user.logout_all",
+    userId: user.sub,
+    appCode: request.appCode,
+    ipAddress: request.ip,
+    userAgent: request.headers["user-agent"],
+    metadata: { revokedSessions },
+  });
+
+  reply.clearCookie(COOKIE_NAMES.REFRESH_TOKEN, { path: REFRESH_COOKIE_PATH });
+  void reply.status(200).send(
+    ok({ revokedSessions }, `${revokedSessions} sesi berhasil dicabut`),
+  );
 }
 
 // ─── Me ───────────────────────────────────────────────────────────────────────

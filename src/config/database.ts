@@ -36,6 +36,19 @@ export async function connectDatabase(): Promise<void> {
 }
 
 /**
+ * Ping ringan untuk health check. Mengembalikan false, tidak melempar —
+ * pemanggil melaporkan status, bukan menggagalkan request.
+ */
+export async function pingDatabase(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Gracefully disconnects from the database.
  * Call during application shutdown.
  */

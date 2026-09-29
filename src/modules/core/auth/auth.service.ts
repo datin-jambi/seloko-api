@@ -1,7 +1,10 @@
 import argon2 from "argon2";
 import crypto from "node:crypto";
 import { prisma } from "../../../config/database.js";
-import { invalidatePermissionCache } from "../../../config/redis.js";
+import {
+  invalidatePermissionCache,
+  invalidateAllUserPermissionCaches,
+} from "../../../config/redis.js";
 import { resolveUserPermissions } from "../../../common/guards/permission.guard.js";
 import { env } from "../../../config/env.js";
 import {
@@ -15,6 +18,48 @@ import type { FastifyInstance } from "fastify";
 // ─── Token Helpers ────────────────────────────────────────────────────────────
 function hashToken(rawToken: string): string {
   return crypto.createHash("sha256").update(rawToken).digest("hex");
+}
+
+// ─── Access Control ───────────────────────────────────────────────────────────
+/**
+ * Memastikan user berhak masuk ke aplikasi yang diminta.
+ *
+ * Tanpa ini siapa pun yang punya akun di ekosistem bisa login ke aplikasi mana
+ * pun hanya dengan mengganti header X-App-Code — misalnya pedagang lapak masuk
+ * ke CMS internal. Satu-satunya penahan tersisa adalah requirePermission di
+ * tiap route, sehingga route yang lupa memasang guard langsung terbuka.
+ *
+ * Super admin dikecualikan: mereka memang lintas-aplikasi.
+ */
+async function assertUserCanAccessApp(
+  userId: string,
+  isSuperAdmin: boolean,
+  appCode: string,
+): Promise<void> {
+  if (isSuperAdmin) return;
+
+  const application = await prisma.application.findUnique({
+    where: { code: appCode },
+    select: { id: true, isActive: true },
+  });
+
+  if (!application || !application.isActive) {
+    throw new ForbiddenError(`Aplikasi "${appCode}" tidak aktif atau tidak terdaftar`);
+  }
+
+  const assignment = await prisma.userAppRole.findFirst({
+    where: {
+      userId,
+      applicationId: application.id,
+      role: { isActive: true },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+    select: { id: true },
+  });
+
+  if (!assignment) {
+    throw new ForbiddenError(`Anda tidak memiliki akses ke aplikasi "${appCode}"`);
+  }
 }
 
 // ─── Service Methods ──────────────────────────────────────────────────────────
@@ -79,6 +124,9 @@ export async function loginUser(
   if (!passwordValid) {
     throw new UnauthorizedError("Invalid credentials");
   }
+
+  // Kredensial benar bukan berarti berhak masuk aplikasi ini.
+  await assertUserCanAccessApp(user.id, user.isSuperAdmin, appCode);
 
   // Build JWT payload
   const accessPayload: JwtPayload = {
@@ -192,6 +240,10 @@ export async function refreshAccessToken(
     throw new UnauthorizedError("User account is no longer active");
   }
 
+  // Akses aplikasi bisa dicabut setelah token terbit — periksa ulang setiap
+  // rotasi, bukan hanya saat login.
+  await assertUserCanAccessApp(user.id, user.isSuperAdmin, appCode);
+
   const newAccessPayload: JwtPayload = {
     sub: user.id,
     email: user.email,
@@ -249,6 +301,23 @@ export async function logoutUser(
 
   // Invalidate permission cache (helper builds the canonical key)
   await invalidatePermissionCache(userId, appCode);
+}
+
+/**
+ * Mencabut SELURUH sesi aktif user di semua aplikasi.
+ * Dipakai saat perangkat hilang atau ada dugaan akun disusupi.
+ * Mengembalikan jumlah sesi yang dicabut.
+ */
+export async function logoutAllSessions(userId: string): Promise<number> {
+  const { count } = await prisma.refreshToken.updateMany({
+    where: { userId, isRevoked: false },
+    data: { isRevoked: true },
+  });
+
+  // Cache permission di semua aplikasi ikut dibuang.
+  await invalidateAllUserPermissionCaches(userId);
+
+  return count;
 }
 
 /**

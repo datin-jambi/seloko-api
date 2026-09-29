@@ -158,6 +158,15 @@ export async function publishToExchange(
 }
 
 /**
+ * True bila koneksi broker sedang hidup. Dipakai health check.
+ * Listener connection "close"/"error" mengosongkan state, jadi flag ini
+ * ikut turun saat broker mati.
+ */
+export function isRabbitMQConnected(): boolean {
+  return state !== null;
+}
+
+/**
  * Gracefully closes the RabbitMQ connection.
  * Should be called during application shutdown.
  */

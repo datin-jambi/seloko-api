@@ -9,9 +9,10 @@
  * 5. Register SIGTERM/SIGINT handlers for graceful shutdown
  */
 import { env } from "./config/env.js";
-import { connectDatabase, disconnectDatabase } from "./config/database.js";
+import { disconnectDatabase } from "./config/database.js";
 import { getRedisClient, closeRedisClient } from "./config/redis.js";
 import { connectRabbitMQ, closeRabbitMQ } from "./config/rabbitmq.js";
+import { runPreflight } from "./config/preflight.js";
 import { buildApp } from "./app.js";
 
 async function bootstrap(): Promise<void> {
@@ -21,14 +22,35 @@ async function bootstrap(): Promise<void> {
   console.info("╚══════════════════════════════════════════════════╝");
 
   // ── 1. Connect Infrastructure ───────────────────────────────────────────
-  await connectDatabase();
-
   // Initialize Redis connection (lazy=false means it connects immediately)
   getRedisClient();
 
-  await connectRabbitMQ();
+  // RabbitMQ tidak boleh memblokir startup. Broker hanya melayani tugas latar
+  // (audit, notifikasi) yang produsernya sudah menelan kegagalan; kalau start
+  // digagalkan di sini, broker mati berarti seluruh API ikut mati. Modul ini
+  // menjadwalkan reconnect sendiri.
+  try {
+    await connectRabbitMQ();
+  } catch (err) {
+    console.error(
+      "[RabbitMQ] Koneksi awal gagal — API tetap dijalankan, tugas latar menunggu reconnect:",
+      err instanceof Error ? err.message : err,
+    );
+  }
 
-  // ── 2. Build Fastify App ────────────────────────────────────────────────
+  // ── 2. Preflight: laporkan status tiap infrastruktur ────────────────────
+  // connectDatabase() dipanggil di dalam probe PostgreSQL, jadi tidak perlu
+  // lagi di atas. Hanya kegagalan service critical yang membatalkan startup.
+  const checks = await runPreflight();
+  const failedCritical = checks.filter((c) => c.critical && !c.ok);
+  if (failedCritical.length > 0) {
+    console.error(
+      `[Preflight] Startup dibatalkan — ${failedCritical.map((c) => c.name).join(", ")} tidak terhubung.`,
+    );
+    process.exit(1);
+  }
+
+  // ── 3. Build Fastify App ────────────────────────────────────────────────
   const app = await buildApp();
 
   // ── 3. Start Listener ───────────────────────────────────────────────────

@@ -15,7 +15,7 @@
 | Message Broker | RabbitMQ 3 via `amqplib` |
 | Validation | Zod + `fastify-type-provider-zod` |
 | Auth | `@fastify/jwt` + Argon2id |
-| Security | `@fastify/cors`, `@fastify/cookie` |
+| Security | `@fastify/cors`, `@fastify/cookie`, `@fastify/rate-limit` |
 
 ---
 
@@ -61,8 +61,11 @@ src/
 
 Every API request **must** carry the `X-App-Code` header. The `appCodeMiddleware` validates this on every request and populates `request.appCode`.
 
+Only routes under `/api/` require the header. Everything else — `/health`,
+future metrics or docs endpoints — is public by default.
+
 ```bash
-curl -H "X-App-Code: bapenda-profile" http://localhost:3000/api/v1/auth/me
+curl -H "X-App-Code: bapenda-profile" http://localhost:3000/api/auth/me
 ```
 
 Registered codes: `seloko`, `bapenda-profile`, `lapak-jambi-web`, `lapak-jambi-app`.
@@ -170,20 +173,44 @@ npm run dev:worker:audit    # Audit log consumer
 
 ## API Endpoints
 
-### Auth (`/api/v1/auth`)
+### Auth (`/api/auth`)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/login` | ❌ | Login with email/username + password |
-| POST | `/refresh` | Cookie | Refresh access token |
+| POST | `/login` | ❌ | Login with email/username + password (rate limited: 5 / 15 min) |
+| POST | `/refresh` | Cookie | Refresh access token (rotates, re-checks app access) |
 | POST | `/logout` | ✅ | Revoke refresh token |
-| GET | `/me` | ✅ | Get profile + active permissions |
+| POST | `/logout-all` | ✅ | Revoke every active session across all apps |
+| GET | `/me` | ✅ | Get profile + active roles + permissions |
+
+Login and refresh both verify the user holds a live (non-expired) role assignment
+in the app named by `X-App-Code`. Without that check any account in the ecosystem
+could sign into any app just by swapping the header.
 
 ### Health Check
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/health` | Server health (no X-App-Code required) |
+| GET | `/health` | Liveness — process is up. No dependency checks, no `X-App-Code`. |
+| GET | `/health/ready` | Readiness — pings PostgreSQL, Redis, RabbitMQ. |
+
+`/health/ready` returns `503` only when PostgreSQL is unreachable. Redis and
+RabbitMQ being down are reported in `dependencies` but do not fail the probe:
+permission lookups fall back to the database and audit events are dropped by
+design, so the API still serves traffic.
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-09-28T17:33:45.779Z",
+  "uptime": 7.76,
+  "environment": "development",
+  "dependencies": { "database": true, "redis": false, "rabbitmq": false }
+}
+```
+
+Startup follows the same rule: a RabbitMQ outage is logged and the API boots
+anyway, reconnecting in the background.
 
 ---
 

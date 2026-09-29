@@ -3,9 +3,13 @@ import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fas
 import fastifyJwt from "@fastify/jwt";
 import fastifyCookie from "@fastify/cookie";
 import fastifyCors from "@fastify/cors";
+import fastifyRateLimit from "@fastify/rate-limit";
 import fastifyPlugin from "fastify-plugin";
 
 import { env } from "./config/env.js";
+import { getRedisClient, pingRedis } from "./config/redis.js";
+import { pingDatabase } from "./config/database.js";
+import { isRabbitMQConnected } from "./config/rabbitmq.js";
 import { appCodeMiddleware } from "./common/middlewares/index.js";
 import { permissionGuard } from "./common/guards/index.js";
 import { sendError, AppError, HttpStatus } from "./common/errors/index.js";
@@ -59,6 +63,30 @@ export async function buildApp(): Promise<FastifyInstance> {
       cookieName: "seloko_rt",
       signed: false,
     },
+  });
+
+  // ── Rate Limit ────────────────────────────────────────────────────────────
+  // Global longgar; /auth/login mengetatkan sendiri lewat config per-route.
+  // Memakai Redis agar batas berlaku lintas instance, bukan per proses.
+  await app.register(fastifyRateLimit, {
+    global: false,
+    max: 100,
+    timeWindow: "1 minute",
+    redis: getRedisClient(),
+    // Redis mati tidak boleh menjatuhkan request: tanpa ini ioredis melempar
+    // MaxRetriesPerRequestError dan /login balas 500, sehingga login mustahil
+    // justru saat infrastruktur sedang rapuh. Lebih baik batas tidak tegak
+    // sementara daripada autentikasi mati total.
+    skipOnError: true,
+    // Kunci per-aplikasi: satu app yang dibanjiri tidak memblokir app lain
+    // yang kebetulan berada di belakang IP publik yang sama.
+    keyGenerator: (request) => `${request.ip}:${request.headers["x-app-code"] ?? "-"}`,
+    errorResponseBuilder: (_request, context) => ({
+      statusCode: HttpStatus.TOO_MANY_REQUESTS,
+      code: "TOO_MANY_REQUESTS",
+      message: `Terlalu banyak percobaan. Coba lagi dalam ${context.after}.`,
+      timestamp: new Date().toISOString(),
+    }),
   });
 
   // ── Custom Plugins (order matters) ────────────────────────────────────────
@@ -119,11 +147,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   // ── Health Check (no X-App-Code required) ────────────────────────────────
+  // Liveness: proses hidup. Sengaja tidak menyentuh infrastruktur — orchestrator
+  // tidak boleh me-restart API hanya karena Redis sedang down.
   app.get("/health", {
-    schema: {
-      description: "Health check endpoint",
-      tags: ["system"],
-    },
+    schema: { description: "Liveness probe", tags: ["system"] },
   }, async (_request, reply) => {
     return reply.send({
       status: "ok",
@@ -133,8 +160,26 @@ export async function buildApp(): Promise<FastifyInstance> {
     });
   });
 
+  // Readiness: siap melayani trafik. Memeriksa ketiga infrastruktur.
+  // PostgreSQL wajib; Redis dan RabbitMQ terdegradasi (permission jatuh ke DB,
+  // audit event hilang) tapi API tetap melayani — jadi tidak menjatuhkan status.
+  app.get("/health/ready", {
+    schema: { description: "Readiness probe with dependency checks", tags: ["system"] },
+  }, async (_request, reply) => {
+    const [database, redis] = await Promise.all([pingDatabase(), pingRedis()]);
+    const rabbitmq = isRabbitMQConnected();
+
+    return reply.status(database ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).send({
+      status: database ? "ok" : "unavailable",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: env.NODE_ENV,
+      dependencies: { database, redis, rabbitmq },
+    });
+  });
+
   // ── Module Routes ─────────────────────────────────────────────────────────
-  // Register with /api/v1 prefix — modules plug in here
+  // Register with /api prefix — modules plug in here
   await app.register(
     async (api) => {
       // Core modules
@@ -151,7 +196,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       // await api.register(merchantsRoutes, { prefix: "/merchants" });
       // await api.register(productsRoutes, { prefix: "/products" });
     },
-    { prefix: "/api/v1" },
+    { prefix: "/api" },
   );
 
   return app;

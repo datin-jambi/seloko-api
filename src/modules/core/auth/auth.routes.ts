@@ -5,12 +5,14 @@ import {
   LoginResponseSchema,
   RefreshResponseSchema,
   LogoutResponseSchema,
+  LogoutAllResponseSchema,
   MeResponseSchema,
 } from "./auth.schema.js";
 import {
   handleLogin,
   handleRefresh,
   handleLogout,
+  handleLogoutAll,
   handleMe,
 } from "./auth.controller.js";
 
@@ -24,6 +26,14 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       tags: ["auth"],
       body: LoginBodySchema,
       response: { 200: LoginResponseSchema },
+    },
+    config: {
+      // Pengetatan brute force: 5 percobaan per 15 menit, lalu diblokir 1 jam.
+      rateLimit: {
+        max: 5,
+        timeWindow: "15 minutes",
+        ban: 1,
+      },
     },
   }, handleLogin);
 
@@ -45,6 +55,16 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     },
     preHandler: [fastify.authenticate],
   }, handleLogout);
+
+  // POST /auth/logout-all
+  app.post("/logout-all", {
+    schema: {
+      description: "Cabut seluruh sesi aktif user di semua aplikasi",
+      tags: ["auth"],
+      response: { 200: LogoutAllResponseSchema },
+    },
+    preHandler: [fastify.authenticate],
+  }, handleLogoutAll);
 
   // GET /auth/me
   app.get("/me", {

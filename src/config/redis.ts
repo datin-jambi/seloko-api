@@ -57,6 +57,17 @@ export function getRedisClient(): Redis {
 }
 
 /**
+ * Ping ringan untuk health check. Mengembalikan false, tidak melempar.
+ */
+export async function pingRedis(): Promise<boolean> {
+  try {
+    return (await getRedisClient().ping()) === "PONG";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Gracefully disconnects the Redis client.
  * Should be called during application shutdown.
  */
