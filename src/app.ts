@@ -12,7 +12,8 @@ import { pingDatabase } from "./config/database.js";
 import { isRabbitMQConnected } from "./config/rabbitmq.js";
 import { appCodeMiddleware } from "./common/middlewares/index.js";
 import { permissionGuard } from "./common/guards/index.js";
-import { sendError, AppError, HttpStatus } from "./common/errors/index.js";
+import { RATE_LIMIT } from "./common/constants/index.js";
+import { sendError, AppError, HttpStatus, TooManyRequestsError } from "./common/errors/index.js";
 
 // ─── Application Factory ──────────────────────────────────────────────────────
 export async function buildApp(): Promise<FastifyInstance> {
@@ -70,8 +71,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Memakai Redis agar batas berlaku lintas instance, bukan per proses.
   await app.register(fastifyRateLimit, {
     global: false,
-    max: 100,
-    timeWindow: "1 minute",
+    ...RATE_LIMIT.GLOBAL,
     redis: getRedisClient(),
     // Redis mati tidak boleh menjatuhkan request: tanpa ini ioredis melempar
     // MaxRetriesPerRequestError dan /login balas 500, sehingga login mustahil
@@ -81,12 +81,13 @@ export async function buildApp(): Promise<FastifyInstance> {
     // Kunci per-aplikasi: satu app yang dibanjiri tidak memblokir app lain
     // yang kebetulan berada di belakang IP publik yang sama.
     keyGenerator: (request) => `${request.ip}:${request.headers["x-app-code"] ?? "-"}`,
-    errorResponseBuilder: (_request, context) => ({
-      statusCode: HttpStatus.TOO_MANY_REQUESTS,
-      code: "TOO_MANY_REQUESTS",
-      message: `Terlalu banyak percobaan. Coba lagi dalam ${context.after}.`,
-      timestamp: new Date().toISOString(),
-    }),
+    // Wajib melempar TooManyRequestsError, bukan objek polos: error handler
+    // global mencocokkan `instanceof AppError`, jadi objek biasa lolos ke
+    // cabang "unknown error" dan klien menerima 500 alih-alih 429.
+    errorResponseBuilder: (_request, context) =>
+      new TooManyRequestsError(
+        `Terlalu banyak percobaan. Coba lagi dalam ${context.after}.`,
+      ),
   });
 
   // ── Custom Plugins (order matters) ────────────────────────────────────────

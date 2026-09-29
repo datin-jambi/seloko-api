@@ -141,6 +141,9 @@ export async function loginUser(
   const refreshPayload: JwtPayload = {
     ...accessPayload,
     type: "refresh",
+    // jti unik: tanpa ini dua refresh token dengan payload dan iat/exp sama
+    // menghasilkan JWT identik, dan token_hash yang unique menolaknya (P2002).
+    jti: crypto.randomUUID(),
   };
 
   const accessToken = fastify.jwt.sign(accessPayload, {
@@ -258,9 +261,14 @@ export async function refreshAccessToken(
   });
 
   // Issue a replacement refresh token — the old one was just revoked, so without
-  // this the next /refresh call would always fail.
+  // this the next /refresh call would always fail. jti wajib unik, lihat catatan
+  // pada penerbitan saat login.
   const newRefreshToken = fastify.jwt.sign(
-    { ...newAccessPayload, type: "refresh" } satisfies JwtPayload,
+    {
+      ...newAccessPayload,
+      type: "refresh",
+      jti: crypto.randomUUID(),
+    } satisfies JwtPayload,
     { expiresIn: env.JWT_REFRESH_EXPIRES },
   );
 

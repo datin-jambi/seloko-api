@@ -15,6 +15,7 @@ import {
   handleLogoutAll,
   handleMe,
 } from "./auth.controller.js";
+import { RATE_LIMIT } from "../../../common/constants/index.js";
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
@@ -28,12 +29,10 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       response: { 200: LoginResponseSchema },
     },
     config: {
-      // Pengetatan brute force: 5 percobaan per 15 menit, lalu diblokir 1 jam.
-      rateLimit: {
-        max: 5,
-        timeWindow: "15 minutes",
-        ban: 1,
-      },
+      // Pengetatan brute force. Produksi: 5 percobaan / 15 menit lalu diban.
+      // Development: dilonggarkan agar iterasi manual tidak memblokir diri
+      // sendiri — lihat RATE_LIMIT di common/constants.
+      rateLimit: RATE_LIMIT.LOGIN,
     },
   }, handleLogin);
 

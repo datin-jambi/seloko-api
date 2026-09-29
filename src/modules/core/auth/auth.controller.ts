@@ -9,7 +9,11 @@ import { publishAuditUserLogin, publishAuditUserLogout, publishAuditEvent } from
 import { ROUTING_KEYS } from "../../../workers/queue-names/index.js";
 
 // ─── Refresh Cookie ───────────────────────────────────────────────────────────
-const REFRESH_COOKIE_PATH = "/api/auth/refresh";
+// Path harus mencakup /logout juga, bukan hanya /refresh: cookie dengan
+// Path=/api/auth/refresh tidak pernah dikirim ke /api/auth/logout, sehingga
+// handleLogout tidak menemukan token, melewati revokasi, dan tetap membalas 200
+// padahal refresh token masih hidup.
+const REFRESH_COOKIE_PATH = "/api/auth";
 
 function refreshCookieOptions() {
   return {

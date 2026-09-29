@@ -1,3 +1,5 @@
+import { env } from "../../config/env.js";
+
 // ─── App Codes ────────────────────────────────────────────────────────────────
 // Harus sama persis dengan kolom applications.code di database.
 export const APP_CODES = {
@@ -33,6 +35,21 @@ export const PAGINATION = {
   DEFAULT_PAGE: 1,
   DEFAULT_LIMIT: 20,
   MAX_LIMIT: 100,
+} as const;
+
+// ─── Rate Limit ───────────────────────────────────────────────────────────────
+// Dibedakan per environment: di development batas dibuat sangat longgar supaya
+// iterasi di Postman/curl tidak memblokir diri sendiri, tapi TIDAK dimatikan —
+// jalur kodenya tetap ikut teruji. Produksi memakai batas ketat + ban.
+const isDev = env.NODE_ENV !== "production";
+
+export const RATE_LIMIT = {
+  GLOBAL: { max: isDev ? 1000 : 100, timeWindow: "1 minute" },
+  // ban: 1 berarti sekali melewati batas langsung diblokir penuh — terlalu
+  // galak untuk development, jadi hanya dipasang di produksi.
+  LOGIN: isDev
+    ? { max: 50, timeWindow: "1 minute" }
+    : { max: 5, timeWindow: "15 minutes", ban: 1 },
 } as const;
 
 // ─── Permission Actions ───────────────────────────────────────────────────────

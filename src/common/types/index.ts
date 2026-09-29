@@ -8,6 +8,13 @@ export interface JwtPayload {
   isSuperAdmin: boolean;
   appCode: string;
   type: "access" | "refresh";
+  /**
+   * Token id — wajib untuk refresh token. Tanpa ini payload dua token refresh
+   * berturut-turut identik, dan bila terbit dalam detik yang sama `iat`/`exp`
+   * pun sama, sehingga JWT yang dihasilkan byte-identik. token_hash di DB
+   * unique, jadi rotasi gagal dengan P2002.
+   */
+  jti?: string;
   iat?: number;
   exp?: number;
 }
