@@ -100,8 +100,22 @@ export async function handleLogout(
   const rawRefreshToken = request.cookies[COOKIE_NAMES.REFRESH_TOKEN];
   const user = request.user;
 
+  // Ekstrak raw access token dari Authorization header untuk di-block di Redis.
+  // request.user sudah terisi oleh fastify.authenticate (jwtVerify), sehingga
+  // exp tersedia di payload dan digunakan sebagai TTL blocklist.
+  const authHeader = request.headers.authorization;
+  const rawAccessToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : undefined;
+
   if (rawRefreshToken) {
-    await logoutUser(rawRefreshToken, user.sub, request.appCode);
+    await logoutUser(
+      rawRefreshToken,
+      user.sub,
+      request.appCode,
+      rawAccessToken,
+      user.exp, // Unix timestamp expire dari JWT payload
+    );
 
     void publishAuditUserLogout({
       userId: user.sub,
@@ -121,7 +135,18 @@ export async function handleLogoutAll(
   reply: FastifyReply,
 ): Promise<void> {
   const user = request.user;
-  const revokedSessions = await logoutAllSessions(user.sub);
+
+  // Ekstrak raw access token dari Authorization header untuk di-block di Redis.
+  const authHeader = request.headers.authorization;
+  const rawAccessToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : undefined;
+
+  const revokedSessions = await logoutAllSessions(
+    user.sub,
+    rawAccessToken,
+    user.exp, // Unix timestamp expire dari JWT payload
+  );
 
   void publishAuditEvent(ROUTING_KEYS.AUDIT_USER_LOGOUT, {
     action: "user.logout_all",

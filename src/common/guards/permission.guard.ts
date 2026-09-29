@@ -1,10 +1,12 @@
 import fp from "fastify-plugin";
+import crypto from "node:crypto";
 import type { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
-import { getCachedPermissions } from "../../config/redis.js";
+import { getCachedPermissions, isAccessTokenBlocked } from "../../config/redis.js";
 import { prisma } from "../../config/database.js";
 import { setCachedPermissions } from "../../config/redis.js";
 import { ForbiddenError, UnauthorizedError } from "../errors/index.js";
 import type { JwtPayload } from "../types/index.js";
+
 
 // ─── Module Augmentation: Add requirePermission to Fastify ────────────────────
 declare module "fastify" {
@@ -115,12 +117,28 @@ async function permissionGuardPlugin(
             `Token was issued for app "${payload.appCode}" but request targets "${request.appCode}"`,
           );
         }
+
+        // ── Blocklist check ──────────────────────────────────────────────────
+        // JWT stateless: hanya cek signature. Revokasi (logout) tidak bisa
+        // ditanamkan ke dalam token — satu-satunya cara adalah menyimpan hash
+        // token di Redis dan menolaknya di sini.
+        const authHeader = request.headers.authorization;
+        if (authHeader?.startsWith("Bearer ")) {
+          const rawToken = authHeader.slice(7); // Strip "Bearer "
+          const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+          if (await isAccessTokenBlocked(tokenHash)) {
+            throw new UnauthorizedError("Token has been revoked");
+          }
+        }
       } catch (err) {
         if (err instanceof ForbiddenError) throw err;
+        if (err instanceof UnauthorizedError) throw err;
         throw new UnauthorizedError("Invalid or expired access token");
       }
     },
   );
+
 
   // ── requirePermission decorator ───────────────────────────────────────────
   fastify.decorate(

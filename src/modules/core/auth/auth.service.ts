@@ -4,6 +4,7 @@ import { prisma } from "../../../config/database.js";
 import {
   invalidatePermissionCache,
   invalidateAllUserPermissionCaches,
+  blockAccessToken,
 } from "../../../config/redis.js";
 import { resolveUserPermissions } from "../../../common/guards/permission.guard.js";
 import { env } from "../../../config/env.js";
@@ -220,8 +221,28 @@ export async function refreshAccessToken(
   const tokenHash = hashToken(rawRefreshToken);
   const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
 
-  if (!stored || stored.isRevoked || stored.expiresAt < new Date()) {
-    throw new UnauthorizedError("Refresh token is invalid or expired");
+  if (!stored) {
+    // Token tidak ada di DB: token yang tidak pernah diterbitkan atau sudah dihapus.
+    throw new UnauthorizedError("Refresh token not recognized");
+  }
+
+  if (stored.isRevoked) {
+    // ── Token Reuse Detection ─────────────────────────────────────────────────
+    // Token yang sudah di-revoke dicoba ulang — kemungkinan besar refresh token
+    // dicuri. Cabut SEMUA sesi user sebagai tindakan preventif.
+    fastify.log.warn(
+      { userId: stored.userId, tokenHash },
+      "[Auth] Revoked refresh token reuse detected — revoking all sessions",
+    );
+    await prisma.refreshToken.updateMany({
+      where: { userId: stored.userId, isRevoked: false },
+      data: { isRevoked: true },
+    });
+    throw new UnauthorizedError("Refresh token has been revoked. All sessions invalidated for security.");
+  }
+
+  if (stored.expiresAt < new Date()) {
+    throw new UnauthorizedError("Refresh token has expired");
   }
 
   if (stored.appCode !== appCode) {
@@ -294,11 +315,15 @@ export async function refreshAccessToken(
 
 /**
  * Revokes the given refresh token and clears permission cache.
+ * Jika rawAccessToken disertakan, token tersebut juga diblokir di Redis
+ * sehingga tidak bisa dipakai lagi meski belum expire.
  */
 export async function logoutUser(
   rawRefreshToken: string,
   userId: string,
   appCode: string,
+  rawAccessToken?: string,
+  accessTokenExp?: number, // Unix timestamp (seconds)
 ): Promise<void> {
   const tokenHash = hashToken(rawRefreshToken);
 
@@ -307,6 +332,14 @@ export async function logoutUser(
     data: { isRevoked: true },
   });
 
+  // Block access token di Redis agar tidak bisa dipakai setelah logout.
+  // TTL = sisa waktu hidup token; jika sudah expire tidak perlu disimpan.
+  if (rawAccessToken && accessTokenExp) {
+    const ttl = Math.floor(accessTokenExp - Date.now() / 1000);
+    const atHash = hashToken(rawAccessToken);
+    await blockAccessToken(atHash, ttl);
+  }
+
   // Invalidate permission cache (helper builds the canonical key)
   await invalidatePermissionCache(userId, appCode);
 }
@@ -314,13 +347,28 @@ export async function logoutUser(
 /**
  * Mencabut SELURUH sesi aktif user di semua aplikasi.
  * Dipakai saat perangkat hilang atau ada dugaan akun disusupi.
+ * Jika rawAccessToken disertakan (token dari request saat ini), token itu
+ * juga langsung diblokir. Token dari sesi lain akan expire secara natural.
  * Mengembalikan jumlah sesi yang dicabut.
  */
-export async function logoutAllSessions(userId: string): Promise<number> {
+export async function logoutAllSessions(
+  userId: string,
+  rawAccessToken?: string,
+  accessTokenExp?: number, // Unix timestamp (seconds)
+): Promise<number> {
   const { count } = await prisma.refreshToken.updateMany({
     where: { userId, isRevoked: false },
     data: { isRevoked: true },
   });
+
+  // Block access token dari sesi saat ini agar langsung tidak bisa dipakai.
+  // Sesi lain yang masih aktif akan expire secara natural (tidak bisa di-revoke
+  // tanpa menyimpan semua access token aktif — trade-off yang disengaja).
+  if (rawAccessToken && accessTokenExp) {
+    const ttl = Math.floor(accessTokenExp - Date.now() / 1000);
+    const atHash = hashToken(rawAccessToken);
+    await blockAccessToken(atHash, ttl);
+  }
 
   // Cache permission di semua aplikasi ikut dibuang.
   await invalidateAllUserPermissionCaches(userId);

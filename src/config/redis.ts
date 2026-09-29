@@ -146,6 +146,48 @@ export async function invalidatePermissionCache(
   await redis.del(key);
 }
 
+// ─── Access Token Blocklist ───────────────────────────────────────────────────
+/**
+ * Builds the Redis key for a blocked access token.
+ * @param tokenHash - SHA-256 hex digest of the raw access token.
+ */
+function buildBlockedTokenKey(tokenHash: string): string {
+  return `blocked_at:${tokenHash}`;
+}
+
+/**
+ * Memasukkan access token ke blocklist Redis.
+ * TTL disetel ke sisa waktu hidup token agar entry otomatis terhapus
+ * setelah token expire — tidak perlu pembersihan manual.
+ *
+ * @param tokenHash  - SHA-256 hex digest dari raw access token
+ * @param ttlSeconds - Sisa waktu hidup token dalam detik (≥ 1)
+ */
+export async function blockAccessToken(
+  tokenHash: string,
+  ttlSeconds: number,
+): Promise<void> {
+  if (ttlSeconds <= 0) return; // Sudah expire, tidak perlu disimpan
+  const redis = getRedisClient();
+  await redis.set(buildBlockedTokenKey(tokenHash), "1", "EX", ttlSeconds);
+}
+
+/**
+ * Mengecek apakah access token sudah masuk blocklist (telah di-revoke).
+ * Mengembalikan false jika Redis sedang down agar API tidak mati total.
+ */
+export async function isAccessTokenBlocked(tokenHash: string): Promise<boolean> {
+  try {
+    const redis = getRedisClient();
+    const value = await redis.get(buildBlockedTokenKey(tokenHash));
+    return value !== null;
+  } catch {
+    // Redis down: fail-open agar autentikasi tidak mati total.
+    // Trade-off: revoked token bisa lewat sementara selama Redis down.
+    return false;
+  }
+}
+
 /**
  * Invalidates ALL permission caches for a user across all apps.
  * Uses SCAN to avoid blocking the server with KEYS.
