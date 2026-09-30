@@ -18,7 +18,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --env-file-if-exists=.env src/modules/core/auth/auth.check.ts && tsx --env-file-if-exists=.env src/app.check.ts"
+    "test": "tsx --env-file-if-exists=.env src/modules/core/auth/auth.check.ts && tsx --env-file-if-exists=.env src/common/utils/utils.check.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11",
