@@ -17,6 +17,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:reset": "tsx prisma/seed.ts --reset",
+    "db:smoke": "bash prisma/seed-data/smoke.sh",
     "typecheck": "tsc --noEmit",
     "test": "tsx --env-file-if-exists=.env src/modules/core/auth/auth.check.ts && tsx --env-file-if-exists=.env src/common/utils/utils.check.ts"
   },

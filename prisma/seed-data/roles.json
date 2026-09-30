@@ -1,0 +1,61 @@
+{
+  "$comment": "Label aksi, grup aksi, dan role bawaan. allowedActions=null berarti role menerima SELURUH permission aplikasi. 'apps' mempersempit role ke aplikasi tertentu; kosong/absen berarti dibuat di semua aplikasi.",
+  "actionLabels": {
+    "create": "Menambah",
+    "read": "Melihat Detail",
+    "update": "Mengubah",
+    "delete": "Menghapus",
+    "list": "Melihat Daftar",
+    "publish": "Menerbitkan",
+    "approve": "Menyetujui",
+    "reject": "Menolak",
+    "export": "Mengekspor",
+    "import": "Mengimpor"
+  },
+  "actionGroups": {
+    "content": ["create", "read", "update", "delete", "list"],
+    "publishable": ["create", "read", "update", "delete", "list", "publish"],
+    "verifiable": ["create", "read", "update", "delete", "list", "approve", "reject"],
+    "readonly": ["read", "list"]
+  },
+  "roles": [
+    {
+      "name": "superadmin",
+      "description": "Akses penuh seluruh fitur aplikasi",
+      "allowedActions": null
+    },
+    {
+      "name": "admin",
+      "description": "Kelola konten penuh termasuk hapus dan terbit",
+      "allowedActions": null
+    },
+    {
+      "name": "editor",
+      "description": "Membuat dan mengubah konten, tanpa hapus/terbit",
+      "allowedActions": ["create", "read", "update", "list"]
+    },
+    {
+      "name": "verifikator",
+      "description": "Memverifikasi pengajuan: setujui atau tolak",
+      "allowedActions": ["read", "list", "approve", "reject"]
+    },
+    {
+      "name": "viewer",
+      "description": "Hanya melihat data",
+      "allowedActions": ["readonly", "export"]
+    },
+    {
+      "name": "operator-pengguna",
+      "description": "Khusus tata kelola akun: buat user dan tugaskan role",
+      "apps": ["seloko"],
+      "allowedActions": ["create", "read", "list", "update"]
+    },
+    {
+      "name": "role-nonaktif",
+      "description": "Sengaja isActive=false — untuk menguji role yang dimatikan tidak memberi permission",
+      "apps": ["seloko"],
+      "isActive": false,
+      "allowedActions": null
+    }
+  ]
+}
