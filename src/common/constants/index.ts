@@ -41,6 +41,11 @@ export const PAGINATION = {
 // Dibedakan per environment: di development batas dibuat sangat longgar supaya
 // iterasi di Postman/curl tidak memblokir diri sendiri, tapi TIDAK dimatikan —
 // jalur kodenya tetap ikut teruji. Produksi memakai batas ketat + ban.
+//
+// LOGIN dev dinaikkan ke 200: satu smoke test end-to-end melakukan belasan
+// login (tiap skenario butuh token pada appCode berbeda), dan dengan batas 50
+// dua run beruntun dalam satu menit sudah saling memblokir — kegagalan yang
+// menyesatkan karena tampak seperti bug autentikasi.
 const isDev = env.NODE_ENV !== "production";
 
 export const RATE_LIMIT = {
@@ -48,7 +53,7 @@ export const RATE_LIMIT = {
   // ban: 1 berarti sekali melewati batas langsung diblokir penuh — terlalu
   // galak untuk development, jadi hanya dipasang di produksi.
   LOGIN: isDev
-    ? { max: 50, timeWindow: "1 minute" }
+    ? { max: 200, timeWindow: "1 minute" }
     : { max: 5, timeWindow: "15 minutes", ban: 1 },
 } as const;
 

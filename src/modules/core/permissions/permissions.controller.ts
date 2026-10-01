@@ -3,6 +3,7 @@ import { ok } from "~/common/types/index.js";
 import {
   listPermissions,
   listModules,
+  getMyPermissions,
   getPermissionById,
   createPermission,
   updatePermission,
@@ -12,6 +13,7 @@ import {
 import type {
   ListPermissionsQuery,
   ListModulesQuery,
+  MyPermissionsParams,
   CreatePermissionBody,
   UpdatePermissionBody,
 } from "./permissions.schema.js";
@@ -37,6 +39,16 @@ export async function handleListModules(
 ): Promise<void> {
   const modules = await listModules(request.query as ListModulesQuery);
   void reply.status(200).send(ok(modules, "Daftar modul berhasil diambil"));
+}
+
+// ─── Milik Sendiri ────────────────────────────────────────────────────────────
+export async function handleGetMyPermissions(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { applicationId } = request.params as MyPermissionsParams;
+  const userId = request.user.sub;
+  void reply.status(200).send(ok(await getMyPermissions(userId, applicationId)));
 }
 
 // ─── Get ──────────────────────────────────────────────────────────────────────

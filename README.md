@@ -288,6 +288,7 @@ aplikasi — `applicationId` eksplisit di body create dan sebagai filter di list
 |---|---|---|---|
 | GET | `/` | `permission:list` | Daftar permission + `roleCount` + `menuCount`; filter `applicationId`, `module`, `search` |
 | GET | `/modules` | `permission:list` | Modul distingtif + jumlahnya — isi dropdown filter di CMS |
+| GET | `/:applicationId/me` | ✅ auth saja | Permission efektif milik pemanggil pada aplikasi itu |
 | GET | `/:id` | `permission:read` | Detail + role yang memegang & menu yang memakainya |
 | POST | `/` | `permission:create` | Daftarkan permission baru |
 | PATCH | `/:id` | `permission:update` | Ubah `name` atau `module` saja |
@@ -325,8 +326,63 @@ tersimpan sampai TTL 5 menit habis. `npm run db:smoke:permissions` membuktikan
 403 muncul seketika setelah penghapusan.
 
 > **Catatan uji:** `db:smoke:permissions` menghapus permission sungguhan di
-> `lapak-jambi-web`. Jalankan `npm run db:seed` sesudahnya — seeder membuat
-> ulang permission yang hilang dan menautkan ulang role serta menu lewat kode.
+> `lapak-jambi-web` dan `seloko`. Skrip itu memulihkan dirinya sendiri dengan
+> menjalankan `db:seed` di akhir — tanpa itu, smoke test lain yang berjalan
+> sesudahnya gagal karena fixture-nya bolong.
+
+#### `GET /permissions/:applicationId/me`
+
+Permission efektif milik pemanggil pada satu aplikasi. **Tanpa `requirePermission`**
+— cukup `authenticate`. Alasannya: pengguna aplikasi lain (`editor.profil` di
+`bapenda-profile`, `verifikator.lapak` di `lapak-jambi-web`) tidak akan pernah
+punya `permission:read` pada `appCode` mereka sendiri, sehingga menuntut izin di
+sini justru mengunci orang yang paling butuh memeriksa haknya. Berbeda dari
+`GET /permissions/:id` yang memang untuk operator konsol.
+
+`applicationId` bisa aplikasi mana pun, tidak harus sama dengan `X-App-Code`:
+CMS di aplikasi A boleh menanyakan izin pengguna di aplikasi B — dan jawabannya
+memang bisa kosong, karena `resolveUserPermissions` menyaring lewat penugasan
+role yang berlaku di aplikasi itu.
+
+Daftar `permissions` diambil dari **`resolveUserPermissions` yang sama** dengan
+yang dipakai `requirePermission`, bukan dirakit ulang. Ini bagian terpenting:
+bila dirakit sendiri, endpoint ini akan perlahan melenceng dari jawaban guard,
+dan CMS yang menyembunyikan menu berdasarkan hasilnya akan menyembunyikan tombol
+yang justru dijawab `200`. Smoke test-nya membandingkan hasil endpoint ini dengan
+`permissions` dari `/auth/me` (sumber yang sama) untuk empat pengguna berbeda
+dan menuntut keduanya identik.
+
+Super admin: `requirePermission` melewati seluruh pemeriksaan, jadi di sini
+bypass itu diterjemahkan menjadi **seluruh permission aplikasi**. `roles` tetap
+dilaporkan apa adanya dan bisa kosong meski `permissions` penuh — super admin
+punya akses tanpa perlu penugasan role di aplikasi tersebut. `isSuperAdmin`
+dikirim agar front-end tidak menyimpulkan "tidak punya role berarti tidak punya
+akses".
+
+Respons mengikuti bentuk "daftar centang": `permissions` (kode datar, yang dicek
+guard) plus `permissionsByModule` (kode + label, siap dirender). `roles`
+melaporkan penugasan yang berlaku beserta `expiresAt` — role nonaktif dan
+penugasan kedaluwarsa tidak ikut, cermin dari penyaring resolver.
+
+```json
+{
+  "application": { "id": "…", "code": "lapak-jambi-web", "name": "…", "icon": "store" },
+  "isSuperAdmin": false,
+  "roles": [{ "id": "…", "name": "verifikator", "expiresAt": null }],
+  "permissions": ["product:list", "product:read", "product:approve", "…"],
+  "permissionsByModule": [
+    { "module": "Produk", "permissions": [{ "code": "product:list", "name": "Melihat Daftar Produk" }] }
+  ],
+  "total": 12
+}
+```
+
+> **Utang seed yang ketahuan dari sini:** katalog `seloko` hanya memuat
+> `permission:read` dan `permission:list`, sehingga `POST`/`PATCH`/`DELETE
+> /permissions` (yang menuntut `permission:create`/`update`/`delete`) tidak
+> dapat diberikan ke role mana pun — praktis hanya super admin yang bisa
+> memakainya. Perluas entitas `permission` di `applications.json` (mis.
+> `"actions": ["content"]`) agar operator konsol bisa mengelola katalog izin.
 
 ### Health Check
 

@@ -5,6 +5,8 @@ import {
   ListPermissionsResponseSchema,
   ListModulesQuerySchema,
   ListModulesResponseSchema,
+  MyPermissionsParamsSchema,
+  MyPermissionsResponseSchema,
   PermissionParamsSchema,
   GetPermissionResponseSchema,
   CreatePermissionBodySchema,
@@ -16,6 +18,7 @@ import {
 import {
   handleListPermissions,
   handleListModules,
+  handleGetMyPermissions,
   handleGetPermission,
   handleCreatePermission,
   handleUpdatePermission,
@@ -36,6 +39,21 @@ export async function permissionsRoutes(fastify: FastifyInstance): Promise<void>
     },
     preHandler: [fastify.authenticate, fastify.requirePermission("permission:list")],
   }, handleListModules);
+
+  // ── GET /permissions/:applicationId/me ─────────────────────────────────────
+  // TANPA requirePermission: isinya izin si pemanggil sendiri. Menuntut
+  // "permission:read" akan mengunci justru pengguna yang paling butuh — dan
+  // pengguna aplikasi lain tidak akan pernah punya izin itu di appCode-nya.
+  // Didaftarkan sebelum "/:id" agar "…/me" tidak dicocokkan sebagai UUID.
+  app.get("/:applicationId/me", {
+    schema: {
+      description: "Permission efektif milik pemanggil pada satu aplikasi",
+      tags: ["permissions"],
+      params: MyPermissionsParamsSchema,
+      response: { 200: MyPermissionsResponseSchema },
+    },
+    preHandler: [fastify.authenticate],
+  }, handleGetMyPermissions);
 
   // ── GET /permissions ───────────────────────────────────────────────────────
   app.get("/", {

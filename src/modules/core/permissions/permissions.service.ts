@@ -1,5 +1,6 @@
 import { prisma } from "~/config/database.js";
 import { invalidateAppPermissionCaches } from "~/config/redis.js";
+import { resolveUserPermissions } from "~/common/guards/permission.guard.js";
 import { ConflictError, NotFoundError, BadRequestError } from "~/common/errors/index.js";
 import { buildPaginatedResult } from "~/common/types/index.js";
 import type {
@@ -133,7 +134,98 @@ export async function getPermissionById(id: string) {
   };
 }
 
-// ─── Create ───────────────────────────────────────────────────────────────────
+// ─── Milik Sendiri ────────────────────────────────────────────────────────────
+/**
+ * Permission efektif milik pemanggil pada satu aplikasi.
+ *
+ * Daftar `permissions` diambil dari `resolveUserPermissions` — resolver yang SAMA
+ * yang dipakai `requirePermission` — bukan dirakit ulang di sini. Merakit sendiri
+ * berarti endpoint ini akan perlahan melenceng dari jawaban guard yang
+ * sesungguhnya, dan CMS yang menyembunyikan menu berdasarkan hasilnya akan
+ * menampilkan tombol yang justru dijawab 403.
+ *
+ * Karena resolver memakai `application: { code }` sementara pemanggil menunjuk
+ * lewat id, kode aplikasinya dicari lebih dulu.
+ *
+ * Super admin: `requirePermission` melewati seluruh pemeriksaan untuk mereka.
+ * Di sini bypass itu diterjemahkan menjadi "seluruh permission aplikasi", supaya
+ * CMS super admin tidak menyembunyikan menu apa pun. `roles` tetap dilaporkan apa
+ * adanya, jadi bisa saja kosong meski `permissions` penuh.
+ */
+export async function getMyPermissions(userId: string, applicationId: string) {
+  const app = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: { id: true, code: true, name: true, icon: true, isActive: true },
+  });
+
+  if (!app) throw new NotFoundError("Application", applicationId);
+  if (!app.isActive) {
+    throw new NotFoundError("Application", applicationId);
+  }
+
+  // Penugasan yang benar-benar berlaku — penyaringnya cermin dari resolver.
+  const assignments = await prisma.userAppRole.findMany({
+    where: {
+      userId,
+      applicationId: app.id,
+      role: { isActive: true },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+    select: {
+      expiresAt: true,
+      role: { select: { id: true, name: true } },
+    },
+    orderBy: { role: { name: "asc" } },
+  });
+
+  const roles = assignments.map(({ role, expiresAt }) => ({
+    id: role.id,
+    name: role.name,
+    expiresAt: expiresAt?.toISOString() ?? null,
+  }));
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isSuperAdmin: true },
+  });
+  const isSuperAdmin = user?.isSuperAdmin ?? false;
+
+  const codes = isSuperAdmin
+    ? (
+        await prisma.permission.findMany({
+          where: { applicationId: app.id },
+          select: { code: true },
+        })
+      ).map((p) => p.code)
+    : await resolveUserPermissions(userId, app.code);
+
+  // Lengkapi kode dengan labelnya untuk dirender CMS, lalu kelompokkan per modul.
+  const catalog = await prisma.permission.findMany({
+    where: { applicationId: app.id, code: { in: codes } },
+    select: { code: true, name: true, module: true },
+    orderBy: [{ module: "asc" }, { code: "asc" }],
+  });
+
+  const grouped = new Map<string, { code: string; name: string }[]>();
+  for (const { module, ...perm } of catalog) {
+    const bucket = grouped.get(module);
+    if (bucket) bucket.push(perm);
+    else grouped.set(module, [perm]);
+  }
+
+  return {
+    application: { id: app.id, code: app.code, name: app.name, icon: app.icon },
+    isSuperAdmin,
+    roles,
+    permissions: catalog.map((p) => p.code),
+    permissionsByModule: [...grouped].map(([module, permissions]) => ({
+      module,
+      permissions,
+    })),
+    total: catalog.length,
+  };
+}
+
 export async function createPermission(data: CreatePermissionBody) {
   const app = await prisma.application.findUnique({
     where: { id: data.applicationId },

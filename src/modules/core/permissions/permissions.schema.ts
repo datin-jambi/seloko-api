@@ -105,6 +105,58 @@ export const PermissionParamsSchema = z.object({
   id: z.string().uuid("Permission ID harus berformat UUID"),
 });
 
+// ─── Milik Sendiri ────────────────────────────────────────────────────────────
+/**
+ * Permission efektif milik pemanggil pada satu aplikasi.
+ *
+ * Bentuknya sengaja mengikuti "daftar centang yang dinonaktifkan": CMS di
+ * aplikasi mana pun bisa menanyakan izin penggunanya sendiri tanpa perlu tahu
+ * apa pun tentang RBAC, lalu menyembunyikan menu yang tidak boleh dibuka.
+ */
+export const MyPermissionsParamsSchema = z.object({
+  applicationId: z.string().uuid("Application ID harus berformat UUID"),
+});
+
+export const MyPermissionsResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  data: z.object({
+    application: z.object({
+      id: z.string(),
+      code: z.string(),
+      name: z.string(),
+      icon: z.string().nullable(),
+    }),
+    /**
+     * True bila pemanggil adalah super admin. Perhatikan: bila true, `roles`
+     * bisa saja kosong sementara `permissions` penuh — super admin melewati
+     * SELURUH pemeriksaan izin tanpa perlu penugasan role di aplikasi ini.
+     */
+    isSuperAdmin: z.boolean(),
+    /**
+     * Penugasan role yang sedang berlaku — role nonaktif dan penugasan yang
+     * sudah kedaluwarsa tidak ikut.
+     */
+    roles: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        expiresAt: z.string().datetime().nullable(),
+      }),
+    ),
+    /** Kode permission datar — inilah yang dicek `requirePermission`. */
+    permissions: z.array(z.string()),
+    /** Bentuk yang sama, dikelompokkan per modul untuk dirender CMS. */
+    permissionsByModule: z.array(
+      z.object({
+        module: z.string(),
+        permissions: z.array(z.object({ code: z.string(), name: z.string() })),
+      }),
+    ),
+    total: z.number(),
+  }),
+});
+
 // ─── Get ──────────────────────────────────────────────────────────────────────
 export const GetPermissionResponseSchema = z.object({
   success: z.boolean(),
@@ -171,5 +223,6 @@ export const DeletePermissionResponseSchema = z.object({
 export type ListPermissionsQuery = z.infer<typeof ListPermissionsQuerySchema>;
 export type ListModulesQuery = z.infer<typeof ListModulesQuerySchema>;
 export type PermissionParams = z.infer<typeof PermissionParamsSchema>;
+export type MyPermissionsParams = z.infer<typeof MyPermissionsParamsSchema>;
 export type CreatePermissionBody = z.infer<typeof CreatePermissionBodySchema>;
 export type UpdatePermissionBody = z.infer<typeof UpdatePermissionBodySchema>;

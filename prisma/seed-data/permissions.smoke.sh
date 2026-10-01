@@ -189,5 +189,25 @@ echo "== Tidak meninggalkan role uji =="
 check "role uji-cache-perm ikut terhapus" 404 "$(code "$BASE/roles/$UJI_ROLE")"
 
 echo
+echo "== Pulihkan fixture =="
+# Uji ini MENGHAPUS permission sungguhan (user:list seloko, product:list lapak),
+# jadi ia WAJIB memulihkannya sendiri. Tanpa ini setiap smoke test lain yang
+# berjalan sesudahnya gagal karena fixture-nya bolong — kegagalan yang
+# menyesatkan karena tampak seperti bug di modul yang sama sekali lain.
+# Seeder membuat ulang permission hilang lalu menautkan ulang role dan menu
+# lewat kode, jadi pemulihannya menyeluruh.
+if npm run --silent db:seed >/dev/null 2>&1; then
+  pass=$((pass+1)); printf '  ok    %-54s %s\n' "db:seed memulihkan fixture" "ok"
+else
+  fail=$((fail+1)); printf '  GAGAL %-54s db:seed gagal\n' "db:seed memulihkan fixture"
+fi
+check "permission seloko kembali 23" 23 \
+  "$(get "/permissions?applicationId=$SELOKO&limit=200" | j 'o.meta.total')"
+check "permission lapak kembali 23" 23 \
+  "$(get "/permissions?applicationId=$LAPAK&limit=200" | j 'o.meta.total')"
+check "user:list seloko hidup lagi" true \
+  "$(get "/permissions?applicationId=$SELOKO&search=user%3Alist&limit=200" | j 'o.meta.total > 0')"
+
+echo
 echo "$([ "$fail" = 0 ] && echo '✅' || echo '❌') $pass ok, $fail gagal"
 [ "$fail" = 0 ] || exit 1
