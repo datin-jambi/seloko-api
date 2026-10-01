@@ -187,6 +187,32 @@ Login and refresh both verify the user holds a live (non-expired) role assignmen
 in the app named by `X-App-Code`. Without that check any account in the ecosystem
 could sign into any app just by swapping the header.
 
+### Applications (`/api/applications`)
+
+Manajemen aplikasi yang terdaftar di ekosistem — super app registry.
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/` | `application:list` | Daftar aplikasi + jumlah permission/role/menu/penugasan |
+| GET | `/:id` | `application:read` | Detail + role (dengan `permissionCount`) + permission dikelompokkan per `module` |
+| POST | `/` | `application:create` | Daftarkan aplikasi baru |
+| PATCH | `/:id` | `application:update` | Ubah `name`, `description`, `baseUrl`, `icon` |
+| PATCH | `/:id/activate` | `application:update` | Aktifkan / nonaktifkan |
+| DELETE | `/:id` | `application:delete` | Hapus permanen (cascade ke permission, role, menu) |
+
+`code` tidak dapat diubah setelah dibuat: nilainya tertanam di header
+`X-App-Code` milik klien yang sudah terpasang, di `refresh_tokens.app_code`, dan
+di `audit_logs` yang bersifat tak-termutasi.
+
+Menonaktifkan aplikasi langsung menutup pintu — `assertUserCanAccessApp` menolak
+login dan refresh, seluruh refresh token aplikasi itu dicabut, dan cache
+permission se-aplikasi dibuang agar access token yang masih hidup tidak menikmati
+izin dari cache selama TTL.
+
+Dua pengaman: aplikasi `seloko` tidak dapat dinonaktifkan atau dihapus (konsol
+manajemen akan mengunci dirinya sendiri), dan penghapusan ditolak `409` selama
+masih ada penugasan role pengguna — cascade akan menghapusnya diam-diam.
+
 ### Health Check
 
 | Method | Path | Description |

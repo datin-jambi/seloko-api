@@ -226,27 +226,23 @@ export async function isAccessTokenBlocked(tokenHash: string): Promise<boolean> 
 }
 
 /**
- * Invalidates ALL permission caches for a user across all apps.
- * Uses SCAN to avoid blocking the server with KEYS.
+ * Hapus setiap key yang cocok dengan pola, lewat SCAN agar tidak memblokir
+ * server seperti KEYS.
  *
- * Seperti invalidatePermissionCache: mengembalikan false bila Redis down,
- * tidak melempar. Lihat catatan di sana untuk alasannya.
+ * ioredis menempelkan keyPrefix hanya pada argumen key — MATCH milik SCAN
+ * BUKAN key, jadi prefix harus ditambahkan sendiri di sini. Sebaliknya key yang
+ * dikembalikan SCAN sudah membawa prefix, dan del() akan menambahkannya sekali
+ * lagi, jadi prefix dilepas dulu sebelum dihapus.
+ *
+ * Mengembalikan false bila Redis down, tidak melempar — lihat catatan pada
+ * invalidatePermissionCache untuk alasannya.
  */
-export async function invalidateAllUserPermissionCaches(
-  userId: string,
-): Promise<boolean> {
+async function deleteByPattern(suffixPattern: string, label: string): Promise<boolean> {
   const prefix = env.REDIS_KEY_PREFIX;
 
   try {
     const redis = getRedisClient();
-
-    // ioredis applies keyPrefix to key arguments only — SCAN's MATCH pattern is
-    // NOT a key, so the prefix has to be added by hand here. Conversely the keys
-    // SCAN returns already carry the prefix, and del() would add it a second
-    // time, so strip it back off before deleting.
-    const pattern = `${prefix}perms:user:${userId}:app:*`;
-    const stream = redis.scanStream({ match: pattern, count: 100 });
-
+    const stream = redis.scanStream({ match: `${prefix}${suffixPattern}`, count: 100 });
     const keysToDelete: string[] = [];
 
     await new Promise<void>((resolve, reject) => {
@@ -265,7 +261,33 @@ export async function invalidateAllUserPermissionCaches(
 
     return true;
   } catch (err) {
-    console.error("[Redis] Gagal menghapus seluruh cache permission user:", err);
+    console.error(`[Redis] Gagal menghapus ${label}:`, err);
     return false;
   }
+}
+
+/**
+ * Invalidates ALL permission caches for a user across all apps.
+ */
+export async function invalidateAllUserPermissionCaches(
+  userId: string,
+): Promise<boolean> {
+  return deleteByPattern(
+    `perms:user:${userId}:app:*`,
+    "seluruh cache permission user",
+  );
+}
+
+/**
+ * Buang cache permission SELURUH user pada satu aplikasi.
+ *
+ * Dipakai saat aplikasi dinonaktifkan atau permission/role-nya berubah: tanpa
+ * ini pemegang izin lama tetap lolos guard sampai TTL 5 menit habis. Pola
+ * key menaruh userId di tengah, jadi tidak bisa dihapus dengan satu DEL —
+ * harus SCAN.
+ */
+export async function invalidateAppPermissionCaches(
+  appCode: string,
+): Promise<boolean> {
+  return deleteByPattern(`perms:user:*:app:${appCode}`, `cache permission aplikasi "${appCode}"`);
 }

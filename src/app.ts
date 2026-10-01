@@ -202,6 +202,11 @@ export async function buildApp(): Promise<FastifyInstance> {
       const { usersRoutes } = await import("~/modules/core/users/users.routes.js");
       await api.register(usersRoutes, { prefix: "/users" });
 
+      const { applicationsRoutes } = await import(
+        "~/modules/core/applications/applications.routes.js"
+      );
+      await api.register(applicationsRoutes, { prefix: "/applications" });
+
       // await api.register(rbacRoutes, { prefix: "/rbac" });
 
       // Bapenda modules
