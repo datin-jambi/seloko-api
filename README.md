@@ -227,6 +227,58 @@ aplikasi yang justru menolak saat diklik. Beberapa role di satu aplikasi
 digabung menjadi satu entri (`roles: ["editor", "verifikator"]`), dan super
 admin menerima seluruh aplikasi aktif dengan `roles: []`.
 
+### Roles (`/api/roles`)
+
+Manajemen role per aplikasi. Cakupannya lintas aplikasi — `seloko` adalah konsol
+terpusat, jadi operator di sana mengelola role milik `lapak-jambi-web`,
+`bapenda-profile`, dan seterusnya. Permission `role:*` memang hanya ada di
+`seloko`, sehingga pintunya sudah sempit secara alami.
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/` | `role:list` | Daftar role + `permissionCount` + `userCount`; filter `applicationId`, `isActive`, `isSystemRole`, `search` |
+| GET | `/:id` | `role:read` | Detail + SELURUH permission aplikasi, ditandai `granted` |
+| POST | `/` | `role:create` | Buat role sekaligus set permission awalnya |
+| PATCH | `/:id` | `role:update` | Ubah `name` atau `description` |
+| PUT | `/:id/permissions` | `role:update` | Setel ulang seluruh permission role |
+| DELETE | `/:id/permissions/:permissionId` | `role:update` | Cabut satu permission dari role |
+| PATCH | `/:id/activate` | `role:update` | Aktifkan / nonaktifkan |
+| DELETE | `/:id` | `role:delete` | Hapus permanen |
+
+`GET /roles/:id` mengembalikan seluruh permission aplikasi dengan penanda
+`granted`, dikelompokkan per `module` — bentuk yang langsung cocok untuk layar
+daftar centang di CMS, tanpa perlu memanggil dua endpoint lalu mencocokkan
+sendiri.
+
+`PUT /:id/permissions` memakai PUT, bukan PATCH: body memuat **seluruh**
+permission role, bukan tambahan. Satu simpan = satu kiriman, sehingga dua
+operator yang menyimpan bersamaan tidak saling menimpa separuh perubahan.
+Respons melaporkan `granted`, `revoked`, dan `total`.
+
+`DELETE /:id/permissions/:permissionId` adalah pelengkapnya: mencabut **satu**
+izin tanpa perlu mengirim daftar lengkap. Berguna saat operator mengklik cabut
+di satu baris layar detail, atau saat pemanggil non-UI (job, skrip) hanya tahu
+permission mana yang harus dilepas. Mengirim `permissionId` yang tidak sedang
+dipegang role dijawab `404` — bukan `200` yang membuat pemanggil menyangka ada
+yang berubah padahal tidak.
+
+Setiap perubahan yang menggeser izin — set permission, aktif/nonaktif, hapus —
+membuang cache permission se-aplikasi. Tanpa itu izin yang baru dicabut masih
+meloloskan request sampai TTL 5 menit habis; `npm run db:smoke:roles-cache`
+membuktikan 403 muncul seketika.
+
+Pengaman:
+- `applicationId` tidak dapat diubah — permission yang terpasang milik aplikasi
+  lama, dan memindahkan role membuat izinnya lintas aplikasi. Buat role baru di
+  aplikasi tujuan.
+- Permission dari aplikasi lain ditolak `400`. Guard hanya mencocokkan string
+  `code`, jadi tanpa pemeriksaan ini isolasi RBAC bocor dari dalam.
+- Role sistem (`isSystemRole`, dibuat seeder) tidak dapat diganti nama,
+  dinonaktifkan, atau dihapus — seeder mencarinya lewat nama, jadi perubahan
+  membuat seed berikutnya membuat baris baru dan penugasan lama hilang tanpa
+  jejak. Deskripsi dan permission-nya tetap boleh diubah.
+- Penghapusan ditolak `409` selama role masih dipegang pengguna.
+
 ### Health Check
 
 | Method | Path | Description |

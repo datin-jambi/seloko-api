@@ -207,6 +207,9 @@ export async function buildApp(): Promise<FastifyInstance> {
       );
       await api.register(applicationsRoutes, { prefix: "/applications" });
 
+      const { rolesRoutes } = await import("~/modules/core/roles/roles.routes.js");
+      await api.register(rolesRoutes, { prefix: "/roles" });
+
       // await api.register(rbacRoutes, { prefix: "/rbac" });
 
       // Bapenda modules
