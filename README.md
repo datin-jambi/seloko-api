@@ -279,6 +279,55 @@ Pengaman:
   jejak. Deskripsi dan permission-nya tetap boleh diubah.
 - Penghapusan ditolak `409` selama role masih dipegang pengguna.
 
+### Permissions (`/api/permissions`)
+
+Manajemen permission per aplikasi. Sama seperti role, cakupannya lintas
+aplikasi — `applicationId` eksplisit di body create dan sebagai filter di list.
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/` | `permission:list` | Daftar permission + `roleCount` + `menuCount`; filter `applicationId`, `module`, `search` |
+| GET | `/modules` | `permission:list` | Modul distingtif + jumlahnya — isi dropdown filter di CMS |
+| GET | `/:id` | `permission:read` | Detail + role yang memegang & menu yang memakainya |
+| POST | `/` | `permission:create` | Daftarkan permission baru |
+| PATCH | `/:id` | `permission:update` | Ubah `name` atau `module` saja |
+| DELETE | `/:id` | `permission:delete` | Hapus permanen, laporkan dampaknya |
+
+**`code` tidak dapat diubah, di mana pun.** Ia literal di dalam kode program —
+`requirePermission("user:list")` di setiap route — di-cache Redis sebagai string,
+dan dipakai `menus.json`. Mengubahnya lewat API akan membuat guard menolak semua
+orang tanpa satu pun baris kode berubah. `applicationId` juga terkunci.
+`PATCH` hanya menerima `name` (label) dan `module` (pengelompokan tampilan); zod
+men-strip field lain, jadi `{"code": "..."}` diabaikan tanpa efek.
+
+Karena `code` tetap, `PATCH` **tidak** membuang cache: yang di-cache dan
+diperiksa guard hanyalah kode permission, jadi menyunting label tidak memaksa
+seluruh pengguna aplikasi resolve ulang.
+
+`GET /:id` mengembalikan `roles` dan `menus` yang memakai permission itu — layar
+konfirmasi hapus di CMS bisa menampilkan akibatnya sebelum operator menekan
+tombol, tanpa perlu query tambahan.
+
+Hapus permission melakukan dua hal lewat cascade: mencabut izin dari semua role
+(`role_permissions`) dan men-NULL-kan `menu_items.permission_id` — menu yang
+tadinya terbatas menjadi terbuka bagi siapa pun yang bisa mengakses aplikasinya.
+Tidak ada penghalang `409` di sini seperti pada role: mencabut izin tidak
+menghilangkan data pengguna, dan menahan operator justru membuat izin usang
+menumpuk. Sebagai gantinya respons melaporkan dampaknya secara eksplisit:
+
+```json
+{ "revokedFromRoles": 5, "unguardedMenus": 1 }
+```
+
+Hapus permission **wajib** membuang cache se-aplikasi: `resolveUserPermissions`
+meng-cache daftar kode, bukan id, jadi kode yang barisnya sudah dihapus tetap
+tersimpan sampai TTL 5 menit habis. `npm run db:smoke:permissions` membuktikan
+403 muncul seketika setelah penghapusan.
+
+> **Catatan uji:** `db:smoke:permissions` menghapus permission sungguhan di
+> `lapak-jambi-web`. Jalankan `npm run db:seed` sesudahnya — seeder membuat
+> ulang permission yang hilang dan menautkan ulang role serta menu lewat kode.
+
 ### Health Check
 
 | Method | Path | Description |
