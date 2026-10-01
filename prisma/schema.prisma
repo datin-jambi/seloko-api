@@ -26,6 +26,11 @@ model Application {
   code        String   @unique @db.VarChar(50) // 'seloko', 'lapak-jambi-web', …
   name        String   @db.VarChar(100)
   description String?
+  /// Alamat pangkal aplikasi — menu dengan path relatif digabung ke sini.
+  /// 'https://lapak.jambiprov.go.id' + '/cms/produk'
+  baseUrl     String?  @map("base_url") @db.VarChar(255)
+  /// Nama ikon aplikasi di launcher super app (kunci icon set front-end).
+  icon        String?  @db.VarChar(50)
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
@@ -33,8 +38,72 @@ model Application {
   permissions  Permission[]
   roles        Role[]
   userAppRoles UserAppRole[]
+  menuItems    MenuItem[]
 
   @@map("applications")
+}
+
+// ─── Menu Items (Sidebar) ──────────────────────────────────────────────────────
+/// Satu baris sidebar milik satu aplikasi. Hirarki lewat parentId — parent
+/// biasanya tanpa path (hanya pembuka grup), child yang punya alamat.
+///
+/// Visibilitas berlapis, dievaluasi dari yang paling longgar:
+///   1. isActive          — mematikan item untuk semua orang
+///   2. permissionId null — tidak butuh izin; terisi → hanya pemegang izin itu
+///   3. menuRoles kosong  — berlaku untuk semua role di aplikasi;
+///                          terisi → hanya role yang terdaftar
+/// Super admin melewati lapis 2 dan 3, sama seperti requirePermission.
+model MenuItem {
+  id            String   @id @default(uuid(7)) @db.VarChar(36)
+  applicationId String   @map("app_id") @db.VarChar(36)
+  parentId      String?  @map("parent_id") @db.VarChar(36)
+  /// Kunci stabil dalam lingkup aplikasi, mis. 'pengguna', 'akses.role'.
+  /// Dipakai seeder untuk upsert dan oleh front-end untuk menandai menu aktif —
+  /// label boleh berubah tanpa memutus referensi.
+  code          String   @db.VarChar(100)
+  /// Label yang tampil di sidebar — bahasa Indonesia.
+  label         String   @db.VarChar(100)
+  /// Nama ikon (kunci icon set front-end, mis. 'users', 'file-text').
+  icon          String?  @db.VarChar(50)
+  /// Alamat tujuan. Relatif ('/cms/produk') digabung dengan Application.baseUrl;
+  /// absolut ('https://…') dipakai apa adanya. Null = parent grup saja.
+  path          String?  @db.VarChar(255)
+  /// Buka di tab baru — dipakai untuk tautan ke aplikasi lain.
+  isExternal    Boolean  @default(false) @map("is_external")
+  /// Urutan tampil di antara saudara sekandung.
+  sortOrder     Int      @default(0) @map("sort_order")
+  isActive      Boolean  @default(true) @map("is_active")
+  /// Izin yang harus dipegang agar item tampil. Null = bebas izin.
+  permissionId  String?  @map("permission_id") @db.VarChar(36)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  parent      MenuItem?   @relation("MenuItemTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    MenuItem[]  @relation("MenuItemTree")
+  permission  Permission? @relation(fields: [permissionId], references: [id], onDelete: SetNull)
+  menuRoles   MenuRole[]
+
+  @@unique([applicationId, code], map: "uq_app_menu_code")
+  @@index([applicationId, parentId, sortOrder], map: "idx_menu_items_app_parent_order")
+  @@index([parentId], map: "idx_menu_items_parent")
+  @@index([permissionId], map: "idx_menu_items_permission")
+  @@map("menu_items")
+}
+
+// ─── Menu Roles (Pivot) ────────────────────────────────────────────────────────
+/// Pembatas opsional: item hanya tampil untuk role yang terdaftar di sini.
+/// Tanpa baris sama sekali, item berlaku untuk seluruh role di aplikasinya.
+model MenuRole {
+  menuItemId String @map("menu_item_id") @db.VarChar(36)
+  roleId     String @map("role_id") @db.VarChar(36)
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  role     Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([menuItemId, roleId])
+  @@index([roleId], map: "idx_menu_roles_role")
+  @@map("menu_roles")
 }
 
 // ─── Permissions ───────────────────────────────────────────────────────────────
@@ -51,6 +120,7 @@ model Permission {
 
   application     Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   rolePermissions RolePermission[]
+  menuItems       MenuItem[]
 
   @@unique([applicationId, code], map: "uq_app_permission")
   @@index([applicationId], map: "idx_permissions_app_id")
@@ -73,6 +143,7 @@ model Role {
   application     Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   rolePermissions RolePermission[]
   userAppRoles    UserAppRole[]
+  menuRoles       MenuRole[]
 
   @@unique([applicationId, name], map: "uq_app_role_name")
   @@index([applicationId], map: "idx_roles_app_id")
