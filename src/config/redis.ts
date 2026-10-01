@@ -104,9 +104,18 @@ export async function getCachedPermissions(
   userId: string,
   appCode: string,
 ): Promise<string[] | null> {
-  const redis = getRedisClient();
   const key = buildPermissionCacheKey(userId, appCode);
-  const raw = await redis.get(key);
+  let raw: string | null;
+
+  try {
+    raw = await getRedisClient().get(key);
+  } catch (err) {
+    // Redis down: laporkan sebagai cache miss agar pemanggil jatuh ke DB.
+    // Cache bukan sumber kebenaran, jadi hasilnya tetap benar — hanya lebih
+    // lambat. Melempar di sini membuat setiap request ber-permission balas 500.
+    console.error("[Redis] Gagal membaca cache permission:", err);
+    return null;
+  }
 
   if (!raw) return null;
 
@@ -114,7 +123,9 @@ export async function getCachedPermissions(
     return JSON.parse(raw) as string[];
   } catch {
     // Corrupt cache entry — evict it
-    await redis.del(key);
+    await getRedisClient()
+      .del(key)
+      .catch(() => undefined);
     return null;
   }
 }
@@ -128,22 +139,42 @@ export async function setCachedPermissions(
   appCode: string,
   permissions: string[],
 ): Promise<void> {
-  const redis = getRedisClient();
   const key = buildPermissionCacheKey(userId, appCode);
-  await redis.set(key, JSON.stringify(permissions), "EX", PERMISSION_CACHE_TTL_SECONDS);
+  try {
+    await getRedisClient().set(
+      key,
+      JSON.stringify(permissions),
+      "EX",
+      PERMISSION_CACHE_TTL_SECONDS,
+    );
+  } catch (err) {
+    // Gagal menulis cache tidak mengubah jawaban yang sudah dihitung dari DB.
+    console.error("[Redis] Gagal menulis cache permission:", err);
+  }
 }
 
 /**
  * Invalidates the permission cache for a specific user in a given app.
  * Call this whenever roles/permissions are updated.
+ *
+ * Mengembalikan false bila Redis sedang down, bukan melempar: aksi utama
+ * (perubahan di DB) sudah permanen, dan entry cache yang tertinggal toh
+ * kedaluwarsa sendiri dalam PERMISSION_CACHE_TTL_SECONDS. Pemanggil memakai
+ * flag ini untuk memberi tahu klien bahwa perubahan baru efektif penuh
+ * setelah TTL habis.
  */
 export async function invalidatePermissionCache(
   userId: string,
   appCode: string,
-): Promise<void> {
-  const redis = getRedisClient();
+): Promise<boolean> {
   const key = buildPermissionCacheKey(userId, appCode);
-  await redis.del(key);
+  try {
+    await getRedisClient().del(key);
+    return true;
+  } catch (err) {
+    console.error("[Redis] Gagal menghapus cache permission:", err);
+    return false;
+  }
 }
 
 // ─── Access Token Blocklist ───────────────────────────────────────────────────
@@ -162,6 +193,12 @@ function buildBlockedTokenKey(tokenHash: string): string {
  *
  * @param tokenHash  - SHA-256 hex digest dari raw access token
  * @param ttlSeconds - Sisa waktu hidup token dalam detik (≥ 1)
+ *
+ * SENGAJA melempar bila Redis down — jangan diubah jadi fail-open. Blocklist
+ * ini tidak punya cadangan apa pun: gagal menulis berarti token tetap sah
+ * sampai expire, dan tidak ada mekanisme lain yang menangkapnya. Lebih baik
+ * logout balas error (klien bisa retry) daripada balas 200 padahal tokennya
+ * masih hidup.
  */
 export async function blockAccessToken(
   tokenHash: string,
@@ -191,33 +228,44 @@ export async function isAccessTokenBlocked(tokenHash: string): Promise<boolean> 
 /**
  * Invalidates ALL permission caches for a user across all apps.
  * Uses SCAN to avoid blocking the server with KEYS.
+ *
+ * Seperti invalidatePermissionCache: mengembalikan false bila Redis down,
+ * tidak melempar. Lihat catatan di sana untuk alasannya.
  */
 export async function invalidateAllUserPermissionCaches(
   userId: string,
-): Promise<void> {
-  const redis = getRedisClient();
+): Promise<boolean> {
   const prefix = env.REDIS_KEY_PREFIX;
 
-  // ioredis applies keyPrefix to key arguments only — SCAN's MATCH pattern is
-  // NOT a key, so the prefix has to be added by hand here. Conversely the keys
-  // SCAN returns already carry the prefix, and del() would add it a second
-  // time, so strip it back off before deleting.
-  const pattern = `${prefix}perms:user:${userId}:app:*`;
-  const stream = redis.scanStream({ match: pattern, count: 100 });
+  try {
+    const redis = getRedisClient();
 
-  const keysToDelete: string[] = [];
+    // ioredis applies keyPrefix to key arguments only — SCAN's MATCH pattern is
+    // NOT a key, so the prefix has to be added by hand here. Conversely the keys
+    // SCAN returns already carry the prefix, and del() would add it a second
+    // time, so strip it back off before deleting.
+    const pattern = `${prefix}perms:user:${userId}:app:*`;
+    const stream = redis.scanStream({ match: pattern, count: 100 });
 
-  await new Promise<void>((resolve, reject) => {
-    stream.on("data", (keys: string[]) => {
-      for (const key of keys) {
-        keysToDelete.push(key.startsWith(prefix) ? key.slice(prefix.length) : key);
-      }
+    const keysToDelete: string[] = [];
+
+    await new Promise<void>((resolve, reject) => {
+      stream.on("data", (keys: string[]) => {
+        for (const key of keys) {
+          keysToDelete.push(key.startsWith(prefix) ? key.slice(prefix.length) : key);
+        }
+      });
+      stream.on("end", resolve);
+      stream.on("error", reject);
     });
-    stream.on("end", resolve);
-    stream.on("error", reject);
-  });
 
-  if (keysToDelete.length > 0) {
-    await redis.del(...keysToDelete);
+    if (keysToDelete.length > 0) {
+      await redis.del(...keysToDelete);
+    }
+
+    return true;
+  } catch (err) {
+    console.error("[Redis] Gagal menghapus seluruh cache permission user:", err);
+    return false;
   }
 }

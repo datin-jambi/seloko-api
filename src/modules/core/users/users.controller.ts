@@ -9,6 +9,7 @@ import {
   softDeleteUser,
   assignRole,
   revokeRole,
+  CACHE_DEGRADED_NOTE,
 } from "./users.service.js";
 import type {
   ListUsersQuery,
@@ -57,8 +58,10 @@ export async function handleUpdateUser(
   reply: FastifyReply,
 ): Promise<void> {
   const { id } = request.params as { id: string };
-  const user = await updateUser(id, request.body as UpdateUserBody);
-  void reply.status(200).send(ok(user, "Pengguna berhasil diperbarui"));
+  const { cacheCleared, ...user } = await updateUser(id, request.body as UpdateUserBody);
+  void reply
+    .status(200)
+    .send(ok(user, `Pengguna berhasil diperbarui${cacheCleared ? "" : CACHE_DEGRADED_NOTE}`));
 }
 
 // ─── Set Active Status ────────────────────────────────────────────────────────
@@ -67,9 +70,14 @@ export async function handleSetActive(
   reply: FastifyReply,
 ): Promise<void> {
   const { id } = request.params as { id: string };
-  const result = await setUserActiveStatus(id, (request.body as SetActiveBody).isActive);
+  const { cacheCleared, ...result } = await setUserActiveStatus(
+    id,
+    (request.body as SetActiveBody).isActive,
+  );
   const label = result.isActive ? "diaktifkan" : "dinonaktifkan";
-  void reply.status(200).send(ok(result, `Pengguna berhasil ${label}`));
+  void reply
+    .status(200)
+    .send(ok(result, `Pengguna berhasil ${label}${cacheCleared ? "" : CACHE_DEGRADED_NOTE}`));
 }
 
 // ─── Delete User ──────────────────────────────────────────────────────────────
@@ -78,8 +86,10 @@ export async function handleDeleteUser(
   reply: FastifyReply,
 ): Promise<void> {
   const { id } = request.params as { id: string };
-  await softDeleteUser(id, request.user.sub);
-  void reply.status(200).send(accepted("Pengguna berhasil dihapus"));
+  const { cacheCleared } = await softDeleteUser(id, request.user.sub);
+  void reply
+    .status(200)
+    .send(accepted(`Pengguna berhasil dihapus${cacheCleared ? "" : CACHE_DEGRADED_NOTE}`));
 }
 
 // ─── Assign Role ──────────────────────────────────────────────────────────────
@@ -88,8 +98,14 @@ export async function handleAssignRole(
   reply: FastifyReply,
 ): Promise<void> {
   const { id } = request.params as { id: string };
-  const uar = await assignRole(id, request.body as AssignRoleBody, request.user.sub);
-  void reply.status(201).send(ok(uar, "Role berhasil ditugaskan"));
+  const { cacheCleared, ...uar } = await assignRole(
+    id,
+    request.body as AssignRoleBody,
+    request.user.sub,
+  );
+  void reply
+    .status(201)
+    .send(ok(uar, `Role berhasil ditugaskan${cacheCleared ? "" : CACHE_DEGRADED_NOTE}`));
 }
 
 // ─── Revoke Role ──────────────────────────────────────────────────────────────
@@ -98,6 +114,8 @@ export async function handleRevokeRole(
   reply: FastifyReply,
 ): Promise<void> {
   const { id, userAppRoleId } = request.params as { id: string; userAppRoleId: string };
-  await revokeRole(id, userAppRoleId);
-  void reply.status(200).send(accepted("Role berhasil dicabut"));
+  const { cacheCleared } = await revokeRole(id, userAppRoleId);
+  void reply
+    .status(200)
+    .send(accepted(`Role berhasil dicabut${cacheCleared ? "" : CACHE_DEGRADED_NOTE}`));
 }

@@ -5,6 +5,13 @@ import { ConflictError, NotFoundError, ForbiddenError, BadRequestError } from "~
 import { buildPaginatedResult } from "~/common/types/index.js";
 import type { ListUsersQuery, CreateUserBody, UpdateUserBody, AssignRoleBody } from "./users.schema.js";
 
+// Dipakai controller saat invalidasi cache gagal (Redis down): aksi di DB sudah
+// permanen, tapi izin lama masih terbaca dari cache sampai TTL-nya habis.
+// Klien harus diberi tahu, bukan dibiarkan menyangka perubahan langsung efektif.
+export const CACHE_DEGRADED_NOTE =
+  " (cache izin gagal dibersihkan — perubahan efektif penuh dalam ≤5 menit)";
+
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 /**
  * Memformat satu baris UserAppRole menjadi shape respons yang konsisten.
@@ -240,8 +247,9 @@ export async function updateUser(id: string, data: UpdateUserBody) {
   });
 
   // Jika isSuperAdmin berubah, cache permission perlu dibuang
+  let cacheCleared = true;
   if (data.isSuperAdmin !== undefined) {
-    await invalidateAllUserPermissionCaches(id);
+    cacheCleared = await invalidateAllUserPermissionCaches(id);
   }
 
   const { userAppRoles, ...rest } = user;
@@ -249,6 +257,7 @@ export async function updateUser(id: string, data: UpdateUserBody) {
   return {
     ...formatUser(rest),
     roles: userAppRoles.map(formatRole),
+    cacheCleared,
   };
 }
 
@@ -264,15 +273,16 @@ export async function setUserActiveStatus(id: string, isActive: boolean) {
   await prisma.user.update({ where: { id }, data: { isActive } });
 
   // Saat dinonaktifkan, revoke semua refresh token agar tidak bisa memperpanjang sesi
+  let cacheCleared = true;
   if (!isActive) {
     await prisma.refreshToken.updateMany({
       where: { userId: id, isRevoked: false },
       data: { isRevoked: true },
     });
-    await invalidateAllUserPermissionCaches(id);
+    cacheCleared = await invalidateAllUserPermissionCaches(id);
   }
 
-  return { isActive };
+  return { isActive, cacheCleared };
 }
 
 // ─── Soft Delete ──────────────────────────────────────────────────────────────
@@ -296,7 +306,7 @@ export async function softDeleteUser(id: string, requesterId: string) {
   ]);
 
   // Buang permission cache
-  await invalidateAllUserPermissionCaches(id);
+  return { cacheCleared: await invalidateAllUserPermissionCaches(id) };
 }
 
 // ─── Assign Role ──────────────────────────────────────────────────────────────
@@ -354,9 +364,9 @@ export async function assignRole(
   });
 
   // Buang cache permission agar perubahan langsung efektif
-  await invalidateAllUserPermissionCaches(userId);
+  const cacheCleared = await invalidateAllUserPermissionCaches(userId);
 
-  return formatRole(uar);
+  return { ...formatRole(uar), cacheCleared };
 }
 
 // ─── Revoke Role ──────────────────────────────────────────────────────────────
@@ -376,5 +386,6 @@ export async function revokeRole(userId: string, userAppRoleId: string) {
   await prisma.userAppRole.delete({ where: { id: userAppRoleId } });
 
   // Buang cache permission agar pencabutan langsung efektif
-  await invalidateAllUserPermissionCaches(userId);
+  return { cacheCleared: await invalidateAllUserPermissionCaches(userId) };
 }
+
