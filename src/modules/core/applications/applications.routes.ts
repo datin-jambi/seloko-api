@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import {
   ListApplicationsQuerySchema,
   ListApplicationsResponseSchema,
+  ListMyApplicationsResponseSchema,
   ApplicationParamsSchema,
   GetApplicationResponseSchema,
   CreateApplicationBodySchema,
@@ -15,6 +16,7 @@ import {
 } from "./applications.schema.js";
 import {
   handleListApplications,
+  handleListMyApplications,
   handleGetApplication,
   handleCreateApplication,
   handleUpdateApplication,
@@ -38,6 +40,20 @@ export async function applicationsRoutes(fastify: FastifyInstance): Promise<void
       fastify.requirePermission("application:list"),
     ],
   }, handleListApplications);
+
+  // ── GET /applications/me ───────────────────────────────────────────────────
+  // WAJIB didaftarkan sebelum "/:id": find-my-way mencocokkan rute statis lebih
+  // dulu, tapi menaruhnya di bawah membuat maksudnya bergantung pada detail
+  // router. Tanpa permission — isinya milik si pemanggil sendiri, dan ini yang
+  // mengisi launcher super app.
+  app.get("/me", {
+    schema: {
+      description: "Aplikasi yang boleh diakses user yang sedang login — untuk launcher",
+      tags: ["applications"],
+      response: { 200: ListMyApplicationsResponseSchema },
+    },
+    preHandler: [fastify.authenticate],
+  }, handleListMyApplications);
 
   // ── GET /applications/:id ──────────────────────────────────────────────────
   app.get("/:id", {

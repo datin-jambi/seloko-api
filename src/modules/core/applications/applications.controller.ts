@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import { ok, accepted } from "~/common/types/index.js";
 import {
   listApplications,
+  listMyApplications,
   getApplicationById,
   createApplication,
   updateApplication,
@@ -37,6 +38,16 @@ export async function handleGetApplication(
 ): Promise<void> {
   const { id } = request.params as { id: string };
   void reply.status(200).send(ok(await getApplicationById(id)));
+}
+
+// ─── Milik Sendiri ────────────────────────────────────────────────────────────
+export async function handleListMyApplications(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { sub, isSuperAdmin } = request.user;
+  const apps = await listMyApplications(sub, isSuperAdmin);
+  void reply.status(200).send(ok(apps, "Daftar aplikasi Anda berhasil diambil"));
 }
 
 // ─── Create ───────────────────────────────────────────────────────────────────

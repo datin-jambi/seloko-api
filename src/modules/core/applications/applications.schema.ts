@@ -99,6 +99,34 @@ export const ListApplicationsResponseSchema = z.object({
   }),
 });
 
+// ─── Milik Sendiri ────────────────────────────────────────────────────────────
+/**
+ * Bentuk entri launcher: metadata navigasi saja.
+ *
+ * Tanpa `counts` (pemanggil belum tentu berhak melihat isi internal aplikasi),
+ * tanpa `isActive` (yang non-aktif tidak pernah muncul di sini), dan tanpa
+ * timestamp — launcher tidak punya gunanya untuk ketiganya.
+ */
+const MyApplicationShape = ApplicationShape.pick({
+  id: true,
+  code: true,
+  name: true,
+  description: true,
+  baseUrl: true,
+  icon: true,
+}).extend({
+  /** Role yang dipegang di aplikasi ini. Kosong untuk super admin (bypass). */
+  roles: z.array(z.string()),
+  /** Kapan akses hilang; null berarti permanen. */
+  expiresAt: z.string().datetime().nullable(),
+});
+
+export const ListMyApplicationsResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  data: z.array(MyApplicationShape),
+});
+
 // ─── Get ──────────────────────────────────────────────────────────────────────
 export const ApplicationParamsSchema = z.object({
   id: z.string().uuid("Application ID harus berformat UUID"),

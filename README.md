@@ -194,6 +194,7 @@ Manajemen aplikasi yang terdaftar di ekosistem — super app registry.
 | Method | Path | Permission | Description |
 |---|---|---|---|
 | GET | `/` | `application:list` | Daftar aplikasi + jumlah permission/role/menu/penugasan |
+| GET | `/me` | ✅ auth saja | Aplikasi yang boleh diakses pemanggil — mengisi launcher super app |
 | GET | `/:id` | `application:read` | Detail + role (dengan `permissionCount`) + permission dikelompokkan per `module` |
 | POST | `/` | `application:create` | Daftarkan aplikasi baru |
 | PATCH | `/:id` | `application:update` | Ubah `name`, `description`, `baseUrl`, `icon` |
@@ -212,6 +213,19 @@ izin dari cache selama TTL.
 Dua pengaman: aplikasi `seloko` tidak dapat dinonaktifkan atau dihapus (konsol
 manajemen akan mengunci dirinya sendiri), dan penghapusan ditolak `409` selama
 masih ada penugasan role pengguna — cascade akan menghapusnya diam-diam.
+
+#### `GET /applications/me`
+
+Tanpa permission — isinya milik si pemanggil sendiri. Hanya metadata navigasi
+yang dikembalikan (`code`, `name`, `description`, `baseUrl`, `icon`) plus nama
+role dan `expiresAt`; tidak ada `counts`, `isActive`, atau timestamp, sehingga
+isolasi antar aplikasi tetap utuh meski token hanya terbit untuk satu `appCode`.
+
+Penyaringnya sama dengan `assertUserCanAccessApp` — aplikasi aktif, role aktif,
+penugasan belum kedaluwarsa — supaya daftar ini tidak pernah menampilkan
+aplikasi yang justru menolak saat diklik. Beberapa role di satu aplikasi
+digabung menjadi satu entri (`roles: ["editor", "verifikator"]`), dan super
+admin menerima seluruh aplikasi aktif dengan `roles: []`.
 
 ### Health Check
 

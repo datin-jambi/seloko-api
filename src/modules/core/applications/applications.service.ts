@@ -124,6 +124,96 @@ export async function listApplications(query: ListApplicationsQuery) {
   return buildPaginatedResult(data, total, page, limit);
 }
 
+// ─── Milik Sendiri (launcher super app) ───────────────────────────────────────
+/**
+ * Aplikasi yang boleh diakses user yang sedang login.
+ *
+ * Inilah daftar yang mengisi launcher super app, jadi sengaja TIDAK memerlukan
+ * permission apa pun: isinya milik si pemanggil sendiri. Yang dikembalikan hanya
+ * metadata navigasi (kode, nama, baseUrl, icon) plus nama role — bukan data
+ * internal aplikasinya — sehingga tidak melanggar isolasi antar aplikasi
+ * meskipun token diterbitkan untuk satu appCode saja.
+ *
+ * Aturan sama dengan assertUserCanAccessApp, supaya daftar ini tidak pernah
+ * menampilkan aplikasi yang justru menolak saat diklik:
+ *   - aplikasi harus aktif
+ *   - role harus aktif
+ *   - penugasan belum kedaluwarsa
+ *
+ * Super admin memang lintas-aplikasi, jadi menerima seluruh aplikasi aktif
+ * dengan `roles` kosong — tidak ada role yang perlu disebut saat semuanya
+ * di-bypass.
+ */
+export async function listMyApplications(userId: string, isSuperAdmin: boolean) {
+  // Hanya field navigasi — selaras dengan MyApplicationShape.
+  const select = {
+    id: true,
+    code: true,
+    name: true,
+    description: true,
+    baseUrl: true,
+    icon: true,
+  } as const;
+
+  if (isSuperAdmin) {
+    const apps = await prisma.application.findMany({
+      where: { isActive: true },
+      select,
+      orderBy: { code: "asc" },
+    });
+
+    return apps.map((app) => ({ ...app, roles: [] as string[], expiresAt: null }));
+  }
+
+  const assignments = await prisma.userAppRole.findMany({
+    where: {
+      userId,
+      application: { isActive: true },
+      role: { isActive: true },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+    select: {
+      expiresAt: true,
+      role: { select: { name: true } },
+      application: { select },
+    },
+    orderBy: { application: { code: "asc" } },
+  });
+
+  // Satu user bisa punya beberapa role di satu aplikasi — kelompokkan agar
+  // aplikasinya tampil sekali saja di launcher, dengan role digabung.
+  type Entry = {
+    app: (typeof assignments)[number]["application"];
+    roles: string[];
+    expiresAt: Date | null;
+  };
+  const byApp = new Map<string, Entry>();
+
+  for (const { application, role, expiresAt } of assignments) {
+    const entry = byApp.get(application.id);
+
+    if (!entry) {
+      byApp.set(application.id, { app: application, roles: [role.name], expiresAt });
+      continue;
+    }
+
+    entry.roles.push(role.name);
+
+    // Penugasan permanen (null) mengalahkan yang berbatas waktu; di antara yang
+    // berbatas waktu, yang paling lama menentukan kapan akses benar-benar hilang.
+    if (entry.expiresAt !== null) {
+      entry.expiresAt =
+        expiresAt === null ? null : new Date(Math.max(+entry.expiresAt, +expiresAt));
+    }
+  }
+
+  return [...byApp.values()].map(({ app, roles, expiresAt }) => ({
+    ...app,
+    roles,
+    expiresAt: expiresAt?.toISOString() ?? null,
+  }));
+}
+
 // ─── Get By ID ────────────────────────────────────────────────────────────────
 /**
  * Detail aplikasi beserta role dan permission-nya.
