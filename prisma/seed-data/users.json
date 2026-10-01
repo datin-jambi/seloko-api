@@ -4,7 +4,7 @@
   "users": [
     {
       "username": "superadmin",
-      "email": "superadmin@bapenda-jambi.go.id",
+      "email": "superadmin@gmail.com",
       "fullName": "Super Administrator",
       "nip": "197001011990031001",
       "phoneNumber": "0811-7400-001",
@@ -14,15 +14,27 @@
       "passwordEnv": "SEED_SUPER_ADMIN_PASSWORD",
       "password": "SelokoBapenda@2025!",
       "roles": [
-        { "app": "seloko", "role": "superadmin" },
-        { "app": "bapenda-profile", "role": "superadmin" },
-        { "app": "lapak-jambi-web", "role": "superadmin" },
-        { "app": "lapak-jambi-app", "role": "superadmin" }
+        {
+          "app": "seloko",
+          "role": "superadmin"
+        },
+        {
+          "app": "bapenda-profile",
+          "role": "superadmin"
+        },
+        {
+          "app": "lapak-jambi-web",
+          "role": "superadmin"
+        },
+        {
+          "app": "lapak-jambi-app",
+          "role": "superadmin"
+        }
       ]
     },
     {
       "username": "admin.seloko",
-      "email": "admin.seloko@bapenda-jambi.go.id",
+      "email": "admin.seloko@gmail.com",
       "fullName": "Rahmat Hidayat",
       "nip": "198203152008011002",
       "phoneNumber": "0812-7411-002",
@@ -30,43 +42,63 @@
       "isActive": true,
       "emailVerified": true,
       "$note": "Admin CMS biasa — TANPA flag isSuperAdmin, jadi jalur requirePermission benar-benar diuji.",
-      "roles": [{ "app": "seloko", "role": "admin" }]
+      "roles": [
+        {
+          "app": "seloko",
+          "role": "admin"
+        }
+      ]
     },
     {
       "username": "operator.user",
-      "email": "operator.user@bapenda-jambi.go.id",
+      "email": "operator.user@gmail.com",
       "fullName": "Siti Nurhaliza",
       "nip": "199005202015012003",
       "phoneNumber": "0813-7422-003",
       "isActive": true,
       "emailVerified": true,
       "$note": "Punya user:create/read/list/update tapi TIDAK user:delete — uji 403 pada DELETE /users/:id.",
-      "roles": [{ "app": "seloko", "role": "operator-pengguna" }]
+      "roles": [
+        {
+          "app": "seloko",
+          "role": "operator-pengguna"
+        }
+      ]
     },
     {
       "username": "editor.profil",
-      "email": "editor.profil@bapenda-jambi.go.id",
+      "email": "editor.profil@gmail.com",
       "fullName": "Andi Saputra",
       "nip": "199111102016011004",
       "phoneNumber": "0814-7433-004",
       "isActive": true,
       "emailVerified": true,
       "$note": "Hanya di bapenda-profile — uji penolakan login ke app lain (assertUserCanAccessApp).",
-      "roles": [{ "app": "bapenda-profile", "role": "editor" }]
+      "roles": [
+        {
+          "app": "bapenda-profile",
+          "role": "editor"
+        }
+      ]
     },
     {
       "username": "verifikator.lapak",
-      "email": "verifikator.lapak@bapenda-jambi.go.id",
+      "email": "verifikator.lapak@gmail.com",
       "fullName": "Dewi Lestari",
       "nip": "198807072014012005",
       "phoneNumber": "0815-7444-005",
       "isActive": true,
       "emailVerified": true,
-      "roles": [{ "app": "lapak-jambi-web", "role": "verifikator" }]
+      "roles": [
+        {
+          "app": "lapak-jambi-web",
+          "role": "verifikator"
+        }
+      ]
     },
     {
       "username": "multirole",
-      "email": "multirole@bapenda-jambi.go.id",
+      "email": "multirole@gmail.com",
       "fullName": "Bayu Prakoso",
       "nip": "199302022017011006",
       "phoneNumber": "0816-7455-006",
@@ -74,91 +106,143 @@
       "emailVerified": true,
       "$note": "Dua role di SATU aplikasi — uji union permission di resolveUserPermissions (editor+verifikator).",
       "roles": [
-        { "app": "lapak-jambi-web", "role": "editor" },
-        { "app": "lapak-jambi-web", "role": "verifikator" }
+        {
+          "app": "lapak-jambi-web",
+          "role": "editor"
+        },
+        {
+          "app": "lapak-jambi-web",
+          "role": "verifikator"
+        }
       ]
     },
     {
       "username": "lintasapp",
-      "email": "lintasapp@bapenda-jambi.go.id",
+      "email": "lintasapp@gmail.com",
       "fullName": "Nurul Aini",
       "phoneNumber": "0817-7466-007",
       "isActive": true,
       "emailVerified": true,
       "$note": "Role di tiga aplikasi berbeda — uji isolasi appCode: permission lapak tidak boleh terbaca saat X-App-Code=seloko.",
       "roles": [
-        { "app": "seloko", "role": "viewer" },
-        { "app": "bapenda-profile", "role": "admin" },
-        { "app": "lapak-jambi-app", "role": "editor" }
+        {
+          "app": "seloko",
+          "role": "viewer"
+        },
+        {
+          "app": "bapenda-profile",
+          "role": "admin"
+        },
+        {
+          "app": "lapak-jambi-app",
+          "role": "editor"
+        }
       ]
     },
     {
       "username": "viewer.only",
-      "email": "viewer.only@bapenda-jambi.go.id",
+      "email": "viewer.only@gmail.com",
       "fullName": "Hendra Wijaya",
       "isActive": true,
       "emailVerified": true,
       "$note": "read/list/export saja — uji 403 pada semua endpoint tulis.",
-      "roles": [{ "app": "seloko", "role": "viewer" }]
+      "roles": [
+        {
+          "app": "seloko",
+          "role": "viewer"
+        }
+      ]
     },
     {
       "username": "nonaktif",
-      "email": "nonaktif@bapenda-jambi.go.id",
+      "email": "nonaktif@gmail.com",
       "fullName": "Akun Dinonaktifkan",
       "isActive": false,
       "emailVerified": true,
       "$note": "isActive=false — loginUser harus balas 401 walau password benar.",
-      "roles": [{ "app": "seloko", "role": "admin" }]
+      "roles": [
+        {
+          "app": "seloko",
+          "role": "admin"
+        }
+      ]
     },
     {
       "username": "terhapus",
-      "email": "terhapus@bapenda-jambi.go.id",
+      "email": "terhapus@gmail.com",
       "fullName": "Akun Soft Deleted",
       "isActive": false,
       "emailVerified": true,
       "softDeleted": true,
       "$note": "deletedAt terisi — tidak boleh muncul di GET /users maupun bisa login.",
-      "roles": [{ "app": "seloko", "role": "viewer" }]
+      "roles": [
+        {
+          "app": "seloko",
+          "role": "viewer"
+        }
+      ]
     },
     {
       "username": "belum.verifikasi",
-      "email": "belum.verifikasi@bapenda-jambi.go.id",
+      "email": "belum.verifikasi@gmail.com",
       "fullName": "Fajar Ramadhan",
       "isActive": true,
       "emailVerified": false,
       "$note": "emailVerifiedAt null — untuk menguji tampilan/alur verifikasi email.",
-      "roles": [{ "app": "bapenda-profile", "role": "viewer" }]
+      "roles": [
+        {
+          "app": "bapenda-profile",
+          "role": "viewer"
+        }
+      ]
     },
     {
       "username": "role.kedaluwarsa",
-      "email": "role.kedaluwarsa@bapenda-jambi.go.id",
+      "email": "role.kedaluwarsa@gmail.com",
       "fullName": "Intan Permata",
       "isActive": true,
       "emailVerified": true,
       "$note": "Penugasan role sudah lewat expiresAt — login ke seloko harus 403 dan permission kosong.",
-      "roles": [{ "app": "seloko", "role": "admin", "expiresAt": "expired" }]
+      "roles": [
+        {
+          "app": "seloko",
+          "role": "admin",
+          "expiresAt": "expired"
+        }
+      ]
     },
     {
       "username": "role.sementara",
-      "email": "role.sementara@bapenda-jambi.go.id",
+      "email": "role.sementara@gmail.com",
       "fullName": "Galih Nugroho",
       "isActive": true,
       "emailVerified": true,
       "$note": "Penugasan berbatas waktu yang MASIH berlaku — kebalikan dari role.kedaluwarsa.",
-      "roles": [{ "app": "seloko", "role": "editor", "expiresAt": "+30d" }]
+      "roles": [
+        {
+          "app": "seloko",
+          "role": "editor",
+          "expiresAt": "+30d"
+        }
+      ]
     },
     {
       "username": "role.mati",
-      "email": "role.mati@bapenda-jambi.go.id",
+      "email": "role.mati@gmail.com",
       "fullName": "Wulan Sari",
       "isActive": true,
       "emailVerified": true,
       "$note": "Ditugaskan ke role yang isActive=false — permission harus kosong dan login ke seloko ditolak.",
-      "roles": [{ "app": "seloko", "role": "role-nonaktif" }]
+      "roles": [
+        {
+          "app": "seloko",
+          "role": "role-nonaktif"
+        }
+      ]
     },
     {
       "username": "tanpa.role",
-      "email": "tanpa.role@bapenda-jambi.go.id",
+      "email": "tanpa.role@gmail.com",
       "fullName": "Yusuf Maulana",
       "isActive": true,
       "emailVerified": true,
@@ -173,7 +257,34 @@
     "emailDomain": "bapenda-jambi.go.id",
     "app": "seloko",
     "role": "viewer",
-    "firstNames": ["Adi", "Bagas", "Citra", "Dian", "Eka", "Farid", "Gita", "Hasan", "Ika", "Joko", "Kartika", "Lukman", "Maya", "Nanda", "Oki"],
-    "lastNames": ["Pratama", "Wibowo", "Anggraini", "Setiawan", "Kurniawan", "Halim", "Syahputra", "Marlina", "Ardiansyah", "Puspita"]
+    "firstNames": [
+      "Adi",
+      "Bagas",
+      "Citra",
+      "Dian",
+      "Eka",
+      "Farid",
+      "Gita",
+      "Hasan",
+      "Ika",
+      "Joko",
+      "Kartika",
+      "Lukman",
+      "Maya",
+      "Nanda",
+      "Oki"
+    ],
+    "lastNames": [
+      "Pratama",
+      "Wibowo",
+      "Anggraini",
+      "Setiawan",
+      "Kurniawan",
+      "Halim",
+      "Syahputra",
+      "Marlina",
+      "Ardiansyah",
+      "Puspita"
+    ]
   }
 }
