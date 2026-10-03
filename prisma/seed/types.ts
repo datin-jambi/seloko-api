@@ -7,6 +7,8 @@
  */
 
 // ─── applications.json ────────────────────────────────────────────────────────
+export type Audience = "INTERNAL" | "PUBLIC";
+
 export interface PermissionDef {
   module: string;
   entity: string;
@@ -20,6 +22,11 @@ export interface ApplicationDef {
   name: string;
   description?: string;
   isActive?: boolean;
+  /** Absen = INTERNAL. */
+  audience?: Audience;
+  logoUrl?: string;
+  /** { branding, seo } — bentuknya divalidasi ApplicationSettingsSchema di API. */
+  settings?: Record<string, unknown>;
   permissions: PermissionDef[];
 }
 
@@ -36,6 +43,8 @@ export interface RoleDef {
   /** Kode aplikasi tempat role dibuat. Absen = semua aplikasi. */
   apps?: string[];
   isActive?: boolean;
+  /** Absen = INTERNAL. Role PUBLIC hanya dibuat di aplikasi PUBLIC. */
+  audience?: Audience;
 }
 
 export interface RolesFile {
@@ -53,7 +62,10 @@ export interface RoleAssignmentDef {
 }
 
 export interface UserDef {
-  username: string;
+  /** Absen = INTERNAL (pegawai). */
+  accountType?: Audience;
+  /** Wajib untuk INTERNAL; akun PUBLIC tidak punya username. */
+  username?: string;
   email: string;
   fullName: string;
   nip?: string;

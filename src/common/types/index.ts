@@ -4,7 +4,15 @@ import "@fastify/jwt";
 export interface JwtPayload {
   sub: string;          // userId
   email: string;
-  username: string;
+  /** null untuk akun PUBLIC — warga login dengan email saja. */
+  username: string | null;
+  /**
+   * INTERNAL (pegawai) atau PUBLIC (warga). Disimpan di token karena guard
+   * memakainya di setiap request untuk memutuskan boleh tidaknya akses
+   * lintas aplikasi — query DB tiap request hanya untuk ini terlalu mahal.
+   * Nilainya tidak pernah berubah untuk satu akun, jadi tidak bisa basi.
+   */
+  accountType: "INTERNAL" | "PUBLIC";
   isSuperAdmin: boolean;
   appCode: string;
   type: "access" | "refresh";

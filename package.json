@@ -27,9 +27,10 @@
     "db:smoke:roles-cache": "bash prisma/seed-data/roles-cache.smoke.sh",
     "db:smoke:permissions": "bash prisma/seed-data/permissions.smoke.sh",
     "db:smoke:my-permissions": "bash prisma/seed-data/my-permissions.smoke.sh",
+    "db:smoke:access": "bash prisma/seed-data/access.smoke.sh",
     "db:check:menus": "tsx prisma/seed-data/menus.check.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit --project prisma/tsconfig.json",
-    "test": "tsx --env-file-if-exists=.env src/modules/core/auth/auth.check.ts && tsx --env-file-if-exists=.env src/common/utils/utils.check.ts && tsx src/config/redis.check.ts"
+    "test": "tsx --env-file-if-exists=.env src/modules/core/auth/auth.check.ts && tsx --env-file-if-exists=.env src/common/utils/utils.check.ts && tsx src/config/redis.check.ts && tsx src/common/guards/access.check.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11",

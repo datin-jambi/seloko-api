@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { APP_CODES } from "~/common/constants/index.js";
 import {
   ListRolesQuerySchema,
   ListRolesResponseSchema,
@@ -39,7 +40,7 @@ export async function rolesRoutes(fastify: FastifyInstance): Promise<void> {
       querystring: ListRolesQuerySchema,
       response: { 200: ListRolesResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("role:list")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("role:list", { app: APP_CODES.SELOKO })],
   }, handleListRoles);
 
   // ── GET /roles/:id ─────────────────────────────────────────────────────────
@@ -51,7 +52,7 @@ export async function rolesRoutes(fastify: FastifyInstance): Promise<void> {
       params: RoleParamsSchema,
       response: { 200: GetRoleResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("role:read")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("role:read", { app: APP_CODES.SELOKO })],
   }, handleGetRole);
 
   // ── POST /roles ────────────────────────────────────────────────────────────
@@ -62,7 +63,7 @@ export async function rolesRoutes(fastify: FastifyInstance): Promise<void> {
       body: CreateRoleBodySchema,
       response: { 201: CreateRoleResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("role:create")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("role:create", { app: APP_CODES.SELOKO })],
   }, handleCreateRole);
 
   // ── PATCH /roles/:id ───────────────────────────────────────────────────────
@@ -74,7 +75,7 @@ export async function rolesRoutes(fastify: FastifyInstance): Promise<void> {
       body: UpdateRoleBodySchema,
       response: { 200: UpdateRoleResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("role:update")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("role:update", { app: APP_CODES.SELOKO })],
   }, handleUpdateRole);
 
   // ── PUT /roles/:id/permissions ─────────────────────────────────────────────
@@ -87,7 +88,7 @@ export async function rolesRoutes(fastify: FastifyInstance): Promise<void> {
       body: SetRolePermissionsBodySchema,
       response: { 200: SetRolePermissionsResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("role:update")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("role:update", { app: APP_CODES.SELOKO })],
   }, handleSetRolePermissions);
 
   // ── DELETE /roles/:id/permissions/:permissionId ─────────────────────────────
@@ -101,7 +102,7 @@ export async function rolesRoutes(fastify: FastifyInstance): Promise<void> {
       params: RolePermissionParamsSchema,
       response: { 200: RevokeRolePermissionResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("role:update")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("role:update", { app: APP_CODES.SELOKO })],
   }, handleRevokeRolePermission);
 
   // ── PATCH /roles/:id/activate ──────────────────────────────────────────────
@@ -114,7 +115,7 @@ export async function rolesRoutes(fastify: FastifyInstance): Promise<void> {
       body: SetRoleActiveBodySchema,
       response: { 200: SetRoleActiveResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("role:update")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("role:update", { app: APP_CODES.SELOKO })],
   }, handleSetRoleActive);
 
   // ── DELETE /roles/:id ──────────────────────────────────────────────────────
@@ -125,6 +126,6 @@ export async function rolesRoutes(fastify: FastifyInstance): Promise<void> {
       params: RoleParamsSchema,
       response: { 200: DeleteRoleResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("role:delete")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("role:delete", { app: APP_CODES.SELOKO })],
   }, handleDeleteRole);
 }

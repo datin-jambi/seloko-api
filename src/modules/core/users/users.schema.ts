@@ -15,11 +15,13 @@ const UserRoleShape = z.object({
 const UserShape = z.object({
   id: z.string(),
   nip: z.string().nullable(),
-  username: z.string(),
+  /** null untuk akun PUBLIC — warga login dengan email saja. */
+  username: z.string().nullable(),
   email: z.string().email(),
   fullName: z.string(),
   phoneNumber: z.string().nullable(),
   avatarUrl: z.string().nullable(),
+  accountType: z.enum(["INTERNAL", "PUBLIC"]),
   isSuperAdmin: z.boolean(),
   isActive: z.boolean(),
   emailVerifiedAt: z.string().datetime().nullable(),
@@ -38,6 +40,10 @@ export const ListUsersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().optional().describe("Cari berdasarkan username, email, atau nama lengkap"),
+  accountType: z
+    .enum(["INTERNAL", "PUBLIC"])
+    .optional()
+    .describe("Pegawai atau warga — keduanya dikelola terpisah di CMS"),
   isActive: z.enum(["true", "false"]).optional().describe("Filter status aktif"),
   isSuperAdmin: z.enum(["true", "false"]).optional().describe("Filter super admin"),
 });
@@ -68,6 +74,14 @@ export const GetUserResponseSchema = z.object({
 });
 
 // ─── Create User ──────────────────────────────────────────────────────────────
+/**
+ * Endpoint ini HANYA membuat akun pegawai (INTERNAL).
+ *
+ * Akun warga lahir lewat pendaftaran mandiri di aplikasi publik beserta
+ * verifikasi email (Fase 2), bukan dibuat operator. Tidak ada field
+ * `accountType` di body justru supaya operator konsol tidak bisa membuat akun
+ * warga dengan kata sandi yang ia ketahui.
+ */
 export const CreateUserBodySchema = z.object({
   username: z
     .string()

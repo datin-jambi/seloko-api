@@ -5,7 +5,8 @@
  * sini lewat kode/nama, bukan id.
  */
 import { prisma, expandActions } from "./utils.js";
-import type { ApplicationDef, RoleDef } from "./types.js";
+import type { Prisma } from "@prisma/client";
+import type { ApplicationDef, Audience, RoleDef } from "./types.js";
 
 /**
  * Buat/perbarui permission satu aplikasi dari daftar PermissionDef.
@@ -43,6 +44,7 @@ async function syncPermissions(
 async function syncRoles(
   appCode: string,
   applicationId: string,
+  appAudience: Audience,
   roles: RoleDef[],
   actionGroups: Record<string, string[]>,
 ): Promise<number> {
@@ -51,18 +53,30 @@ async function syncRoles(
     select: { id: true, code: true },
   });
 
-  const applicable = roles.filter(
-    (r) => !r.apps || r.apps.length === 0 || r.apps.includes(appCode),
-  );
+  const applicable = roles.filter((r) => {
+    const listed = !r.apps || r.apps.length === 0 || r.apps.includes(appCode);
+    // Role PUBLIC tak berguna di aplikasi INTERNAL — warga tak pernah login ke
+    // sana. Diabaikan diam-diam untuk role "semua aplikasi"; bila disebut
+    // eksplisit lewat `apps`, itu salah konfigurasi dan harus berisik.
+    if (listed && r.audience === "PUBLIC" && appAudience === "INTERNAL") {
+      if (r.apps?.includes(appCode)) {
+        throw new Error(`Role PUBLIC "${r.name}" tidak boleh dibuat di aplikasi INTERNAL "${appCode}"`);
+      }
+      return false;
+    }
+    return listed;
+  });
 
   for (const roleDef of applicable) {
+    const audience = roleDef.audience ?? "INTERNAL";
     const role = await prisma.role.upsert({
       where: { applicationId_name: { applicationId, name: roleDef.name } },
-      update: { description: roleDef.description, isActive: roleDef.isActive ?? true },
+      update: { description: roleDef.description, isActive: roleDef.isActive ?? true, audience },
       create: {
         applicationId,
         name: roleDef.name,
         description: roleDef.description,
+        audience,
         isSystemRole: true,
         isActive: roleDef.isActive ?? true,
       },
@@ -99,21 +113,23 @@ export async function seedApplications(
   roles: RoleDef[],
 ): Promise<void> {
   for (const def of apps) {
+    const audience = def.audience ?? "INTERNAL";
+    const profile = {
+      name: def.name,
+      description: def.description ?? null,
+      isActive: def.isActive ?? true,
+      audience,
+      logoUrl: def.logoUrl ?? null,
+      settings: (def.settings ?? {}) as Prisma.InputJsonObject,
+    };
     // baseUrl dan icon TIDAK disetel di sini — keduanya urusan navigasi dan
     // dikelola menus.json, supaya satu berkas saja yang mengatur sidebar.
+    // `audience` ikut di update: lewat API ia final, tapi seeder adalah sumber
+    // kebenaran lingkungan development dan boleh memperbaikinya.
     const app = await prisma.application.upsert({
       where: { code: def.code },
-      update: {
-        name: def.name,
-        description: def.description ?? null,
-        isActive: def.isActive ?? true,
-      },
-      create: {
-        code: def.code,
-        name: def.name,
-        description: def.description ?? null,
-        isActive: def.isActive ?? true,
-      },
+      update: profile,
+      create: { code: def.code, ...profile },
       select: { id: true },
     });
 
@@ -123,11 +139,11 @@ export async function seedApplications(
       actionLabels,
       actionGroups,
     );
-    const roleCount = await syncRoles(def.code, app.id, roles, actionGroups);
+    const roleCount = await syncRoles(def.code, app.id, audience, roles, actionGroups);
 
     const status = def.isActive === false ? " (NONAKTIF)" : "";
     console.log(
-      `✅ ${def.code}${status} — ${permissionCount} permission, ${roleCount} role`,
+      `✅ ${def.code} [${audience}]${status} — ${permissionCount} permission, ${roleCount} role`,
     );
   }
 }

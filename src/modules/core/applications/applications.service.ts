@@ -7,7 +7,9 @@ import type {
   ListApplicationsQuery,
   CreateApplicationBody,
   UpdateApplicationBody,
+  ApplicationSettings,
 } from "./applications.schema.js";
+import type { Prisma } from "@prisma/client";
 
 // Dipakai controller saat invalidasi cache gagal (Redis down): perubahan di DB
 // sudah permanen, tapi izin lama masih terbaca dari cache sampai TTL habis.
@@ -22,6 +24,9 @@ const APP_SELECT = {
   description: true,
   baseUrl: true,
   icon: true,
+  audience: true,
+  logoUrl: true,
+  settings: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -46,6 +51,9 @@ type AppRow = {
   description: string | null;
   baseUrl: string | null;
   icon: string | null;
+  audience: "INTERNAL" | "PUBLIC";
+  logoUrl: string | null;
+  settings: Prisma.JsonValue;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -54,6 +62,9 @@ type AppRow = {
 function formatApplication(app: AppRow) {
   return {
     ...app,
+    // Kolom JSONB bertipe JsonValue; isinya selalu lewat ApplicationSettingsSchema
+    // saat ditulis, jadi aman dipersempit di sini.
+    settings: (app.settings ?? {}) as ApplicationSettings,
     createdAt: app.createdAt.toISOString(),
     updatedAt: app.updatedAt.toISOString(),
   };
@@ -92,10 +103,11 @@ function assertNotProtected(code: string, action: string): void {
 
 // ─── List ─────────────────────────────────────────────────────────────────────
 export async function listApplications(query: ListApplicationsQuery) {
-  const { page, limit, search, isActive } = query;
+  const { page, limit, search, audience, isActive } = query;
   const skip = (page - 1) * limit;
 
   const where = {
+    ...(audience !== undefined && { audience }),
     ...(isActive !== undefined && { isActive: isActive === "true" }),
     ...(search && {
       OR: [
@@ -143,6 +155,9 @@ export async function listApplications(query: ListApplicationsQuery) {
  * Super admin memang lintas-aplikasi, jadi menerima seluruh aplikasi aktif
  * dengan `roles` kosong — tidak ada role yang perlu disebut saat semuanya
  * di-bypass.
+ *
+ * Untuk akun PUBLIC daftar ini adalah aplikasi tempat warga sudah mendaftar;
+ * untuk akun INTERNAL, aplikasi yang bisa ia kelola dari seloko.
  */
 export async function listMyApplications(userId: string, isSuperAdmin: boolean) {
   // Hanya field navigasi — selaras dengan MyApplicationShape.
@@ -153,6 +168,7 @@ export async function listMyApplications(userId: string, isSuperAdmin: boolean) 
     description: true,
     baseUrl: true,
     icon: true,
+    logoUrl: true,
   } as const;
 
   if (isSuperAdmin) {
@@ -233,6 +249,7 @@ export async function getApplicationById(id: string) {
           id: true,
           name: true,
           description: true,
+          audience: true,
           isSystemRole: true,
           isActive: true,
           _count: { select: { rolePermissions: true } },
@@ -293,9 +310,12 @@ export async function createApplication(data: CreateApplicationBody) {
     data: {
       code: data.code,
       name: data.name,
+      audience: data.audience,
       description: data.description ?? null,
       baseUrl: data.baseUrl ?? null,
       icon: data.icon ?? null,
+      logoUrl: data.logoUrl ?? null,
+      settings: data.settings,
       isActive: data.isActive,
     },
     select: APP_SELECT,
@@ -323,6 +343,8 @@ export async function updateApplication(id: string, data: UpdateApplicationBody)
       ...(data.description !== undefined && { description: data.description }),
       ...(data.baseUrl !== undefined && { baseUrl: data.baseUrl }),
       ...(data.icon !== undefined && { icon: data.icon }),
+      ...(data.logoUrl !== undefined && { logoUrl: data.logoUrl }),
+      ...(data.settings !== undefined && { settings: data.settings }),
     },
     select: APP_SELECT,
   });

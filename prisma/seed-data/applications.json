@@ -1,11 +1,14 @@
 {
-  "$comment": "Aplikasi terdaftar + permission per aplikasi. entity+action menyusun kode permission '<entity>:<action>' yang dicek requirePermission(). 'actions' boleh memakai nama grup dari roles.json (mis. 'content', 'publishable') atau aksi tunggal.",
+  "$comment": "Aplikasi terdaftar + permission per aplikasi. entity+action menyusun kode permission '<entity>:<action>' yang dicek requirePermission(). 'actions' boleh memakai nama grup dari roles.json (mis. 'content', 'publishable') atau aksi tunggal. 'audience': INTERNAL (pegawai, masuk lewat seloko) atau PUBLIC (warga daftar sendiri) — final setelah dibuat. 'logoUrl' dan 'settings' {branding, seo} murni tampilan.",
   "applications": [
     {
       "code": "seloko",
       "name": "SELOKO CMS",
       "description": "Konsol manajemen terpusat Bapenda Jambi",
       "isActive": true,
+      "audience": "INTERNAL",
+      "logoUrl": "https://cdn.bapenda.jambiprov.go.id/logo/seloko.png",
+      "settings": { "branding": { "shortName": "SELOKO", "primaryColor": "#0F766E" } },
       "permissions": [
         { "module": "Pengguna", "entity": "user", "label": "Pengguna", "actions": ["content"] },
         { "module": "Akses", "entity": "role", "label": "Role", "actions": ["content"] },
@@ -20,6 +23,12 @@
       "name": "Bapenda Profile Portal",
       "description": "Portal profil dan informasi publik Bapenda Jambi",
       "isActive": true,
+      "audience": "PUBLIC",
+      "logoUrl": "https://cdn.bapenda.jambiprov.go.id/logo/bapenda.png",
+      "settings": {
+        "branding": { "shortName": "Bapenda Jambi", "primaryColor": "#1D4ED8" },
+        "seo": { "titleTemplate": "%s | Bapenda Provinsi Jambi", "description": "Portal resmi Badan Pendapatan Daerah Provinsi Jambi" }
+      },
       "permissions": [
         { "module": "Konten", "entity": "article", "label": "Artikel", "actions": ["publishable"] },
         { "module": "Konten", "entity": "announcement", "label": "Pengumuman", "actions": ["publishable"] },
@@ -32,6 +41,12 @@
       "name": "Lapak Jambi Web",
       "description": "Marketplace UMKM Jambi — antarmuka web",
       "isActive": true,
+      "audience": "PUBLIC",
+      "logoUrl": "https://cdn.bapenda.jambiprov.go.id/logo/lapak.png",
+      "settings": {
+        "branding": { "shortName": "Lapak Jambi", "primaryColor": "#EA580C" },
+        "seo": { "titleTemplate": "%s | Lapak Jambi", "description": "Marketplace UMKM Provinsi Jambi" }
+      },
       "permissions": [
         { "module": "Mitra", "entity": "merchant", "label": "Merchant", "actions": ["verifiable"] },
         { "module": "Katalog", "entity": "product", "label": "Produk", "actions": ["verifiable"] },
@@ -44,6 +59,8 @@
       "name": "Lapak Jambi Mobile",
       "description": "Marketplace UMKM Jambi — aplikasi mobile",
       "isActive": true,
+      "audience": "PUBLIC",
+      "settings": { "branding": { "shortName": "Lapak Jambi", "primaryColor": "#EA580C" } },
       "permissions": [
         { "module": "Mitra", "entity": "merchant", "label": "Merchant", "actions": ["read", "list", "update"] },
         { "module": "Katalog", "entity": "product", "label": "Produk", "actions": ["content"] },
@@ -55,6 +72,7 @@
       "name": "Aplikasi Uji Nonaktif",
       "description": "Sengaja isActive=false — untuk menguji penolakan login pada aplikasi yang dimatikan",
       "isActive": false,
+      "audience": "INTERNAL",
       "permissions": [
         { "module": "Sistem", "entity": "dummy", "label": "Dummy", "actions": ["read", "list"] }
       ]

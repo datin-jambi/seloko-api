@@ -38,7 +38,7 @@ check "viewer tanpa role:create → 403" 403 \
 echo
 echo "== List & filter =="
 LIST=$(get /roles)
-check "list → 27 role (seed)" 27 "$(echo "$LIST" | j 'o.meta.total')"
+check "list → 28 role (seed, termasuk pedagang)" 28 "$(echo "$LIST" | j 'o.meta.total')"
 check "list membawa permissionCount" true "$(echo "$LIST" | j 'o.data.every(r=>"permissionCount" in r)')"
 check "list membawa userCount" true "$(echo "$LIST" | j 'o.data.every(r=>"userCount" in r)')"
 check "list membawa applicationCode" true "$(echo "$LIST" | j 'o.data.every(r=>!!r.applicationCode)')"

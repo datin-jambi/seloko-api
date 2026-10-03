@@ -45,6 +45,7 @@ const USER_LIST_SELECT = {
   fullName: true,
   phoneNumber: true,
   avatarUrl: true,
+  accountType: true,
   isSuperAdmin: true,
   isActive: true,
   emailVerifiedAt: true,
@@ -68,11 +69,12 @@ const ROLES_INCLUDE = {
 function formatUser(user: {
   id: string;
   nip: string | null;
-  username: string;
+  username: string | null;
   email: string;
   fullName: string;
   phoneNumber: string | null;
   avatarUrl: string | null;
+  accountType: "INTERNAL" | "PUBLIC";
   isSuperAdmin: boolean;
   isActive: boolean;
   emailVerifiedAt: Date | null;
@@ -89,6 +91,7 @@ function formatUser(user: {
     fullName: user.fullName,
     phoneNumber: user.phoneNumber,
     avatarUrl: user.avatarUrl,
+    accountType: user.accountType,
     isSuperAdmin: user.isSuperAdmin,
     isActive: user.isActive,
     emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
@@ -106,11 +109,12 @@ function formatUser(user: {
  * Soft-deleted user TIDAK ditampilkan secara default.
  */
 export async function listUsers(query: ListUsersQuery) {
-  const { page, limit, search, isActive, isSuperAdmin } = query;
+  const { page, limit, search, accountType, isActive, isSuperAdmin } = query;
   const skip = (page - 1) * limit;
 
   const where = {
     deletedAt: null, // Sembunyikan soft-deleted
+    ...(accountType !== undefined && { accountType }),
     ...(isActive !== undefined && { isActive: isActive === "true" }),
     ...(isSuperAdmin !== undefined && { isSuperAdmin: isSuperAdmin === "true" }),
     ...(search && {
@@ -167,13 +171,15 @@ export async function getUserById(id: string) {
  * Menolak jika username atau email sudah dipakai.
  */
 export async function createUser(data: CreateUserBody) {
-  // Cek konflik sebelum hash (hemat CPU)
+  // Cek konflik sebelum hash (hemat CPU). Email hanya unik di antara akun
+  // pegawai — warga dengan email sama adalah akun lain, dan bukan konflik.
+  // Baris soft-deleted IKUT dicek: unique index di DB tetap memegang username/
+  // email/NIP-nya, jadi tanpa ini INSERT gagal P2002 dan berakhir 500.
   const existing = await prisma.user.findFirst({
     where: {
-      deletedAt: null,
       OR: [
         { username: data.username.toLowerCase() },
-        { email: data.email.toLowerCase() },
+        { accountType: "INTERNAL", email: data.email.toLowerCase() },
         ...(data.nip ? [{ nip: data.nip }] : []),
       ],
     },
@@ -198,6 +204,7 @@ export async function createUser(data: CreateUserBody) {
 
   const user = await prisma.user.create({
     data: {
+      accountType: "INTERNAL",
       username: data.username.toLowerCase(),
       email: data.email.toLowerCase(),
       fullName: data.fullName,
@@ -321,7 +328,10 @@ export async function assignRole(
   assignedBy: string,
 ) {
   // Validasi: user ada?
-  const user = await prisma.user.findUnique({ where: { id: userId, deletedAt: null }, select: { id: true } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId, deletedAt: null },
+    select: { id: true, accountType: true },
+  });
   if (!user) throw new NotFoundError("User", userId);
 
   // Validasi: aplikasi aktif?
@@ -334,9 +344,19 @@ export async function assignRole(
   // Validasi: role ada dan milik aplikasi yang sama?
   const role = await prisma.role.findFirst({
     where: { id: data.roleId, applicationId: data.applicationId, isActive: true },
-    select: { id: true },
+    select: { id: true, name: true, audience: true },
   });
   if (!role) throw new BadRequestError(`Role dengan ID "${data.roleId}" tidak ditemukan di aplikasi ini`);
+
+  // Role pegawai hanya untuk akun pegawai, role warga hanya untuk akun warga.
+  // Tanpa pagar ini operator bisa memberi akun warga role "verifikator" lapak
+  // — dan warga itu ikut memegang izin approve pedagang lain.
+  if (role.audience !== user.accountType) {
+    throw new BadRequestError(
+      `Role "${role.name}" khusus akun ${role.audience === "INTERNAL" ? "pegawai" : "publik"}, ` +
+        `sedangkan pengguna ini akun ${user.accountType === "INTERNAL" ? "pegawai" : "publik"}`,
+    );
+  }
 
   const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
 

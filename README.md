@@ -65,10 +65,34 @@ Only routes under `/api/` require the header. Everything else — `/health`,
 future metrics or docs endpoints — is public by default.
 
 ```bash
-curl -H "X-App-Code: bapenda-profile" http://localhost:3000/api/auth/me
+curl -H "X-App-Code: seloko" http://localhost:3000/api/auth/me
 ```
 
 Registered codes: `seloko`, `bapenda-profile`, `lapak-jambi-web`, `lapak-jambi-app`.
+
+### 1b. Dua dunia akun: pegawai (INTERNAL) dan warga (PUBLIC)
+
+`users.accountType`, `applications.audience`, dan `roles.audience` memakai enum
+yang sama. Aturannya:
+
+| | Pegawai (`INTERNAL`) | Warga (`PUBLIC`) |
+|---|---|---|
+| Masuk lewat | aplikasi `INTERNAL` saja — **seloko**, super app sentral | aplikasi `PUBLIC` tempat ia sudah terdaftar |
+| Identity login | email atau username | email saja (username null) |
+| Syarat login | punya penugasan berlaku di aplikasi **mana pun** | punya penugasan berlaku di aplikasi **itu** |
+| Mengelola aplikasi lain | ya, lewat seloko, sesuai role di aplikasi itu | tidak pernah |
+
+- Email unik per `(accountType, email)`: pegawai yang juga belanja di lapak punya
+  **dua akun terpisah** dengan email sama. Aplikasi yang dituju yang menentukan
+  baris mana yang dicari saat login.
+- Di aplikasi publik, akun pegawai "tidak ada" → `401` generik, identik dengan
+  akun tak dikenal. Bukan `403 akun pegawai` — itu membocorkan siapa pegawai.
+- Super admin selalu `INTERNAL`; ia tidak bisa login ke aplikasi publik.
+- Role ber-audience: penugasan ditolak `400` bila audience role ≠ `accountType`
+  user. Aplikasi `INTERNAL` hanya boleh punya role `INTERNAL`; aplikasi `PUBLIC`
+  boleh keduanya (verifikator lapak = pegawai, pedagang = warga).
+- `audience` aplikasi dan role **final** setelah dibuat. `POST /users` hanya
+  membuat pegawai; akun warga lahir dari pendaftaran mandiri (Fase 2).
 
 ### 2. Dynamic Granular RBAC (No Enum Roles)
 
@@ -95,15 +119,26 @@ for temporary access.
 
 ### 3. Guard Usage in Routes
 
+`requirePermission` **wajib** menyebut aplikasi pemilik modul. Izin dibaca di
+aplikasi itu, bukan di pintu masuk — pegawai login di seloko lalu mengelola
+artikel milik bapenda-profile:
+
 ```typescript
 // In *.routes.ts
 app.delete("/articles/:id", {
   preHandler: [
     fastify.authenticate,
-    fastify.requirePermission("article:delete")
+    fastify.requirePermission("article:delete", { app: APP_CODES.BAPENDA_PROFILE }),
   ],
 }, handleDeleteArticle);
 ```
+
+Tidak ada default "pakai pintu masuk": dengan default itu, warga lapak yang
+kebetulan memegang permission bernama sama (`user:list` milik lapak) akan lolos
+di `/api/users` milik seloko. Hanya akun `INTERNAL` yang boleh menjangkau
+aplikasi lain dari pintu masuknya; akun `PUBLIC` terkunci di aplikasi tempat
+token terbit (`403`). Aturan murninya ada di `src/common/guards/access.ts` dan
+diuji tanpa server oleh `access.check.ts` (bagian dari `npm test`).
 
 ### 4. Background Jobs via RabbitMQ
 

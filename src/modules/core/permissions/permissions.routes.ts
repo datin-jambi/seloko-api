@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { APP_CODES } from "~/common/constants/index.js";
 import {
   ListPermissionsQuerySchema,
   ListPermissionsResponseSchema,
@@ -37,7 +38,7 @@ export async function permissionsRoutes(fastify: FastifyInstance): Promise<void>
       querystring: ListModulesQuerySchema,
       response: { 200: ListModulesResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("permission:list")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("permission:list", { app: APP_CODES.SELOKO })],
   }, handleListModules);
 
   // ── GET /permissions/:applicationId/me ─────────────────────────────────────
@@ -63,7 +64,7 @@ export async function permissionsRoutes(fastify: FastifyInstance): Promise<void>
       querystring: ListPermissionsQuerySchema,
       response: { 200: ListPermissionsResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("permission:list")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("permission:list", { app: APP_CODES.SELOKO })],
   }, handleListPermissions);
 
   // ── GET /permissions/:id ───────────────────────────────────────────────────
@@ -74,7 +75,7 @@ export async function permissionsRoutes(fastify: FastifyInstance): Promise<void>
       params: PermissionParamsSchema,
       response: { 200: GetPermissionResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("permission:read")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("permission:read", { app: APP_CODES.SELOKO })],
   }, handleGetPermission);
 
   // ── POST /permissions ──────────────────────────────────────────────────────
@@ -85,7 +86,7 @@ export async function permissionsRoutes(fastify: FastifyInstance): Promise<void>
       body: CreatePermissionBodySchema,
       response: { 201: CreatePermissionResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("permission:create")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("permission:create", { app: APP_CODES.SELOKO })],
   }, handleCreatePermission);
 
   // ── PATCH /permissions/:id ─────────────────────────────────────────────────
@@ -97,7 +98,7 @@ export async function permissionsRoutes(fastify: FastifyInstance): Promise<void>
       body: UpdatePermissionBodySchema,
       response: { 200: UpdatePermissionResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("permission:update")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("permission:update", { app: APP_CODES.SELOKO })],
   }, handleUpdatePermission);
 
   // ── DELETE /permissions/:id ────────────────────────────────────────────────
@@ -109,6 +110,6 @@ export async function permissionsRoutes(fastify: FastifyInstance): Promise<void>
       params: PermissionParamsSchema,
       response: { 200: DeletePermissionResponseSchema },
     },
-    preHandler: [fastify.authenticate, fastify.requirePermission("permission:delete")],
+    preHandler: [fastify.authenticate, fastify.requirePermission("permission:delete", { app: APP_CODES.SELOKO })],
   }, handleDeletePermission);
 }

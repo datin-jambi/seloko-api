@@ -82,12 +82,22 @@ async function seedUser(
     def.password ??
     defaultPassword;
 
-  const passwordHash = await hashPassword(plain);
-  const username = def.username.toLowerCase();
+  const accountType = def.accountType ?? "INTERNAL";
   const email = def.email.toLowerCase();
+  const username = def.username?.toLowerCase() ?? null;
+  const label = username ?? email;
+
+  if (accountType === "INTERNAL" && !username) {
+    throw new Error(`Akun INTERNAL "${email}" wajib punya username.`);
+  }
+  if (accountType === "PUBLIC" && username) {
+    throw new Error(`Akun PUBLIC "${email}" tidak boleh punya username — warga login dengan email.`);
+  }
+
+  const passwordHash = await hashPassword(plain);
 
   const profile = {
-    email,
+    username,
     fullName: def.fullName,
     nip: def.nip ?? null,
     phoneNumber: def.phoneNumber ?? null,
@@ -97,12 +107,15 @@ async function seedUser(
     deletedAt: def.softDeleted ? new Date() : null,
   };
 
+  // Kunci upsert (accountType, email) — bukan username, karena akun warga
+  // tidak punya username dan email yang sama boleh dimiliki pegawai sekaligus
+  // warga sebagai dua akun berbeda.
   const user = await prisma.user.upsert({
-    where: { username },
+    where: { accountType_email: { accountType, email } },
     // passwordHash hanya di create: seed ulang tidak boleh mengubah kredensial
     // akun yang sudah dipakai untuk pengujian.
     update: profile,
-    create: { username, passwordHash, ...profile },
+    create: { accountType, email, passwordHash, ...profile },
     select: { id: true },
   });
 
@@ -111,7 +124,7 @@ async function seedUser(
       roleIndex,
       assignment.app,
       assignment.role,
-      `user "${def.username}"`,
+      `user "${label}"`,
     );
     await assignRole(user.id, target, resolveExpiry(assignment.expiresAt));
   }
@@ -131,13 +144,15 @@ async function seedBulkUsers(
     const last = bulk.lastNames[i % bulk.lastNames.length] ?? "Jambi";
     const seq = String(i).padStart(3, "0");
     const username = `${bulk.usernamePrefix}${seq}`;
+    const email = `${username}@${bulk.emailDomain}`;
 
     const user = await prisma.user.upsert({
-      where: { username },
+      where: { accountType_email: { accountType: "INTERNAL", email } },
       update: {},
       create: {
+        accountType: "INTERNAL",
         username,
-        email: `${username}@${bulk.emailDomain}`,
+        email,
         passwordHash,
         fullName: `${first} ${last}`,
         // NIP semu tapi berpola 18 digit seperti NIP ASN asli.

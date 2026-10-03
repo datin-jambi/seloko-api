@@ -28,8 +28,10 @@ login_code() { curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/auth/login"
 
 check "superadmin @seloko"              200 "$(login_code superadmin seloko 'SelokoBapenda@2025!')"
 check "admin.seloko @seloko"            200 "$(login_code admin.seloko seloko)"
-check "editor.profil @bapenda-profile"  200 "$(login_code editor.profil bapenda-profile)"
-check "editor.profil @seloko (app lain)" 403 "$(login_code editor.profil seloko)"
+# Pegawai masuk lewat seloko (super app) meski role-nya hanya di bapenda-profile;
+# di aplikasi publik ia tidak dikenal sama sekali.
+check "editor.profil @seloko (pintu masuk)"     200 "$(login_code editor.profil seloko)"
+check "editor.profil @bapenda-profile (publik)" 401 "$(login_code editor.profil bapenda-profile)"
 check "nonaktif (isActive=false)"       401 "$(login_code nonaktif seloko)"
 check "terhapus (soft deleted)"         401 "$(login_code terhapus seloko)"
 check "tanpa.role"                      403 "$(login_code tanpa.role seloko)"
@@ -60,7 +62,7 @@ check "viewer POST (tanpa user:create)" 403 \
 check "tanpa token"          401 "$(code "$BASE/users" -H "$H_APP")"
 check "tanpa X-App-Code"     400 "$(code "$BASE/users" -H "Authorization: Bearer $T_ADMIN")"
 check "token app lain dipakai di seloko" 403 \
-  "$(code "$BASE/users" -H "Authorization: Bearer $(login editor.profil bapenda-profile | jqf '.data.accessToken')" -H "$H_APP")"
+  "$(code "$BASE/users" -H "Authorization: Bearer $(login warga.pedagang@gmail.com lapak-jambi-web | jqf '.data.accessToken')" -H "$H_APP")"
 
 echo "== Pagination & filter (butuh data massal) =="
 # Catatan: buildPaginatedResult menaruh `meta` di ROOT respons (sejajar `data`),
@@ -78,10 +80,12 @@ printf '  info isActive=false: total %s\n' "$(echo "$F" | jqf '.meta.total')"
 echo "== /auth/me: permission ter-resolve per aplikasi =="
 ME_VIEW=$(curl -s "$BASE/auth/me" -H "Authorization: Bearer $T_VIEW" -H "$H_APP")
 check "viewer.only role"  viewer "$(echo "$ME_VIEW" | jqf '.data.roles[0]')"
-T_MULTI=$(login multirole lapak-jambi-web | jqf '.data.accessToken')
-ME_MULTI=$(curl -s "$BASE/auth/me" -H "Authorization: Bearer $T_MULTI" -H 'X-App-Code: lapak-jambi-web')
-check "multirole punya 2 role di 1 app" 2 "$(echo "$ME_MULTI" | jqf '.data.roles.length')"
-printf '  info permission union multirole: %s\n' "$(echo "$ME_MULTI" | jqf '.data.permissions.length')"
+# /auth/me melaporkan role di pintu masuk; role pegawai di aplikasi lain dibaca
+# lewat /permissions/:appId/me (diuji di my-permissions.smoke.sh).
+T_MULTI=$(login multirole seloko | jqf '.data.accessToken')
+ME_MULTI=$(curl -s "$BASE/auth/me" -H "Authorization: Bearer $T_MULTI" -H "$H_APP")
+check "multirole accountType INTERNAL" INTERNAL "$(echo "$ME_MULTI" | jqf '.data.accountType')"
+check "multirole tanpa role di seloko"  0 "$(echo "$ME_MULTI" | jqf '.data.roles.length')"
 ME_SA=$(curl -s "$BASE/auth/me" -H "Authorization: Bearer $(login superadmin seloko 'SelokoBapenda@2025!' | jqf '.data.accessToken')" -H "$H_APP")
 check "superadmin isSuperAdmin" true "$(echo "$ME_SA" | jqf '.data.isSuperAdmin')"
 

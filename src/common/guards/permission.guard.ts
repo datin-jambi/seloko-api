@@ -6,7 +6,19 @@ import { prisma } from "~/config/database.js";
 import { setCachedPermissions } from "~/config/redis.js";
 import { ForbiddenError, UnauthorizedError } from "~/common/errors/index.js";
 import type { JwtPayload } from "~/common/types/index.js";
+import { resolveTargetApp } from "./access.js";
 
+/** Opsi requirePermission. */
+export interface PermissionOptions {
+  /**
+   * Kode aplikasi PEMILIK modul ini: "seloko" untuk modul inti, mis.
+   * "bapenda-profile" untuk modul artikel. WAJIB — lihat resolveTargetApp
+   * untuk celah yang muncul bila dibiarkan default ke pintu masuk.
+   * Ditetapkan di kode, bukan dikirim klien: nilai kendali klien tidak boleh
+   * menentukan aplikasi mana yang izinnya diperiksa.
+   */
+  app: string;
+}
 
 // ─── Module Augmentation: Add requirePermission to Fastify ────────────────────
 declare module "fastify" {
@@ -16,12 +28,15 @@ declare module "fastify" {
      *
      * Usage in route definition:
      * ```ts
-     * preHandler: [fastify.authenticate, fastify.requirePermission("article:publish")]
+     * preHandler: [
+     *   fastify.authenticate,
+     *   fastify.requirePermission("article:publish", { app: "bapenda-profile" }),
+     * ]
      * ```
      *
      * @param permissionCode - Kode permission penuh, mis. "article:publish"
      */
-    requirePermission(permissionCode: string): preHandlerHookHandler;
+    requirePermission(permissionCode: string, options: PermissionOptions): preHandlerHookHandler;
 
     /**
      * PreHandler hook that validates JWT and populates request.user.
@@ -143,7 +158,10 @@ async function permissionGuardPlugin(
   // ── requirePermission decorator ───────────────────────────────────────────
   fastify.decorate(
     "requirePermission",
-    function requirePermission(permissionCode: string): preHandlerHookHandler {
+    function requirePermission(
+      permissionCode: string,
+      options: PermissionOptions,
+    ): preHandlerHookHandler {
       return async function checkPermission(
         request: FastifyRequest,
         _reply: FastifyReply,
@@ -154,17 +172,24 @@ async function permissionGuardPlugin(
           throw new UnauthorizedError();
         }
 
+        // Pagar lintas aplikasi dijalankan SEBELUM bypass super admin: super
+        // admin selalu akun INTERNAL, jadi tidak pernah tertahan di sini, tapi
+        // urutan ini menjamin token warga tidak pernah lolos lewat jalan pintas.
+        const targetApp = resolveTargetApp(user.accountType, request.appCode, options.app);
+        if (targetApp === null) {
+          throw new ForbiddenError(
+            `Akses ke modul aplikasi "${options.app}" tidak diizinkan dari "${request.appCode}"`,
+          );
+        }
+
         // Super admins bypass ALL permission checks
         if (user.isSuperAdmin) return;
 
-        const appCode = request.appCode;
-        const userId = user.sub;
-
-        const permissions = await resolveUserPermissions(userId, appCode);
+        const permissions = await resolveUserPermissions(user.sub, targetApp);
 
         if (!permissions.includes(permissionCode)) {
           throw new ForbiddenError(
-            `Permission denied: "${permissionCode}" is required`,
+            `Permission denied: "${permissionCode}" is required on "${targetApp}"`,
           );
         }
       };

@@ -46,8 +46,9 @@ check "counts tidak dibocorkan" false "$(echo "$SU_BODY" | j '"counts" in o.data
 
 echo
 echo "== Satu aplikasi =="
-ED=$(token editor.profil bapenda-profile)
-ED_BODY=$(me "$ED" bapenda-profile)
+# Pegawai selalu masuk lewat seloko; launcher-nya memuat aplikasi yang ia kelola.
+ED=$(token editor.profil seloko)
+ED_BODY=$(me "$ED" seloko)
 check "editor.profil → 1 aplikasi" 1 "$(echo "$ED_BODY" | j 'o.data.length')"
 check "editor.profil → bapenda-profile" "bapenda-profile" "$(echo "$ED_BODY" | j 'o.data[0].code')"
 check "editor.profil → role 'editor'" "editor" "$(echo "$ED_BODY" | j 'o.data[0].roles.join()')"
@@ -65,8 +66,8 @@ check "lintasapp → urut per kode" true \
 echo
 echo "== Multi-role di satu aplikasi =="
 # multirole punya DUA role di lapak-jambi-web (editor + verifikator).
-MR=$(token multirole lapak-jambi-web)
-MR_BODY=$(me "$MR" lapak-jambi-web)
+MR=$(token multirole seloko)
+MR_BODY=$(me "$MR" seloko)
 # Dua role di aplikasi yang sama harus tampil sebagai SATU entri, roles digabung.
 check "multirole → 1 aplikasi" 1 "$(echo "$MR_BODY" | j 'o.data.length')"
 check "multirole → aplikasi tidak terduplikasi" true \
@@ -89,14 +90,21 @@ check "role.sementara → expiresAt terisi" true \
   "$(echo "$TMP_BODY" | j 'o.data[0].expiresAt !== null')"
 
 echo
-echo "== Konsisten dengan izin login =="
-# Daftar ini tidak boleh memuat aplikasi yang justru menolak saat diklik.
-for CODE in $(echo "$LA_BODY" | j 'o.data.map(a=>a.code).join(" ")'); do
-  check "lintasapp dapat login @$CODE" 200 \
-    "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/auth/login" \
-       -H 'Content-Type: application/json' -H "X-App-Code: $CODE" \
-       -d "{\"identity\":\"lintasapp\",\"password\":\"$PW\"}")"
+echo "== Konsisten dengan izin =="
+# Tiap aplikasi di launcher pegawai harus punya izin yang terbaca dari seloko —
+# kalau tidak, kartunya terbuka ke layar yang semuanya 403.
+for ID in $(echo "$LA_BODY" | j 'o.data.map(a=>a.id).join(" ")'); do
+  check "lintasapp punya izin di $ID" true \
+    "$(curl -s "$BASE/permissions/$ID/me" -H "Authorization: Bearer $LA" -H 'X-App-Code: seloko' | j 'o.data.total > 0')"
 done
+
+echo
+echo "== Warga: hanya aplikasi tempat ia terdaftar =="
+W=$(token warga.pedagang@gmail.com lapak-jambi-web)
+W_BODY=$(me "$W" lapak-jambi-web)
+check "warga.pedagang → 1 aplikasi" 1 "$(echo "$W_BODY" | j 'o.data.length')"
+check "warga.pedagang → lapak-jambi-web/pedagang" "lapak-jambi-web/pedagang" \
+  "$(echo "$W_BODY" | j 'o.data[0].code+"/"+o.data[0].roles.join()')"
 
 echo
 echo "$([ "$fail" = 0 ] && echo '✅' || echo '❌') $pass ok, $fail gagal"

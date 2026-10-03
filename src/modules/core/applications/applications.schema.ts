@@ -1,5 +1,45 @@
 import { z } from "zod";
 
+// ─── Settings ─────────────────────────────────────────────────────────────────
+/**
+ * Konfigurasi tampilan per aplikasi — hanya dibaca front-end, tidak pernah
+ * ditegakkan API. Disimpan sebagai JSONB supaya field baru tidak butuh migrasi,
+ * tapi bentuknya tetap dikunci di sini: `.strict()` menolak key asing agar
+ * salah ketik ("primaryColour") tidak tersimpan diam-diam lalu tak terbaca.
+ *
+ * Secret (SMTP, token WA) TIDAK PERNAH masuk sini — settings ikut keluar di
+ * respons GET. Tempatnya tabel integrasi terenkripsi (Fase 2).
+ */
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Warna harus hex 6 digit, mis. #0F766E");
+
+export const ApplicationSettingsSchema = z
+  .object({
+    branding: z
+      .object({
+        shortName: z.string().max(30).optional(),
+        primaryColor: hexColor.optional(),
+        faviconUrl: z.string().url().max(255).optional(),
+      })
+      .strict()
+      .optional(),
+    seo: z
+      .object({
+        /** Mis. "%s | Lapak Jambi" — %s diganti judul halaman. */
+        titleTemplate: z.string().max(100).optional(),
+        description: z.string().max(300).optional(),
+        ogImageUrl: z.string().url().max(255).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+export type ApplicationSettings = z.infer<typeof ApplicationSettingsSchema>;
+
+const audienceField = z
+  .enum(["INTERNAL", "PUBLIC"])
+  .describe("INTERNAL = pegawai lewat seloko; PUBLIC = warga daftar sendiri");
+
 // ─── Shared Shapes ────────────────────────────────────────────────────────────
 const ApplicationShape = z.object({
   id: z.string(),
@@ -8,6 +48,9 @@ const ApplicationShape = z.object({
   description: z.string().nullable(),
   baseUrl: z.string().nullable(),
   icon: z.string().nullable(),
+  audience: audienceField,
+  logoUrl: z.string().nullable(),
+  settings: ApplicationSettingsSchema,
   isActive: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -32,6 +75,7 @@ const ApplicationDetailShape = ApplicationShape.extend({
       id: z.string(),
       name: z.string(),
       description: z.string().nullable(),
+      audience: audienceField,
       isSystemRole: z.boolean(),
       isActive: z.boolean(),
       permissionCount: z.number(),
@@ -82,6 +126,7 @@ export const ListApplicationsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().optional().describe("Cari berdasarkan kode atau nama"),
+  audience: audienceField.optional(),
   isActive: z.enum(["true", "false"]).optional().describe("Filter status aktif"),
 });
 
@@ -114,6 +159,7 @@ const MyApplicationShape = ApplicationShape.pick({
   description: true,
   baseUrl: true,
   icon: true,
+  logoUrl: true,
 }).extend({
   /** Role yang dipegang di aplikasi ini. Kosong untuk super admin (bypass). */
   roles: z.array(z.string()),
@@ -142,9 +188,13 @@ export const GetApplicationResponseSchema = z.object({
 export const CreateApplicationBodySchema = z.object({
   code: codeField,
   name: nameField,
+  /** Wajib dan final — lihat catatan UpdateApplicationBodySchema. */
+  audience: audienceField,
   description: z.string().max(500).optional(),
   baseUrl: baseUrlField.optional(),
   icon: iconField.optional(),
+  logoUrl: z.string().url("Format URL logo tidak valid").max(255).optional(),
+  settings: ApplicationSettingsSchema.default({}),
   isActive: z.boolean().default(true),
 });
 
@@ -160,6 +210,14 @@ export const CreateApplicationResponseSchema = z.object({
  * klien yang sudah terpasang, di refresh_tokens.app_code, dan di audit_logs
  * yang bersifat tak-termutasi. Ganti kode = putus seluruh sesi aktif dan
  * memutus jejak audit dari aplikasinya.
+ *
+ * `audience` juga tidak bisa diubah: mengubah aplikasi publik menjadi internal
+ * membuat seluruh akun warga yang terdaftar terkunci, dan sebaliknya membuka
+ * aplikasi pegawai untuk pendaftaran umum. Itu migrasi, bukan suntingan.
+ *
+ * `settings` diganti UTUH, bukan digabung: PATCH {settings:{seo:{…}}} menghapus
+ * branding. Sengaja — layar pengaturan CMS mengirim seluruh form, dan
+ * penggabungan dalam (deep merge) membuat field tidak bisa dikosongkan.
  */
 export const UpdateApplicationBodySchema = z
   .object({
@@ -167,6 +225,8 @@ export const UpdateApplicationBodySchema = z
     description: z.string().max(500).nullable().optional(),
     baseUrl: baseUrlField.nullable().optional(),
     icon: iconField.nullable().optional(),
+    logoUrl: z.string().url("Format URL logo tidak valid").max(255).nullable().optional(),
+    settings: ApplicationSettingsSchema.optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "Setidaknya satu field harus diisi untuk update",

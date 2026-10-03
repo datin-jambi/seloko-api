@@ -66,11 +66,12 @@ check "→ isinya tidak kosong" true "$(mine "$TV0" seloko "$SELOKO" | j 'o.data
 
 echo
 echo "== Pengguna aplikasi LAIN bisa menanyakan aplikasinya sendiri =="
-TV=$(token verifikator.lapak lapak-jambi-web)
-V=$(mine "$TV" lapak-jambi-web "$LAPAK")
+# Pegawai masuk lewat seloko lalu menanyakan izinnya di lapak.
+TV=$(token verifikator.lapak seloko)
+V=$(mine "$TV" seloko "$LAPAK")
 check "verifikator.lapak @lapak → 200" 200 \
   "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/permissions/$LAPAK/me" \
-     -H "Authorization: Bearer $TV" -H 'X-App-Code: lapak-jambi-web')"
+     -H "Authorization: Bearer $TV" -H 'X-App-Code: seloko')"
 check "→ izinnya tidak kosong" true "$(echo "$V" | j 'o.data.total > 0')"
 check "→ aplikasi yang dilaporkan benar" "lapak-jambi-web" "$(echo "$V" | j 'o.data.application.code')"
 check "→ role dilaporkan" "verifikator" "$(echo "$V" | j 'o.data.roles[0].name')"
@@ -78,7 +79,9 @@ check "→ isSuperAdmin false" false "$(echo "$V" | j 'o.data.isSuperAdmin')"
 
 echo
 echo "== Cocok dengan /auth/me (sumber yang sama, tak boleh melenceng) =="
-for spec in "viewer.only:seloko:$SELOKO" "editor.profil:bapenda-profile:$BAPENDA" "verifikator.lapak:lapak-jambi-web:$LAPAK" "multirole:lapak-jambi-web:$LAPAK"; do
+# /auth/me menjawab untuk aplikasi pintu masuk, jadi pembandingan hanya bermakna
+# saat applicationId == pintu masuk: pegawai di seloko, warga di lapak.
+for spec in "viewer.only:seloko:$SELOKO" "admin.seloko:seloko:$SELOKO" "operator.user:seloko:$SELOKO" "warga.pedagang@gmail.com:lapak-jambi-web:$LAPAK"; do
   IFS=: read -r who app appid <<< "$spec"
   T=$(token "$who" "$app")
   FROM_ME=$(curl -s "$BASE/auth/me" -H "Authorization: Bearer $T" -H "X-App-Code: $app" | j 'JSON.stringify(o.data.permissions.slice().sort())')
@@ -89,8 +92,8 @@ done
 
 echo
 echo "== multirole: gabungan dua role, bukan salah satu =="
-TM=$(token multirole lapak-jambi-web)
-M=$(mine "$TM" lapak-jambi-web "$LAPAK")
+TM=$(token multirole seloko)
+M=$(mine "$TM" seloko "$LAPAK")
 check "→ dua role dilaporkan" 2 "$(echo "$M" | j 'o.data.roles.length')"
 check "→ role terurut" "editor,verifikator" "$(echo "$M" | j 'o.data.roles.map(r=>r.name).join(",")')"
 check "→ total = gabungan, bukan irisan" true \
@@ -141,7 +144,7 @@ check "lintasapp @seloko → hanya izin viewer" true \
 # Token terbit untuk lapak-jambi-app (di sana dia punya role), tapi yang
 # ditanyakan lapak-jambi-web — di situ dia tidak punya penugasan apa pun.
 check "lintasapp @lapak-jambi-app → tanya lapak-jambi-web → kosong" 0 \
-  "$(mine "$(token lintasapp lapak-jambi-app)" lapak-jambi-app "$LAPAK" | j 'o.data.total')"
+  "$(mine "$(token lintasapp seloko)" seloko "$LAPAK" | j 'o.data.total')"
 
 echo
 echo "== Perubahan izin langsung terlihat (cache dibuang) =="

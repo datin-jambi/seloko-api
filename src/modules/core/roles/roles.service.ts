@@ -23,6 +23,7 @@ const ROLE_SELECT = {
   applicationId: true,
   name: true,
   description: true,
+  audience: true,
   isSystemRole: true,
   isActive: true,
   createdAt: true,
@@ -35,6 +36,7 @@ type RoleRow = {
   applicationId: string;
   name: string;
   description: string | null;
+  audience: "INTERNAL" | "PUBLIC";
   isSystemRole: boolean;
   isActive: boolean;
   createdAt: Date;
@@ -97,11 +99,12 @@ async function assertPermissionsBelongToApp(
 
 // ─── List ─────────────────────────────────────────────────────────────────────
 export async function listRoles(query: ListRolesQuery) {
-  const { page, limit, search, applicationId, isActive, isSystemRole } = query;
+  const { page, limit, search, applicationId, isActive, isSystemRole, audience } = query;
   const skip = (page - 1) * limit;
 
   const where = {
     ...(applicationId !== undefined && { applicationId }),
+    ...(audience !== undefined && { audience }),
     ...(isActive !== undefined && { isActive: isActive === "true" }),
     ...(isSystemRole !== undefined && { isSystemRole: isSystemRole === "true" }),
     ...(search && { name: { contains: search, mode: "insensitive" as const } }),
@@ -183,7 +186,7 @@ export async function getRoleById(id: string) {
 export async function createRole(data: CreateRoleBody) {
   const app = await prisma.application.findUnique({
     where: { id: data.applicationId },
-    select: { id: true, isActive: true },
+    select: { id: true, isActive: true, audience: true },
   });
 
   if (!app) {
@@ -194,6 +197,14 @@ export async function createRole(data: CreateRoleBody) {
   if (!app.isActive) {
     throw new BadRequestError(
       "Tidak dapat membuat role pada aplikasi yang sedang nonaktif",
+    );
+  }
+
+  // Warga tidak pernah login ke aplikasi internal, jadi role PUBLIC di sana
+  // tidak akan pernah bisa dipakai siapa pun — tolak daripada menyesatkan.
+  if (app.audience === "INTERNAL" && data.audience === "PUBLIC") {
+    throw new BadRequestError(
+      "Aplikasi internal hanya dapat memiliki role untuk akun pegawai",
     );
   }
 
@@ -215,6 +226,7 @@ export async function createRole(data: CreateRoleBody) {
     data: {
       applicationId: app.id,
       name: data.name,
+      audience: data.audience,
       description: data.description ?? null,
       isActive: data.isActive,
       rolePermissions: {

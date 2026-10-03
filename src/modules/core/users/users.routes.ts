@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { APP_CODES } from "~/common/constants/index.js";
 import {
   ListUsersQuerySchema,
   ListUsersResponseSchema,
@@ -41,7 +42,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("user:list"),
+      fastify.requirePermission("user:list", { app: APP_CODES.SELOKO }),
     ],
   }, handleListUsers);
 
@@ -55,7 +56,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("user:read"),
+      fastify.requirePermission("user:read", { app: APP_CODES.SELOKO }),
     ],
   }, handleGetUser);
 
@@ -69,7 +70,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("user:create"),
+      fastify.requirePermission("user:create", { app: APP_CODES.SELOKO }),
     ],
   }, handleCreateUser);
 
@@ -84,7 +85,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("user:update"),
+      fastify.requirePermission("user:update", { app: APP_CODES.SELOKO }),
     ],
   }, handleUpdateUser);
 
@@ -99,7 +100,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("user:update"),
+      fastify.requirePermission("user:update", { app: APP_CODES.SELOKO }),
     ],
   }, handleSetActive);
 
@@ -113,7 +114,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("user:delete"),
+      fastify.requirePermission("user:delete", { app: APP_CODES.SELOKO }),
     ],
   }, handleDeleteUser);
 
@@ -128,7 +129,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("user-app-role:create"),
+      fastify.requirePermission("user-app-role:create", { app: APP_CODES.SELOKO }),
     ],
   }, handleAssignRole);
 
@@ -142,7 +143,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("user-app-role:delete"),
+      fastify.requirePermission("user-app-role:delete", { app: APP_CODES.SELOKO }),
     ],
   }, handleRevokeRole);
 }

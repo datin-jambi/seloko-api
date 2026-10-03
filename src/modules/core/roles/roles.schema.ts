@@ -8,6 +8,8 @@ const RoleShape = z.object({
   applicationName: z.string(),
   name: z.string(),
   description: z.string().nullable(),
+  /** Jenis akun yang boleh memegang role ini. Final setelah dibuat. */
+  audience: z.enum(["INTERNAL", "PUBLIC"]),
   isSystemRole: z.boolean(),
   isActive: z.boolean(),
   createdAt: z.string().datetime(),
@@ -77,6 +79,7 @@ export const ListRolesQuerySchema = z.object({
     .describe("Batasi ke satu aplikasi"),
   isActive: z.enum(["true", "false"]).optional(),
   isSystemRole: z.enum(["true", "false"]).optional(),
+  audience: z.enum(["INTERNAL", "PUBLIC"]).optional(),
 });
 
 export const ListRolesResponseSchema = z.object({
@@ -108,6 +111,12 @@ export const GetRoleResponseSchema = z.object({
 export const CreateRoleBodySchema = z.object({
   applicationId: z.string().uuid("Application ID harus berformat UUID"),
   name: nameField,
+  /**
+   * Absen = INTERNAL. Aplikasi INTERNAL hanya menerima role INTERNAL (warga
+   * tidak pernah login ke sana); aplikasi PUBLIC menerima keduanya —
+   * verifikator lapak adalah pegawai, pedagang lapak adalah warga.
+   */
+  audience: z.enum(["INTERNAL", "PUBLIC"]).default("INTERNAL"),
   description: descriptionField.optional(),
   /** Boleh kosong: role tanpa izin berguna sebagai penanda akses aplikasi saja. */
   permissionIds: permissionIdsField.default([]),

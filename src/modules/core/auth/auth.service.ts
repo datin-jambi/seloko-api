@@ -7,6 +7,7 @@ import {
   blockAccessToken,
 } from "~/config/redis.js";
 import { resolveUserPermissions } from "~/common/guards/permission.guard.js";
+import { canAccountUseApp, type Audience } from "~/common/guards/access.js";
 import { env } from "~/config/env.js";
 import {
   UnauthorizedError,
@@ -25,33 +26,53 @@ function hashToken(rawToken: string): string {
 /**
  * Memastikan user berhak masuk ke aplikasi yang diminta.
  *
- * Tanpa ini siapa pun yang punya akun di ekosistem bisa login ke aplikasi mana
- * pun hanya dengan mengganti header X-App-Code — misalnya pedagang lapak masuk
- * ke CMS internal. Satu-satunya penahan tersisa adalah requirePermission di
- * tiap route, sehingga route yang lupa memasang guard langsung terbuka.
+ * Tiga lapis, semuanya harus lolos:
+ *   1. Aplikasi terdaftar dan aktif.
+ *   2. Jenis akun cocok dengan audience aplikasi. Pegawai hanya masuk lewat
+ *      aplikasi INTERNAL (seloko); warga hanya ke aplikasi PUBLIC. Lapis ini
+ *      berdiri sendiri: bila suatu saat ada bug yang memberi akun warga role
+ *      di aplikasi internal, warga itu tetap tidak bisa login ke sana.
+ *   3. Untuk akun PUBLIC: punya penugasan role yang berlaku di aplikasi itu.
+ *      Data dari aplikasi A tidak memberi akses ke aplikasi B — warga harus
+ *      mendaftar di B lebih dulu.
+ *      Untuk akun INTERNAL: punya penugasan berlaku di aplikasi MANA PUN.
+ *      Seloko adalah pintu masuk super app; pegawai yang hanya mengelola
+ *      bapenda-profile tetap masuk lewat seloko, lalu izinnya dibaca di
+ *      bapenda-profile oleh requirePermission(..., { app }).
  *
- * Super admin dikecualikan: mereka memang lintas-aplikasi.
+ * Super admin melewati lapis 3, tapi TIDAK lapis 2 — super admin selalu akun
+ * INTERNAL, dan tetap tidak boleh login ke aplikasi publik sebagai warga.
  */
 async function assertUserCanAccessApp(
-  userId: string,
-  isSuperAdmin: boolean,
+  user: { id: string; isSuperAdmin: boolean; accountType: Audience },
   appCode: string,
 ): Promise<void> {
-  if (isSuperAdmin) return;
-
   const application = await prisma.application.findUnique({
     where: { code: appCode },
-    select: { id: true, isActive: true },
+    select: { id: true, isActive: true, audience: true },
   });
 
   if (!application || !application.isActive) {
     throw new ForbiddenError(`Aplikasi "${appCode}" tidak aktif atau tidak terdaftar`);
   }
 
+  if (!canAccountUseApp(user.accountType, application.audience)) {
+    throw new ForbiddenError(
+      user.accountType === "INTERNAL"
+        ? `Akun pegawai tidak dapat masuk ke aplikasi publik "${appCode}"`
+        : `Akun publik tidak dapat masuk ke aplikasi internal "${appCode}"`,
+    );
+  }
+
+  if (user.isSuperAdmin) return;
+
   const assignment = await prisma.userAppRole.findFirst({
     where: {
-      userId,
-      applicationId: application.id,
+      userId: user.id,
+      // PUBLIC: harus terdaftar di aplikasi ini. INTERNAL: cukup punya
+      // penugasan berlaku di aplikasi internal/publik mana pun.
+      ...(user.accountType === "PUBLIC" && { applicationId: application.id }),
+      application: { isActive: true },
       role: { isActive: true },
       OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
     },
@@ -63,6 +84,28 @@ async function assertUserCanAccessApp(
   }
 }
 
+/** Payload token akses — satu sumber untuk login dan refresh. */
+function buildAccessPayload(
+  user: {
+    id: string;
+    email: string;
+    username: string | null;
+    isSuperAdmin: boolean;
+    accountType: Audience;
+  },
+  appCode: string,
+): JwtPayload {
+  return {
+    sub: user.id,
+    email: user.email,
+    username: user.username,
+    accountType: user.accountType,
+    isSuperAdmin: user.isSuperAdmin,
+    appCode,
+    type: "access",
+  };
+}
+
 // ─── Service Methods ──────────────────────────────────────────────────────────
 export interface LoginResult {
   accessToken: string;
@@ -71,9 +114,10 @@ export interface LoginResult {
   user: {
     id: string;
     email: string;
-    username: string;
+    username: string | null;
     fullName: string;
     avatarUrl: string | null;
+    accountType: Audience;
     isSuperAdmin: boolean;
   };
 }
@@ -90,19 +134,30 @@ export async function loginUser(
   ipAddress?: string,
   userAgent?: string,
 ): Promise<LoginResult> {
-  // Find user by email or username
+  // Jenis akun ditentukan oleh aplikasi yang dituju, BUKAN oleh identity.
+  // Email yang sama bisa dimiliki satu akun pegawai dan satu akun warga, jadi
+  // tanpa ini login lapak dengan email pegawai bisa mengambil baris pegawai.
+  const app = await prisma.application.findUnique({
+    where: { code: appCode },
+    select: { audience: true },
+  });
+  if (!app) {
+    // Pesan generik, sama dengan kredensial salah — tidak membocorkan
+    // keberadaan aplikasi kepada penebak.
+    throw new UnauthorizedError("Invalid credentials");
+  }
+
+  const normalized = identity.toLowerCase();
   const user = await prisma.user.findFirst({
     where: {
-      AND: [
-        { deletedAt: null },
-        { isActive: true },
-        {
-          OR: [
-            { email: identity.toLowerCase() },
-            { username: identity.toLowerCase() },
-          ],
-        },
-      ],
+      deletedAt: null,
+      isActive: true,
+      accountType: app.audience,
+      // Pegawai: email atau username. Warga: email saja.
+      OR:
+        app.audience === "INTERNAL"
+          ? [{ email: normalized }, { username: normalized }]
+          : [{ email: normalized }],
     },
     select: {
       id: true,
@@ -111,8 +166,8 @@ export async function loginUser(
       fullName: true,
       avatarUrl: true,
       passwordHash: true,
+      accountType: true,
       isSuperAdmin: true,
-      isActive: true,
     },
   });
 
@@ -127,17 +182,9 @@ export async function loginUser(
   }
 
   // Kredensial benar bukan berarti berhak masuk aplikasi ini.
-  await assertUserCanAccessApp(user.id, user.isSuperAdmin, appCode);
+  await assertUserCanAccessApp(user, appCode);
 
-  // Build JWT payload
-  const accessPayload: JwtPayload = {
-    sub: user.id,
-    email: user.email,
-    username: user.username,
-    isSuperAdmin: user.isSuperAdmin,
-    appCode,
-    type: "access",
-  };
+  const accessPayload = buildAccessPayload(user, appCode);
 
   const refreshPayload: JwtPayload = {
     ...accessPayload,
@@ -190,6 +237,7 @@ export async function loginUser(
       username: user.username,
       fullName: user.fullName,
       avatarUrl: user.avatarUrl,
+      accountType: user.accountType,
       isSuperAdmin: user.isSuperAdmin,
     },
   };
@@ -257,7 +305,7 @@ export async function refreshAccessToken(
 
   const user = await prisma.user.findUnique({
     where: { id: payload.sub, isActive: true, deletedAt: null },
-    select: { id: true, email: true, username: true, isSuperAdmin: true },
+    select: { id: true, email: true, username: true, isSuperAdmin: true, accountType: true },
   });
 
   if (!user) {
@@ -266,16 +314,9 @@ export async function refreshAccessToken(
 
   // Akses aplikasi bisa dicabut setelah token terbit — periksa ulang setiap
   // rotasi, bukan hanya saat login.
-  await assertUserCanAccessApp(user.id, user.isSuperAdmin, appCode);
+  await assertUserCanAccessApp(user, appCode);
 
-  const newAccessPayload: JwtPayload = {
-    sub: user.id,
-    email: user.email,
-    username: user.username,
-    isSuperAdmin: user.isSuperAdmin,
-    appCode,
-    type: "access",
-  };
+  const newAccessPayload = buildAccessPayload(user, appCode);
 
   const accessToken = fastify.jwt.sign(newAccessPayload, {
     expiresIn: env.JWT_ACCESS_EXPIRES,
@@ -391,10 +432,12 @@ export async function getMe(userId: string, appCode: string) {
       fullName: true,
       avatarUrl: true,
       phoneNumber: true,
+      accountType: true,
       isSuperAdmin: true,
       emailVerifiedAt: true,
       lastLoginAt: true,
-      // Role aktif pada aplikasi ini — sebuah user bisa punya lebih dari satu.
+      // Role aktif pada aplikasi pintu masuk. Pegawai yang mengelola aplikasi
+      // lain melihat izinnya di sana lewat GET /permissions/:appId/me.
       userAppRoles: {
         where: {
           application: { code: appCode, isActive: true },

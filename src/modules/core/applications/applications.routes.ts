@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { APP_CODES } from "~/common/constants/index.js";
 import {
   ListApplicationsQuerySchema,
   ListApplicationsResponseSchema,
@@ -37,7 +38,7 @@ export async function applicationsRoutes(fastify: FastifyInstance): Promise<void
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("application:list"),
+      fastify.requirePermission("application:list", { app: APP_CODES.SELOKO }),
     ],
   }, handleListApplications);
 
@@ -65,7 +66,7 @@ export async function applicationsRoutes(fastify: FastifyInstance): Promise<void
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("application:read"),
+      fastify.requirePermission("application:read", { app: APP_CODES.SELOKO }),
     ],
   }, handleGetApplication);
 
@@ -79,7 +80,7 @@ export async function applicationsRoutes(fastify: FastifyInstance): Promise<void
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("application:create"),
+      fastify.requirePermission("application:create", { app: APP_CODES.SELOKO }),
     ],
   }, handleCreateApplication);
 
@@ -94,7 +95,7 @@ export async function applicationsRoutes(fastify: FastifyInstance): Promise<void
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("application:update"),
+      fastify.requirePermission("application:update", { app: APP_CODES.SELOKO }),
     ],
   }, handleUpdateApplication);
 
@@ -109,7 +110,7 @@ export async function applicationsRoutes(fastify: FastifyInstance): Promise<void
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("application:update"),
+      fastify.requirePermission("application:update", { app: APP_CODES.SELOKO }),
     ],
   }, handleSetApplicationActive);
 
@@ -123,7 +124,7 @@ export async function applicationsRoutes(fastify: FastifyInstance): Promise<void
     },
     preHandler: [
       fastify.authenticate,
-      fastify.requirePermission("application:delete"),
+      fastify.requirePermission("application:delete", { app: APP_CODES.SELOKO }),
     ],
   }, handleDeleteApplication);
 }

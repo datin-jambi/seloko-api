@@ -1,5 +1,5 @@
 {
-  "$comment": "Akun uji. Password polos di sini DISENGAJA — file ini hanya untuk development/staging. Password superadmin dapat ditimpa lewat env SEED_SUPER_ADMIN_PASSWORD. 'roles' memakai kode aplikasi + nama role dari roles.json. expiresAt: 'null' permanen, 'expired' sudah lewat (uji penolakan), atau ISO/'+30d'.",
+  "$comment": "Akun uji. Password polos di sini DISENGAJA — file ini hanya untuk development/staging. Password superadmin dapat ditimpa lewat env SEED_SUPER_ADMIN_PASSWORD. 'roles' memakai kode aplikasi + nama role dari roles.json. expiresAt: 'null' permanen, 'expired' sudah lewat (uji penolakan), atau ISO/'+30d'. 'accountType' absen = INTERNAL (pegawai, wajib username); PUBLIC = warga (email saja, tanpa username).",
   "defaultPassword": "Seloko@2025!",
   "users": [
     {
@@ -248,6 +248,25 @@
       "emailVerified": true,
       "$note": "Kredensial valid tapi tanpa penugasan role — login harus 403 di aplikasi mana pun.",
       "roles": []
+    },
+    {
+      "accountType": "PUBLIC",
+      "email": "warga.pedagang@gmail.com",
+      "fullName": "Rina Marlina",
+      "phoneNumber": "0819-7488-020",
+      "isActive": true,
+      "emailVerified": true,
+      "$note": "Warga terdaftar di lapak-jambi-web sebagai pedagang. Uji: login lapak 200; login seloko & bapenda-profile 403; token lapak tidak bisa menyentuh modul inti seloko.",
+      "roles": [{ "app": "lapak-jambi-web", "role": "pedagang" }]
+    },
+    {
+      "accountType": "PUBLIC",
+      "email": "viewer.only@gmail.com",
+      "fullName": "Hendra Wijaya (akun warga)",
+      "isActive": true,
+      "emailVerified": true,
+      "$note": "Email SAMA dengan pegawai viewer.only — akun warga terpisah. Uji: email identik di dua accountType tidak bentrok, dan login di aplikasi publik mengambil baris warga, bukan pegawai.",
+      "roles": [{ "app": "lapak-jambi-web", "role": "pedagang" }]
     }
   ],
   "bulk": {

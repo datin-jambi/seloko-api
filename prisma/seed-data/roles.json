@@ -1,5 +1,5 @@
 {
-  "$comment": "Label aksi, grup aksi, dan role bawaan. allowedActions=null berarti role menerima SELURUH permission aplikasi. 'apps' mempersempit role ke aplikasi tertentu; kosong/absen berarti dibuat di semua aplikasi.",
+  "$comment": "Label aksi, grup aksi, dan role bawaan. allowedActions=null berarti role menerima SELURUH permission aplikasi. 'apps' mempersempit role ke aplikasi tertentu; kosong/absen berarti dibuat di semua aplikasi. 'audience' absen = INTERNAL; role PUBLIC hanya untuk aplikasi PUBLIC.",
   "actionLabels": {
     "create": "Menambah",
     "read": "Melihat Detail",
@@ -56,6 +56,13 @@
       "apps": ["seloko"],
       "isActive": false,
       "allowedActions": null
+    },
+    {
+      "name": "pedagang",
+      "description": "Warga pemilik lapak: kelola produk dan pesanannya sendiri",
+      "audience": "PUBLIC",
+      "apps": ["lapak-jambi-web"],
+      "allowedActions": ["create", "read", "update", "list"]
     }
   ]
 }

@@ -31,6 +31,14 @@ model Application {
   baseUrl     String?  @map("base_url") @db.VarChar(255)
   /// Nama ikon aplikasi di launcher super app (kunci icon set front-end).
   icon        String?  @db.VarChar(50)
+  /// Siapa yang boleh login: INTERNAL (pegawai, lewat seloko) atau PUBLIC
+  /// (warga). Tidak dapat diubah setelah dibuat — akun yang sudah terdaftar
+  /// akan terdampar di aplikasi yang tiba-tiba berganti jenis.
+  audience    Audience @default(INTERNAL)
+  logoUrl     String?  @map("logo_url") @db.VarChar(255)
+  /// Konfigurasi tampilan yang hanya dibaca front-end: { branding, seo }.
+  /// Bentuknya divalidasi Zod di modul applications, bukan di DB.
+  settings    Json     @default("{}")
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
@@ -134,6 +142,10 @@ model Role {
   applicationId String   @map("app_id") @db.VarChar(36)
   name          String   @db.VarChar(50) // 'superadmin', 'editor', 'verifikator'
   description   String?
+  /// Jenis akun yang boleh memegang role ini. Satu aplikasi publik bisa punya
+  /// role INTERNAL (verifikator, dipakai pegawai lewat seloko) dan PUBLIC
+  /// (pedagang) sekaligus. Tidak dapat diubah setelah dibuat.
+  audience      Audience @default(INTERNAL)
   /// Role bawaan sistem — tidak boleh dihapus lewat CMS.
   isSystemRole  Boolean  @default(false) @map("is_system_role")
   isActive      Boolean  @default(true) @map("is_active")
@@ -169,8 +181,13 @@ model User {
   id              String    @id @default(uuid(7)) @db.VarChar(36)
   /// NIP ASN/pegawai — kosong untuk pengguna non-ASN.
   nip             String?   @unique @db.VarChar(30)
-  username        String    @unique @db.VarChar(50)
-  email           String    @unique @db.VarChar(100)
+  /// INTERNAL = pegawai (login hanya lewat aplikasi INTERNAL, yaitu seloko);
+  /// PUBLIC = warga (login di aplikasi publik). Satu orang yang juga belanja di
+  /// lapak memiliki DUA baris dengan email sama — keduanya tidak pernah bercampur.
+  accountType     Audience  @default(INTERNAL) @map("account_type")
+  /// Wajib untuk INTERNAL (login email/username), null untuk PUBLIC (email saja).
+  username        String?   @unique @db.VarChar(50)
+  email           String    @db.VarChar(100)
   fullName        String    @map("full_name") @db.VarChar(150)
   phoneNumber     String?   @map("phone_number") @db.VarChar(20)
   passwordHash    String    @map("password_hash") @db.VarChar(255) // Argon2id
@@ -188,8 +205,17 @@ model User {
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
 
+  @@unique([accountType, email], map: "uq_users_account_email")
   @@index([deletedAt], map: "idx_users_deleted_at")
   @@map("users")
+}
+
+/// Pemisah dunia pegawai dan warga — dipakai untuk akun, aplikasi, dan role.
+enum Audience {
+  INTERNAL
+  PUBLIC
+
+  @@map("audience")
 }
 
 // ─── User App Roles (Pivot) ────────────────────────────────────────────────────

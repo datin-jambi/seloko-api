@@ -35,7 +35,7 @@ check "tanpa X-App-Code → 400" 400 \
 check "viewer tanpa application:create → 403" 403 \
   "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/applications" \
      -H "$VAUTH" -H "$APP" -H 'Content-Type: application/json' \
-     -d '{"code":"uji-403","name":"Uji"}')"
+     -d '{"code":"uji-403","name":"Uji","audience":"INTERNAL"}')"
 
 echo
 echo "== List & detail =="
@@ -69,14 +69,14 @@ post() { curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/applications" \
   -H "$AUTH" -H "$APP" -H 'Content-Type: application/json' -d "$1"; }
 check "kode huruf besar → 400" 400 "$(post '{"code":"Uji-Besar","name":"Uji"}')"
 check "kode terlalu pendek → 400" 400 "$(post '{"code":"a","name":"Uji"}')"
-check "baseUrl bukan URL → 400" 400 "$(post '{"code":"uji-url","name":"Uji","baseUrl":"bukan"}')"
-check "kode sudah dipakai → 409" 409 "$(post '{"code":"seloko","name":"Duplikat"}')"
+check "baseUrl bukan URL → 400" 400 "$(post '{"code":"uji-url","name":"Uji","audience":"INTERNAL","baseUrl":"bukan"}')"
+check "kode sudah dipakai → 409" 409 "$(post '{"code":"seloko","name":"Duplikat","audience":"INTERNAL"}')"
 
 echo
 echo "== Siklus hidup =="
 CREATED=$(curl -s -X POST "$BASE/applications" -H "$AUTH" -H "$APP" \
   -H 'Content-Type: application/json' \
-  -d '{"code":"uji-siklus","name":"Uji Siklus","baseUrl":"https://uji.test","icon":"flask"}')
+  -d '{"code":"uji-siklus","name":"Uji Siklus","audience":"PUBLIC","baseUrl":"https://uji.test","icon":"flask"}')
 NEW_ID=$(echo "$CREATED" | j '.data.id')
 check "create → id terbit" true "$([ -n "$NEW_ID" ] && echo true || echo false)"
 check "create → baseUrl tersimpan" "https://uji.test" "$(echo "$CREATED" | j '.data.baseUrl')"
