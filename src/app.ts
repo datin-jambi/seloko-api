@@ -246,6 +246,9 @@ export async function buildApp(): Promise<FastifyInstance> {
       // await api.register(rbacRoutes, { prefix: "/rbac" });
 
       // Bapenda modules
+      const { uptdsRoutes } = await import("~/modules/bapenda/uptds/uptds.routes.js");
+      await api.register(uptdsRoutes, { prefix: "/bapenda/uptds" });
+
       // await api.register(articlesRoutes, { prefix: "/articles" });
       // await api.register(bannersRoutes, { prefix: "/banners" });
 
