@@ -48,6 +48,11 @@ const envSchema = z.object({
 
   // ─── CORS ────────────────────────────────────────────────────────────────────
   CORS_ORIGIN: z.string().default("*"),
+
+  // ─── ImageKit ────────────────────────────────────────────────────────────────
+  IMAGEKIT_PUBLIC_KEY: z.string().optional().default(""),
+  IMAGEKIT_PRIVATE_KEY: z.string().optional().default(""),
+  IMAGEKIT_URL_ENDPOINT: z.string().optional().default(""),
 });
 
 function parseEnv() {

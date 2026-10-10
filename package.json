@@ -31,7 +31,7 @@
     "db:check:menus": "tsx prisma/seed-data/menus.check.ts",
     "db:smoke:menus": "bash prisma/seed-data/menus.smoke.sh",
     "typecheck": "tsc --noEmit && tsc --noEmit --project prisma/tsconfig.json",
-    "test": "tsx --env-file-if-exists=.env src/modules/core/auth/auth.check.ts && tsx --env-file-if-exists=.env src/common/utils/utils.check.ts && tsx src/config/redis.check.ts && tsx src/common/guards/access.check.ts"
+    "test": "tsx --env-file-if-exists=.env src/modules/core/auth/auth.check.ts && tsx --env-file-if-exists=.env src/common/utils/utils.check.ts && tsx src/config/redis.check.ts && tsx src/common/guards/access.check.ts && tsx --env-file-if-exists=.env src/common/services/storage/imagekit.check.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11",
@@ -44,6 +44,7 @@
     "fastify": "^5",
     "fastify-plugin": "^5",
     "fastify-type-provider-zod": "^4",
+    "imagekit": "^6.0.0",
     "ioredis": "^5",
     "prisma": "^6",
     "zod": "^3"

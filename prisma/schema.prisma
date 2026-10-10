@@ -43,10 +43,18 @@ model Application {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
-  permissions  Permission[]
-  roles        Role[]
-  userAppRoles UserAppRole[]
-  menuItems    MenuItem[]
+  permissions       Permission[]
+  roles             Role[]
+  userAppRoles      UserAppRole[]
+  menuItems         MenuItem[]
+  articleCategories ArticleCategory[]
+  articles          Article[]
+  banners           Banner[]
+  galleries         Gallery[]
+  pages             Page[]
+  regulations       Regulation[]
+  faqCategories     FaqCategory[]
+  faqs              Faq[]
 
   @@map("applications")
 }
@@ -201,9 +209,14 @@ model User {
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz() // Soft delete
 
-  userAppRoles  UserAppRole[]
-  refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]
+  userAppRoles     UserAppRole[]
+  refreshTokens    RefreshToken[]
+  auditLogs        AuditLog[]
+  articlesAuthored Article[]
+  galleriesAuthored Gallery[]
+  faqsAuthored     Faq[]                @relation("FaqAuthor")
+  faqsUpdated      Faq[]                @relation("FaqUpdatedBy")
+  vehicleTaxChecks VehicleTaxCheckLog[]
 
   @@unique([accountType, email], map: "uq_users_account_email")
   @@index([deletedAt], map: "idx_users_deleted_at")
@@ -295,4 +308,288 @@ enum AuditSeverity {
   CRITICAL
 
   @@map("audit_severity")
+}
+
+// ─── Enums Konten & Media ─────────────────────────────────────────────────────
+enum ContentStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  PUBLISHED
+
+  @@map("content_status")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  PDF
+
+  @@map("media_type")
+}
+
+// ─── Artikel & Berita (Universal Content) ─────────────────────────────────────
+model ArticleCategory {
+  id            String    @id @default(uuid(7)) @db.VarChar(36)
+  applicationId String    @map("app_id") @db.VarChar(36)
+  name          String    @db.VarChar(100)
+  slug          String    @db.VarChar(120)
+  description   String?
+  isActive      Boolean   @default(true) @map("is_active")
+  sortOrder     Int       @default(0) @map("sort_order")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz()
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  articles    Article[]
+
+  @@unique([applicationId, slug], map: "uq_app_article_category_slug")
+  @@index([applicationId, isActive, sortOrder])
+  @@map("article_categories")
+}
+
+model Article {
+  id              String        @id @default(uuid(7)) @db.VarChar(36)
+  applicationId   String        @map("app_id") @db.VarChar(36)
+  categoryId      String        @map("category_id") @db.VarChar(36)
+  authorId        String        @map("author_id") @db.VarChar(36)
+  title           String        @db.VarChar(255)
+  slug            String        @db.VarChar(255)
+  excerpt         String?       @db.VarChar(500)
+  content         String        @db.Text
+  thumbnailUrl    String?       @map("thumbnail_url")
+  thumbnailFileId String?       @map("thumbnail_file_id") @db.VarChar(100)
+  status          ContentStatus @default(DRAFT)
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz()
+  viewCount       Int           @default(0) @map("view_count")
+  seoTitle        String?       @map("seo_title") @db.VarChar(255)
+  seoDescription  String?       @map("seo_description") @db.VarChar(500)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt       DateTime?     @map("deleted_at") @db.Timestamptz()
+
+  application Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  category    ArticleCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  author      User            @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@unique([applicationId, slug], map: "uq_app_article_slug")
+  @@index([applicationId, status, publishedAt])
+  @@index([categoryId])
+  @@index([authorId])
+  @@map("articles")
+}
+
+// ─── Banner Carousel (Universal Content) ──────────────────────────────────────
+model Banner {
+  id            String    @id @default(uuid(7)) @db.VarChar(36)
+  applicationId String    @map("app_id") @db.VarChar(36)
+  title         String    @db.VarChar(150)
+  description   String?
+  imageUrl      String    @map("image_url")
+  imageFileId   String?   @map("image_file_id") @db.VarChar(100)
+  buttonText    String?   @map("button_text") @db.VarChar(50)
+  buttonUrl     String?   @map("button_url") @db.VarChar(255)
+  sortOrder     Int       @default(0) @map("sort_order")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz()
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, isActive, sortOrder])
+  @@map("banners")
+}
+
+// ─── Galeri Multimedia (Universal Content) ────────────────────────────────────
+model Gallery {
+  id              String        @id @default(uuid(7)) @db.VarChar(36)
+  applicationId   String        @map("app_id") @db.VarChar(36)
+  authorId        String        @map("author_id") @db.VarChar(36)
+  title           String        @db.VarChar(200)
+  slug            String        @db.VarChar(220)
+  description     String?
+  coverImageUrl   String?       @map("cover_image_url")
+  coverImageFileId String?      @map("cover_image_file_id") @db.VarChar(100)
+  status          ContentStatus @default(DRAFT)
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz()
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt       DateTime?     @map("deleted_at") @db.Timestamptz()
+
+  application Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  author      User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  items       GalleryItem[]
+
+  @@unique([applicationId, slug], map: "uq_app_gallery_slug")
+  @@index([applicationId, status])
+  @@map("galleries")
+}
+
+model GalleryItem {
+  id          String    @id @default(uuid(7)) @db.VarChar(36)
+  galleryId   String    @map("gallery_id") @db.VarChar(36)
+  mediaType   MediaType @default(IMAGE) @map("media_type")
+  fileUrl     String    @map("file_url")
+  fileId      String?   @map("file_id") @db.VarChar(100)
+  title       String?   @db.VarChar(150)
+  description String?
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz()
+
+  gallery Gallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  @@index([galleryId, sortOrder])
+  @@map("gallery_items")
+}
+
+// ─── Halaman Profil & Statis (Universal Content) ──────────────────────────────
+model Page {
+  id             String    @id @default(uuid(7)) @db.VarChar(36)
+  applicationId  String    @map("app_id") @db.VarChar(36)
+  title          String    @db.VarChar(200)
+  slug           String    @db.VarChar(220)
+  content        String    @db.Text
+  seoTitle       String?   @map("seo_title") @db.VarChar(255)
+  seoDescription String?   @map("seo_description") @db.VarChar(500)
+  isPublished    Boolean   @default(false) @map("is_published")
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz()
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz()
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, slug], map: "uq_app_page_slug")
+  @@index([applicationId, isPublished])
+  @@map("pages")
+}
+
+// ─── Regulasi & Dokumen Publik (Universal Content) ────────────────────────────
+model Regulation {
+  id            String        @id @default(uuid(7)) @db.VarChar(36)
+  applicationId String        @map("app_id") @db.VarChar(36)
+  title         String        @db.VarChar(255)
+  slug          String        @db.VarChar(255)
+  description   String?
+  fileUrl       String        @map("file_url")
+  fileId        String?       @map("file_id") @db.VarChar(100)
+  fileName      String?       @map("file_name") @db.VarChar(255)
+  fileSize      Int?          @map("file_size")
+  status        ContentStatus @default(DRAFT)
+  publishedAt   DateTime?     @map("published_at") @db.Timestamptz()
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt     DateTime?     @map("deleted_at") @db.Timestamptz()
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, slug], map: "uq_app_regulation_slug")
+  @@index([applicationId, status])
+  @@map("regulations")
+}
+
+// ─── FAQ (Universal Content) ──────────────────────────────────────────────────
+model FaqCategory {
+  id            String    @id @default(uuid(7)) @db.VarChar(36)
+  applicationId String    @map("app_id") @db.VarChar(36)
+  name          String    @db.VarChar(100)
+  slug          String    @db.VarChar(120)
+  description   String?
+  sortOrder     Int       @default(0) @map("sort_order")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz()
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  faqs        Faq[]
+
+  @@unique([applicationId, slug], map: "uq_app_faq_category_slug")
+  @@index([applicationId, isActive, sortOrder])
+  @@map("faq_categories")
+}
+
+model Faq {
+  id            String    @id @default(uuid(7)) @db.VarChar(36)
+  applicationId String    @map("app_id") @db.VarChar(36)
+  categoryId    String    @map("category_id") @db.VarChar(36)
+  authorId      String    @map("author_id") @db.VarChar(36)
+  updatedById   String?   @map("updated_by_id") @db.VarChar(36)
+  question      String    @db.VarChar(500)
+  slug          String    @db.VarChar(500)
+  answer        String    @db.Text
+  sortOrder     Int       @default(0) @map("sort_order")
+  isPublished   Boolean   @default(false) @map("is_published")
+  viewCount     Int       @default(0) @map("view_count")
+  publishedAt   DateTime? @map("published_at") @db.Timestamptz()
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz()
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  category    FaqCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  author      User        @relation("FaqAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  updatedBy   User?       @relation("FaqUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([applicationId, slug], map: "uq_app_faq_slug")
+  @@index([applicationId, categoryId, isPublished])
+  @@map("faqs")
+}
+
+// ─── UPTD Samsat & Wilayah (Domain Bapenda Jambi) ──────────────────────────────
+model BapendaUptd {
+  id              String    @id @default(uuid(7)) @db.VarChar(36)
+  code            String    @unique @db.VarChar(50)
+  name            String    @db.VarChar(150)
+  description     String?
+  address         String?
+  phone           String?   @db.VarChar(30)
+  email           String?   @db.VarChar(100)
+  headName        String?   @map("head_name") @db.VarChar(150)
+
+  // Wilayah Administrasi
+  province        String?   @default("Jambi") @db.VarChar(50)
+  city            String?   @db.VarChar(100)
+  district        String?   @db.VarChar(100)
+  subDistrict     String?   @map("sub_district") @db.VarChar(100)
+  postalCode      String?   @map("postal_code") @db.VarChar(10)
+
+  // Geolokasi
+  latitude        Float?
+  longitude       Float?
+  googleMapsUrl   String?   @map("google_maps_url")
+
+  // Visibilitas Publik
+  isActive        Boolean   @default(true) @map("is_active")
+  showOnPublicMap Boolean   @default(false) @map("show_on_public_map")
+
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz()
+
+  @@map("bapenda_uptds")
+}
+
+// ─── Layanan Operasional Cek Pajak Ranmor (Super App Seloko) ───────────────────
+model VehicleTaxCheckLog {
+  id           String   @id @default(uuid(7)) @db.VarChar(36)
+  userId       String?  @map("user_id") @db.VarChar(36)
+  licensePlate String   @map("license_plate") @db.VarChar(20)
+  status       String   @db.VarChar(50)
+  notes        String?
+  latitude     Float?
+  longitude    Float?
+  locationName String?  @map("location_name") @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([licensePlate], map: "idx_vehicle_tax_license_plate")
+  @@index([userId], map: "idx_vehicle_tax_user_id")
+  @@index([createdAt], map: "idx_vehicle_tax_created_at")
+  @@map("vehicle_tax_check_logs")
 }
