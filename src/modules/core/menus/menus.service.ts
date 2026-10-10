@@ -298,13 +298,10 @@ export async function listMenus(query: ListMenusQuery) {
       skip: (query.page - 1) * query.limit,
       take: query.limit,
       include: {
-        application: { select: { code: true, name: true } },
-        parent: { select: { label: true } },
-        permission: { select: { code: true } },
-        menuRoles: {
-          select: { role: { select: { id: true, name: true } } },
-        },
-        _count: { select: { children: true } },
+        application: { select: { id: true, code: true, name: true } },
+        parent: { select: { id: true, code: true, label: true } },
+        permission: { select: { id: true, code: true, name: true, module: true } },
+        _count: { select: { children: true, menuRoles: true } },
       },
       orderBy: [{ applicationId: "asc" }, { sortOrder: "asc" }],
     }),
@@ -312,11 +309,18 @@ export async function listMenus(query: ListMenusQuery) {
 
   const data = rows.map((r) => ({
     id: r.id,
-    applicationId: r.applicationId,
-    applicationCode: r.application.code,
-    applicationName: r.application.name,
-    parentId: r.parentId,
-    parentLabel: r.parent?.label ?? null,
+    application: {
+      id: r.application.id,
+      code: r.application.code,
+      name: r.application.name,
+    },
+    parent: r.parent
+      ? {
+          id: r.parent.id,
+          code: r.parent.code,
+          label: r.parent.label,
+        }
+      : null,
     code: r.code,
     label: r.label,
     icon: r.icon,
@@ -324,9 +328,15 @@ export async function listMenus(query: ListMenusQuery) {
     isExternal: r.isExternal,
     sortOrder: r.sortOrder,
     isActive: r.isActive,
-    permissionId: r.permissionId,
-    permissionCode: r.permission?.code ?? null,
-    roles: r.menuRoles.map((mr) => ({ id: mr.role.id, name: mr.role.name })),
+    permission: r.permission
+      ? {
+          id: r.permission.id,
+          code: r.permission.code,
+          name: r.permission.name,
+          module: r.permission.module,
+        }
+      : null,
+    rolesCount: r._count.menuRoles,
     childrenCount: r._count.children,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),

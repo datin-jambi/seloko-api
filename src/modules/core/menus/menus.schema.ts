@@ -77,11 +77,18 @@ export const MenuItemCmsNodeSchema: z.ZodType<MenuItemCmsNode> = z.lazy(() =>
 // ─── Zod Shapes: CMS Flat List Item ───────────────────────────────────────────
 export const MenuListItemShape = z.object({
   id: z.string(),
-  applicationId: z.string(),
-  applicationCode: z.string(),
-  applicationName: z.string(),
-  parentId: z.string().nullable(),
-  parentLabel: z.string().nullable(),
+  application: z.object({
+    id: z.string(),
+    code: z.string(),
+    name: z.string(),
+  }),
+  parent: z
+    .object({
+      id: z.string(),
+      code: z.string(),
+      label: z.string(),
+    })
+    .nullable(),
   code: z.string(),
   label: z.string(),
   icon: z.string().nullable(),
@@ -89,14 +96,15 @@ export const MenuListItemShape = z.object({
   isExternal: z.boolean(),
   sortOrder: z.number(),
   isActive: z.boolean(),
-  permissionId: z.string().nullable(),
-  permissionCode: z.string().nullable(),
-  roles: z.array(
-    z.object({
+  permission: z
+    .object({
       id: z.string(),
+      code: z.string(),
       name: z.string(),
-    }),
-  ),
+      module: z.string(),
+    })
+    .nullable(),
+  rolesCount: z.number(),
   childrenCount: z.number(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

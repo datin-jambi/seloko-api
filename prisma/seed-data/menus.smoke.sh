@@ -65,7 +65,7 @@ SELOKO_ID=$(curl -s "$BASE/applications?search=seloko&limit=100" -H "$AUTH" -H "
 
 CMS_LIST=$(curl -s "$BASE/menus?applicationId=$SELOKO_ID&limit=100" -H "$AUTH" -H "$APP")
 check "CMS list seloko total > 10" true "$(echo "$CMS_LIST" | j '.meta.total > 10')"
-check "CMS list punya applicationName" true "$(echo "$CMS_LIST" | j '.data[0].applicationName ? true : false')"
+check "CMS list punya application.name" true "$(echo "$CMS_LIST" | j '.data[0].application.name ? true : false')"
 
 CMS_TREE=$(curl -s "$BASE/menus?applicationId=$SELOKO_ID&tree=true" -H "$AUTH" -H "$APP")
 check "CMS tree root = 5" 5 "$(echo "$CMS_TREE" | j '.data.length')"
