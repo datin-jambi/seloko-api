@@ -168,3 +168,9 @@ Buat folder di `src/modules/<domain>/<feature>/`:
    npm run db:smoke -- <nama-modul>
    ```
    Pastikan seluruh skenario lolos (`✓`).
+
+4. **Otomatis Perbarui Roadmap di `AGENTS.md` (Langkah Penutup Wajib):**
+   - Setelah implementasi dan smoke test lolos, AI Agent **wajib otomatis memperbarui** [AGENTS.md](file:///c:/Users/ASUS/Documents/BPKPD/Code/seloko-api/AGENTS.md).
+   - Ubah status modul yang baru selesai dari `⏳` menjadi `✅`.
+   - Tandai modul berikutnya dengan label `Target pengerjaan berikutnya`.
+
