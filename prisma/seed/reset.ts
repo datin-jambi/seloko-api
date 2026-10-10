@@ -15,6 +15,7 @@ import { prisma } from "./utils.js";
 export async function resetTables(): Promise<void> {
   console.log("🧹 --reset: mengosongkan tabel RBAC & navigasi…");
 
+  await prisma.bapendaUptd.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.refreshToken.deleteMany();
   await prisma.userAppRole.deleteMany();

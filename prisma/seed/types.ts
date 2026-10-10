@@ -130,3 +130,29 @@ export interface RoleRef {
   roleId: string;
   applicationId: string;
 }
+
+// ─── bapenda-uptds.json ───────────────────────────────────────────────────────
+export interface BapendaUptdDef {
+  code: string;
+  name: string;
+  description?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  headName?: string | null;
+  province?: string | null;
+  city?: string | null;
+  district?: string | null;
+  subDistrict?: string | null;
+  postalCode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  googleMapsUrl?: string | null;
+  isActive?: boolean;
+  showOnPublicMap?: boolean;
+}
+
+export interface BapendaUptdsFile {
+  uptds: BapendaUptdDef[];
+}
+

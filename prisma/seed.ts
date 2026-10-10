@@ -19,16 +19,18 @@ import { resetTables } from "./seed/reset.js";
 import { seedApplications } from "./seed/applications.seeder.js";
 import { seedMenus } from "./seed/menus.seeder.js";
 import { buildRoleIndex, seedUsers } from "./seed/users.seeder.js";
+import { seedBapendaUptds } from "./seed/bapenda-uptds.seeder.js";
 import type {
   ApplicationsFile,
   MenusFile,
   RolesFile,
   UsersFile,
+  BapendaUptdsFile,
 } from "./seed/types.js";
 
 /** Cetak tabel ringkasan jumlah baris tiap tabel yang disentuh seeder. */
 async function printSummary(): Promise<void> {
-  const [apps, permissions, roles, users, assignments, menus, menuRoles] =
+  const [apps, permissions, roles, users, assignments, menus, menuRoles, uptds] =
     await Promise.all([
       prisma.application.count(),
       prisma.permission.count(),
@@ -37,6 +39,7 @@ async function printSummary(): Promise<void> {
       prisma.userAppRole.count(),
       prisma.menuItem.count(),
       prisma.menuRole.count(),
+      prisma.bapendaUptd.count(),
     ]);
 
   const rows = [
@@ -47,6 +50,7 @@ async function printSummary(): Promise<void> {
     ["user_app_roles", assignments],
     ["menu_items", menus],
     ["menu_roles", menuRoles],
+    ["bapenda_uptds", uptds],
   ] as const;
 
   console.log("\n┌─────────────────────┬────────┐");
@@ -63,11 +67,12 @@ async function main(): Promise<void> {
 
   if (process.argv.includes("--reset")) await resetTables();
 
-  const [appsFile, rolesFile, usersFile, menusFile] = await Promise.all([
+  const [appsFile, rolesFile, usersFile, menusFile, uptdsFile] = await Promise.all([
     loadJson<ApplicationsFile>("applications.json"),
     loadJson<RolesFile>("roles.json"),
     loadJson<UsersFile>("users.json"),
     loadJson<MenusFile>("menus.json"),
+    loadJson<BapendaUptdsFile>("bapenda-uptds.json"),
   ]);
 
   // Urutan WAJIB: menu dan user menautkan diri ke permission/role yang dibuat
@@ -89,6 +94,9 @@ async function main(): Promise<void> {
     usersFile.defaultPassword,
     await buildRoleIndex(),
   );
+
+  console.log("");
+  await seedBapendaUptds(uptdsFile.uptds);
 
   await printSummary();
 
