@@ -3,8 +3,8 @@
  *
  * Idempoten: melakukan upsert berdasarkan `code`.
  */
-import { prisma } from "./utils.js";
-import type { BapendaUptdDef } from "./types.js";
+import { prisma } from "../shared/utils.js";
+import type { BapendaUptdDef } from "../shared/types.js";
 
 export async function seedBapendaUptds(uptds: BapendaUptdDef[]): Promise<void> {
   console.log(`🏛️  Seed ${uptds.length} data UPTD Samsat Bapenda…`);

@@ -14,19 +14,19 @@
  *   npm run db:migrate:reset     → bangun ulang skema dari nol (tanpa seed)
  *   npm run db:migrate:reset:seed → bangun ulang skema lalu seed
  */
-import { prisma, loadJson } from "./seed/utils.js";
-import { resetTables } from "./seed/reset.js";
-import { seedApplications } from "./seed/applications.seeder.js";
-import { seedMenus } from "./seed/menus.seeder.js";
-import { buildRoleIndex, seedUsers } from "./seed/users.seeder.js";
-import { seedBapendaUptds } from "./seed/bapenda-uptds.seeder.js";
+import { prisma, loadJson } from "./seeds/shared/utils.js";
+import { resetTables } from "./seeds/shared/reset.js";
+import { seedApplications } from "./seeds/core/applications.seeder.js";
+import { seedMenus } from "./seeds/core/menus.seeder.js";
+import { buildRoleIndex, seedUsers } from "./seeds/core/users.seeder.js";
+import { seedBapendaUptds } from "./seeds/bapenda/uptds.seeder.js";
 import type {
   ApplicationsFile,
   MenusFile,
   RolesFile,
   UsersFile,
   BapendaUptdsFile,
-} from "./seed/types.js";
+} from "./seeds/shared/types.js";
 
 /** Cetak tabel ringkasan jumlah baris tiap tabel yang disentuh seeder. */
 async function printSummary(): Promise<void> {
@@ -68,11 +68,11 @@ async function main(): Promise<void> {
   if (process.argv.includes("--reset")) await resetTables();
 
   const [appsFile, rolesFile, usersFile, menusFile, uptdsFile] = await Promise.all([
-    loadJson<ApplicationsFile>("applications.json"),
-    loadJson<RolesFile>("roles.json"),
-    loadJson<UsersFile>("users.json"),
-    loadJson<MenusFile>("menus.json"),
-    loadJson<BapendaUptdsFile>("bapenda-uptds.json"),
+    loadJson<ApplicationsFile>("core/applications.json"),
+    loadJson<RolesFile>("core/roles.json"),
+    loadJson<UsersFile>("core/users.json"),
+    loadJson<MenusFile>("core/menus.json"),
+    loadJson<BapendaUptdsFile>("bapenda/uptds.json"),
   ]);
 
   // Urutan WAJIB: menu dan user menautkan diri ke permission/role yang dibuat

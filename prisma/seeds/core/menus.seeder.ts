@@ -5,8 +5,8 @@
  * dan role yang sudah ada, dicari lewat kode/nama agar menus.json tetap bisa
  * ditulis manusia.
  */
-import { prisma } from "./utils.js";
-import type { AppMenuDef, MenuDef } from "./types.js";
+import { prisma } from "../shared/utils.js";
+import type { AppMenuDef, MenuDef } from "../shared/types.js";
 
 /**
  * Konteks satu aplikasi, dibawa turun lewat rekursi.

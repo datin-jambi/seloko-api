@@ -3,8 +3,8 @@
  *
  * Bergantung pada applications.seeder: role dicari lewat "<appCode>/<roleName>".
  */
-import { prisma, hashPassword, resolveExpiry } from "./utils.js";
-import type { BulkDef, RoleRef, UserDef } from "./types.js";
+import { prisma, hashPassword, resolveExpiry } from "../shared/utils.js";
+import type { BulkDef, RoleRef, UserDef } from "../shared/types.js";
 
 /** Indeks id role per "appCode/roleName" agar tidak query berulang per user. */
 export async function buildRoleIndex(): Promise<Map<string, RoleRef>> {

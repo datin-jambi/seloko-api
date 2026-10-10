@@ -4,9 +4,9 @@
  * Harus jalan PERTAMA: user dan menu menautkan diri ke baris yang dibuat di
  * sini lewat kode/nama, bukan id.
  */
-import { prisma, expandActions } from "./utils.js";
+import { prisma, expandActions } from "../shared/utils.js";
 import type { Prisma } from "@prisma/client";
-import type { ApplicationDef, Audience, RoleDef } from "./types.js";
+import type { ApplicationDef, Audience, RoleDef } from "../shared/types.js";
 
 /**
  * Buat/perbarui permission satu aplikasi dari daftar PermissionDef.

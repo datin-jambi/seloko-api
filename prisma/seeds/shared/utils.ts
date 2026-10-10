@@ -17,13 +17,13 @@ import * as argon2 from "argon2";
  */
 export const prisma = new PrismaClient();
 
-const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "seed-data");
+const SEEDS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-/** Baca satu berkas dari prisma/seed-data/. */
-export async function loadJson<T>(fileName: string): Promise<T> {
+/** Baca berkas JSON dari prisma/seeds/ (misal: "core/applications.json", "bapenda/uptds.json"). */
+export async function loadJson<T>(relativePath: string): Promise<T> {
   // readFile + JSON.parse, bukan `import ... with { type: "json" }`: import
   // attributes masih experimental di Node dan mencetak warning tiap run.
-  const raw = await readFile(join(DATA_DIR, fileName), "utf-8");
+  const raw = await readFile(join(SEEDS_DIR, relativePath), "utf-8");
   return JSON.parse(raw) as T;
 }
 
