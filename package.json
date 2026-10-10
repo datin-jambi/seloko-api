@@ -37,6 +37,7 @@
     "@fastify/cookie": "^11",
     "@fastify/cors": "^10",
     "@fastify/jwt": "^9",
+    "@fastify/multipart": "^10.1.3",
     "@fastify/rate-limit": "^10.3.0",
     "@prisma/client": "^6",
     "amqplib": "^0.10",

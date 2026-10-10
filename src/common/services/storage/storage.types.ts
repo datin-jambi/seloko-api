@@ -37,6 +37,12 @@ export interface UploadFileOptions {
    * Menandai apakah file berstatus private (ImageKit signed URL only).
    */
   isPrivateFile?: boolean;
+
+  /**
+   * Menentukan apakah ImageKit menambahkan karakter acak di nama file.
+   * Default: true. Jika false, menggunakan persis nama fileName yang diberikan.
+   */
+  useUniqueFileName?: boolean;
 }
 
 export interface UploadFileResult {

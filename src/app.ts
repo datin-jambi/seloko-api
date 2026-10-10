@@ -4,6 +4,7 @@ import fastifyJwt from "@fastify/jwt";
 import fastifyCookie from "@fastify/cookie";
 import fastifyCors from "@fastify/cors";
 import fastifyRateLimit from "@fastify/rate-limit";
+import fastifyMultipart from "@fastify/multipart";
 import fastifyPlugin from "fastify-plugin";
 
 import { env } from "~/config/env.js";
@@ -63,6 +64,13 @@ export async function buildApp(): Promise<FastifyInstance> {
     cookie: {
       cookieName: "seloko_rt",
       signed: false,
+    },
+  });
+
+  await app.register(fastifyMultipart, {
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50MB
+      files: 10,
     },
   });
 
@@ -133,18 +141,32 @@ export async function buildApp(): Promise<FastifyInstance> {
       return;
     }
 
+    // Multipart errors
+    if (error.code === "FST_REQ_FILE_TOO_LARGE" ||
+        error.code === "FST_FILES_LIMIT" ||
+        error.code === "FST_PARTS_LIMIT" ||
+        error.code === "FST_FIELDS_LIMIT") {
+      void reply.status(HttpStatus.BAD_REQUEST).send({
+        statusCode: HttpStatus.BAD_REQUEST,
+        code: "FILE_TOO_LARGE",
+        message: error.message || "Ukuran berkas atau jumlah file melebihi batas maksimal",
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
     // Operational AppError subclasses
     if (error instanceof AppError) {
       sendError(reply, error);
       return;
     }
 
-    // Non-operational / unknown error — log and hide internals
+    // Non-operational / unknown error — log and hide internals (expose message in development)
     request.log.error({ err: error }, "Unhandled internal error");
     void reply.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
       code: "INTERNAL_SERVER_ERROR",
-      message: "An unexpected error occurred",
+      message: env.NODE_ENV === "development" ? (error.message || "An unexpected error occurred") : "An unexpected error occurred",
       timestamp: new Date().toISOString(),
     });
   });
@@ -217,6 +239,9 @@ export async function buildApp(): Promise<FastifyInstance> {
 
       const { menusRoutes } = await import("~/modules/core/menus/menus.routes.js");
       await api.register(menusRoutes, { prefix: "/menus" });
+
+      const { storageRoutes } = await import("~/modules/core/storage/storage.routes.js");
+      await api.register(storageRoutes, { prefix: "/storage" });
 
       // await api.register(rbacRoutes, { prefix: "/rbac" });
 

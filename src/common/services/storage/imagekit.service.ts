@@ -65,7 +65,7 @@ export class ImageKitService {
       file: options.file,
       fileName: options.fileName,
       folder,
-      useUniqueFileName: true,
+      useUniqueFileName: options.useUniqueFileName ?? true,
       ...(options.tags ? { tags: options.tags } : {}),
       ...(options.isPrivateFile !== undefined
         ? { isPrivateFile: options.isPrivateFile }
@@ -75,13 +75,26 @@ export class ImageKitService {
     try {
       const response = await imagekit.upload(uploadPayload);
 
+      // Generate clean public thumbnail URL using standard dynamic transformation
+      // (Menghindari named transformation 'tr:n-ik_ml_thumbnail' ImageKit yang diblokir oleh security policy)
+      let thumbnailUrl: string | undefined = undefined;
+      const isImage = Boolean(response.filePath.match(/\.(jpe?g|png|webp|gif|svg)$/i));
+      if (isImage) {
+        thumbnailUrl = imagekit.url({
+          path: response.filePath,
+          transformation: [{ width: 300, height: 300 }],
+        });
+      } else if (response.thumbnailUrl) {
+        thumbnailUrl = response.thumbnailUrl;
+      }
+
       return {
         fileId: response.fileId,
         url: response.url,
         name: response.name,
         size: response.size,
         filePath: response.filePath,
-        ...(response.thumbnailUrl ? { thumbnailUrl: response.thumbnailUrl } : {}),
+        ...(thumbnailUrl ? { thumbnailUrl } : {}),
       };
     } catch (err: unknown) {
       const message =
