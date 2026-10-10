@@ -419,6 +419,29 @@ penugasan kedaluwarsa tidak ikut, cermin dari penyaring resolver.
 > memakainya. Perluas entitas `permission` di `applications.json` (mis.
 > `"actions": ["content"]`) agar operator konsol bisa mengelola katalog izin.
 
+### Menus (`/api/menus`)
+
+Manajemen dan resolusi menu navigasi / sidebar per aplikasi.
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| GET | `/me` | ✅ auth saja | **Sidebar Pemanggil**: Pohon navigasi difilter sesuai role & permission pengguna pada aplikasi aktif |
+| GET | `/` | `application:read` | **CMS List**: Daftar menu (flat terpaginasi atau pohon lengkap via `?tree=true&applicationId=...`) |
+| GET | `/:id` | `application:read` | **CMS Detail**: Detail menu beserta parent, children, permission, dan role pembatas |
+| POST | `/` | `application:update` | **CMS Create**: Tambah item menu baru (validasi parent, permission, & roles sealiran) |
+| PATCH | `/:id` | `application:update` | **CMS Update**: Perbarui metadata, hierarki parent (dengan cycle detection), permission, atau roles |
+| PATCH | `/:id/activate` | `application:update` | **CMS Toggle**: Aktifkan atau nonaktifkan visibilitas menu |
+| PATCH | `/reorder` | `application:update` | **CMS Reorder**: Atur urutan `sortOrder` dan parent secara massal |
+| DELETE | `/:id` | `application:update` | **CMS Delete**: Hapus menu permanen (cascade ke sub-menu anak) |
+
+#### `GET /menus/me`
+Mengembalikan pohon navigasi siap pakai untuk sidebar front-end yang sudah dievaluasi melalui 3 lapis aturan:
+1. `isActive = true`
+2. `permissionId`: diverifikasi dengan permission aktif pemanggil (null = bebas izin).
+3. `menuRoles`: jika terisi, pemanggil harus memegang salah satu role pembatas tersebut.
+4. Grup parent tanpa `path` otomatis di-prune jika seluruh sub-menu anaknya tidak lolos izin.
+5. Super admin otomatis bypass seluruh pengecekan izin dan pembatas role.
+
 ### Health Check
 
 | Method | Path | Description |

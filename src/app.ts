@@ -215,6 +215,9 @@ export async function buildApp(): Promise<FastifyInstance> {
       );
       await api.register(permissionsRoutes, { prefix: "/permissions" });
 
+      const { menusRoutes } = await import("~/modules/core/menus/menus.routes.js");
+      await api.register(menusRoutes, { prefix: "/menus" });
+
       // await api.register(rbacRoutes, { prefix: "/rbac" });
 
       // Bapenda modules
