@@ -12,6 +12,27 @@ const UserRoleShape = z.object({
   createdAt: z.string().datetime(),
 });
 
+export const UserApplicationSummaryShape = z.object({
+  id: z.string().describe("Application ID"),
+  code: z.string().describe("Application Code (e.g. 'seloko')"),
+  name: z.string().describe("Application Name"),
+});
+
+export const UserApplicationRoleItemShape = z.object({
+  id: z.string().describe("UserAppRole ID penugasan"),
+  roleId: z.string(),
+  roleName: z.string(),
+  expiresAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+});
+
+export const UserApplicationGroupShape = z.object({
+  id: z.string().describe("Application ID"),
+  code: z.string().describe("Application Code"),
+  name: z.string().describe("Application Name"),
+  roles: z.array(UserApplicationRoleItemShape).describe("Daftar role pengguna pada aplikasi ini"),
+});
+
 const UserShape = z.object({
   id: z.string(),
   nip: z.string().nullable(),
@@ -32,8 +53,17 @@ const UserShape = z.object({
   deletedAt: z.string().datetime().nullable(),
 });
 
-const UserDetailShape = UserShape.extend({
-  roles: z.array(UserRoleShape),
+export const UserListItemShape = UserShape.extend({
+  totalApplications: z.number().int().nonnegative().describe("Total aplikasi unik yang dimiliki user"),
+  totalRoles: z.number().int().nonnegative().describe("Total penugasan role pada user"),
+  applications: z.array(UserApplicationSummaryShape).describe("Daftar aplikasi yang dapat diakses user"),
+});
+
+export const UserDetailShape = UserShape.extend({
+  totalApplications: z.number().int().nonnegative().describe("Total aplikasi unik yang dimiliki user"),
+  totalRoles: z.number().int().nonnegative().describe("Total penugasan role pada user"),
+  applications: z.array(UserApplicationGroupShape).describe("Daftar aplikasi beserta daftar role di dalamnya"),
+  roles: z.array(UserRoleShape).describe("Flat list seluruh penugasan role (backward compatible)"),
 });
 
 // ─── List Users ───────────────────────────────────────────────────────────────
@@ -52,7 +82,7 @@ export const ListUsersQuerySchema = z.object({
 export const ListUsersResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
-  data: z.array(UserShape),
+  data: z.array(UserListItemShape),
   meta: z.object({
     page: z.number(),
     limit: z.number(),

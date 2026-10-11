@@ -37,6 +37,54 @@ function formatRole(uar: {
   };
 }
 
+/**
+ * Mengelompokkan penugasan role berdasarkan aplikasi sehingga jelas
+ * user terdaftar di aplikasi apa saja dan sebagai role apa saja.
+ */
+function groupUserApplications(userAppRoles: Array<{
+  id: string;
+  roleId: string;
+  expiresAt: Date | null;
+  createdAt: Date;
+  role: { name: string };
+  application: { id: string; code: string; name: string };
+}>) {
+  const appMap = new Map<string, {
+    id: string;
+    code: string;
+    name: string;
+    roles: Array<{
+      id: string;
+      roleId: string;
+      roleName: string;
+      expiresAt: string | null;
+      createdAt: string;
+    }>;
+  }>();
+
+  for (const uar of userAppRoles) {
+    let app = appMap.get(uar.application.id);
+    if (!app) {
+      app = {
+        id: uar.application.id,
+        code: uar.application.code,
+        name: uar.application.name,
+        roles: [],
+      };
+      appMap.set(uar.application.id, app);
+    }
+    app.roles.push({
+      id: uar.id,
+      roleId: uar.roleId,
+      roleName: uar.role.name,
+      expiresAt: uar.expiresAt?.toISOString() ?? null,
+      createdAt: uar.createdAt.toISOString(),
+    });
+  }
+
+  return Array.from(appMap.values());
+}
+
 /** Select standar untuk user dalam daftar (tanpa passwordHash). */
 const USER_LIST_SELECT = {
   id: true,
@@ -108,7 +156,7 @@ function formatUser(user: {
 
 // ─── List Users ───────────────────────────────────────────────────────────────
 /**
- * Mengembalikan daftar user ter-paginasi.
+ * Mengembalikan daftar user ter-paginasi beserta ringkasan aplikasi & total role.
  * Mendukung pencarian full-text (username, email, nama) dan filter status.
  * Soft-deleted user TIDAK ditampilkan secara default.
  */
@@ -134,7 +182,23 @@ export async function listUsers(query: ListUsersQuery) {
   const [users, total] = await Promise.all([
     prisma.user.findMany({
       where,
-      select: USER_LIST_SELECT,
+      select: {
+        ...USER_LIST_SELECT,
+        userAppRoles: {
+          select: {
+            id: true,
+            roleId: true,
+            application: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
       skip,
       take: limit,
       orderBy: { createdAt: "desc" },
@@ -142,12 +206,39 @@ export async function listUsers(query: ListUsersQuery) {
     prisma.user.count({ where }),
   ]);
 
-  return buildPaginatedResult(users.map(formatUser), total, page, limit);
+  const formattedUsers = users.map((user) => {
+    const { userAppRoles, ...rest } = user;
+
+    const appMap = new Map<string, { id: string; code: string; name: string }>();
+    for (const uar of userAppRoles) {
+      if (!appMap.has(uar.application.id)) {
+        appMap.set(uar.application.id, {
+          id: uar.application.id,
+          code: uar.application.code,
+          name: uar.application.name,
+        });
+      }
+    }
+
+    const applications = Array.from(appMap.values());
+    const totalApplications = applications.length;
+    const totalRoles = userAppRoles.length;
+
+    return {
+      ...formatUser(rest),
+      totalApplications,
+      totalRoles,
+      applications,
+    };
+  });
+
+  return buildPaginatedResult(formattedUsers, total, page, limit);
 }
 
 // ─── Get User By ID ───────────────────────────────────────────────────────────
 /**
- * Mengembalikan detail user beserta seluruh penugasan role-nya.
+ * Mengembalikan detail user beserta seluruh penugasan role yang dipetakan
+ * rapi per aplikasi maupun dalam format list roles.
  * Melempar NotFoundError jika user tidak ditemukan atau sudah dihapus.
  */
 export async function getUserById(id: string) {
@@ -162,9 +253,15 @@ export async function getUserById(id: string) {
   if (!user) throw new NotFoundError("User", id);
 
   const { userAppRoles, ...rest } = user;
+  const applications = groupUserApplications(userAppRoles);
+  const totalApplications = applications.length;
+  const totalRoles = userAppRoles.length;
 
   return {
     ...formatUser(rest),
+    totalApplications,
+    totalRoles,
+    applications,
     roles: userAppRoles.map(formatRole),
   };
 }
@@ -263,9 +360,15 @@ export async function createUser(data: CreateUserBody) {
   });
 
   const { userAppRoles, ...rest } = user;
+  const applications = groupUserApplications(userAppRoles);
+  const totalApplications = applications.length;
+  const totalRoles = userAppRoles.length;
 
   return {
     ...formatUser(rest),
+    totalApplications,
+    totalRoles,
+    applications,
     roles: userAppRoles.map(formatRole),
   };
 }
@@ -320,9 +423,15 @@ export async function updateUser(id: string, data: UpdateUserBody) {
   }
 
   const { userAppRoles, ...rest } = user;
+  const applications = groupUserApplications(userAppRoles);
+  const totalApplications = applications.length;
+  const totalRoles = userAppRoles.length;
 
   return {
     ...formatUser(rest),
+    totalApplications,
+    totalRoles,
+    applications,
     roles: userAppRoles.map(formatRole),
     cacheCleared,
   };
