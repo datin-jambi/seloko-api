@@ -117,6 +117,7 @@ export interface LoginResult {
     username: string | null;
     fullName: string;
     avatarUrl: string | null;
+    avatarFileId: string | null;
     accountType: Audience;
     isSuperAdmin: boolean;
   };
@@ -165,6 +166,7 @@ export async function loginUser(
       username: true,
       fullName: true,
       avatarUrl: true,
+      avatarFileId: true,
       passwordHash: true,
       accountType: true,
       isSuperAdmin: true,
@@ -237,6 +239,7 @@ export async function loginUser(
       username: user.username,
       fullName: user.fullName,
       avatarUrl: user.avatarUrl,
+      avatarFileId: user.avatarFileId,
       accountType: user.accountType,
       isSuperAdmin: user.isSuperAdmin,
     },
@@ -431,6 +434,7 @@ export async function getMe(userId: string, appCode: string) {
       username: true,
       fullName: true,
       avatarUrl: true,
+      avatarFileId: true,
       phoneNumber: true,
       accountType: true,
       isSuperAdmin: true,

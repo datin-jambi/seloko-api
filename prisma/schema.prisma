@@ -200,6 +200,7 @@ model User {
   phoneNumber     String?   @map("phone_number") @db.VarChar(20)
   passwordHash    String    @map("password_hash") @db.VarChar(255) // Argon2id
   avatarUrl       String?   @map("avatar_url")
+  avatarFileId    String?   @map("avatar_file_id") @db.VarChar(100)
   /// Melewati SELURUH pengecekan permission di semua aplikasi.
   isSuperAdmin    Boolean   @default(false) @map("is_super_admin")
   isActive        Boolean   @default(true) @map("is_active")

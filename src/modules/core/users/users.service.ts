@@ -3,6 +3,7 @@ import { prisma } from "~/config/database.js";
 import { invalidateAllUserPermissionCaches } from "~/config/redis.js";
 import { ConflictError, NotFoundError, ForbiddenError, BadRequestError } from "~/common/errors/index.js";
 import { buildPaginatedResult } from "~/common/types/index.js";
+import { ImageKitService } from "~/common/services/storage/imagekit.service.js";
 import type { ListUsersQuery, CreateUserBody, UpdateUserBody, AssignRoleBody } from "./users.schema.js";
 
 // Dipakai controller saat invalidasi cache gagal (Redis down): aksi di DB sudah
@@ -45,6 +46,7 @@ const USER_LIST_SELECT = {
   fullName: true,
   phoneNumber: true,
   avatarUrl: true,
+  avatarFileId: true,
   accountType: true,
   isSuperAdmin: true,
   isActive: true,
@@ -74,6 +76,7 @@ function formatUser(user: {
   fullName: string;
   phoneNumber: string | null;
   avatarUrl: string | null;
+  avatarFileId: string | null;
   accountType: "INTERNAL" | "PUBLIC";
   isSuperAdmin: boolean;
   isActive: boolean;
@@ -91,6 +94,7 @@ function formatUser(user: {
     fullName: user.fullName,
     phoneNumber: user.phoneNumber,
     avatarUrl: user.avatarUrl,
+    avatarFileId: user.avatarFileId,
     accountType: user.accountType,
     isSuperAdmin: user.isSuperAdmin,
     isActive: user.isActive,
@@ -165,6 +169,38 @@ export async function getUserById(id: string) {
   };
 }
 
+/**
+ * Memvalidasi berkas avatar di ImageKit dengan kriteria toleran.
+ */
+async function validateAvatarImage(fileId?: string | null): Promise<void> {
+  if (!fileId || !fileId.trim()) return;
+
+  const file = await ImageKitService.getFileDetails(fileId);
+  if (!file) {
+    throw new BadRequestError(
+      `Berkas foto avatar (ID: '${fileId}') tidak ditemukan di ImageKit.`,
+    );
+  }
+
+  // Ukuran maksimal avatar: 2 MB
+  const maxBytes = 2 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+    throw new BadRequestError(
+      `Ukuran foto avatar terlalu besar (${sizeMb} MB). Maksimal yang diizinkan adalah 2 MB.`,
+    );
+  }
+
+  // Dimensi minimal avatar: 100x100 px jika metadata dimensi tersedia
+  if (file.width !== undefined && file.height !== undefined) {
+    if (file.width < 100 || file.height < 100) {
+      throw new BadRequestError(
+        `Dimensi foto avatar terlalu kecil (${file.width}x${file.height} px). Minimal 100x100 px.`,
+      );
+    }
+  }
+}
+
 // ─── Create User ──────────────────────────────────────────────────────────────
 /**
  * Membuat user baru dengan password di-hash argon2id.
@@ -195,6 +231,10 @@ export async function createUser(data: CreateUserBody) {
       throw new ConflictError(`NIP "${data.nip}" sudah terdaftar`);
   }
 
+  if (data.avatarFileId) {
+    await validateAvatarImage(data.avatarFileId);
+  }
+
   const passwordHash = await argon2.hash(data.password, {
     type: argon2.argon2id,
     memoryCost: 65536,
@@ -212,6 +252,7 @@ export async function createUser(data: CreateUserBody) {
       nip: data.nip ?? null,
       phoneNumber: data.phoneNumber ?? null,
       avatarUrl: data.avatarUrl ?? null,
+      avatarFileId: data.avatarFileId ?? null,
       isSuperAdmin: data.isSuperAdmin,
       isActive: true,
     },
@@ -235,8 +276,26 @@ export async function createUser(data: CreateUserBody) {
  * (keduanya butuh verifikasi terpisah).
  */
 export async function updateUser(id: string, data: UpdateUserBody) {
-  const exists = await prisma.user.findUnique({ where: { id, deletedAt: null }, select: { id: true } });
-  if (!exists) throw new NotFoundError("User", id);
+  const existing = await prisma.user.findUnique({
+    where: { id, deletedAt: null },
+    select: { id: true, avatarFileId: true },
+  });
+  if (!existing) throw new NotFoundError("User", id);
+
+  if (data.avatarFileId) {
+    await validateAvatarImage(data.avatarFileId);
+  }
+
+  // Auto-cleanup foto avatar lama di ImageKit jika diganti
+  if (
+    existing.avatarFileId &&
+    data.avatarFileId &&
+    existing.avatarFileId !== data.avatarFileId
+  ) {
+    ImageKitService.deleteFile(existing.avatarFileId).catch((err) => {
+      console.error("[UsersService] Gagal menghapus avatar lama di ImageKit:", err);
+    });
+  }
 
   const user = await prisma.user.update({
     where: { id },
@@ -244,6 +303,7 @@ export async function updateUser(id: string, data: UpdateUserBody) {
       ...(data.fullName !== undefined && { fullName: data.fullName }),
       ...(data.phoneNumber !== undefined && { phoneNumber: data.phoneNumber }),
       ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
+      ...(data.avatarFileId !== undefined && { avatarFileId: data.avatarFileId }),
       ...(data.nip !== undefined && { nip: data.nip }),
       ...(data.isSuperAdmin !== undefined && { isSuperAdmin: data.isSuperAdmin }),
     },

@@ -21,6 +21,7 @@ const UserShape = z.object({
   fullName: z.string(),
   phoneNumber: z.string().nullable(),
   avatarUrl: z.string().nullable(),
+  avatarFileId: z.string().nullable(),
   accountType: z.enum(["INTERNAL", "PUBLIC"]),
   isSuperAdmin: z.boolean(),
   isActive: z.boolean(),
@@ -100,6 +101,7 @@ export const CreateUserBodySchema = z.object({
   nip: z.string().max(30).optional().describe("NIP ASN — opsional untuk non-ASN"),
   phoneNumber: z.string().max(20).optional(),
   avatarUrl: z.string().url("Format URL avatar tidak valid").optional(),
+  avatarFileId: z.string().max(100).optional().nullable(),
   isSuperAdmin: z.boolean().default(false),
 });
 
@@ -115,6 +117,7 @@ export const UpdateUserBodySchema = z
     fullName: z.string().min(2).max(150).optional(),
     phoneNumber: z.string().max(20).nullable().optional(),
     avatarUrl: z.string().url("Format URL avatar tidak valid").nullable().optional(),
+    avatarFileId: z.string().max(100).nullable().optional(),
     nip: z.string().max(30).nullable().optional(),
     isSuperAdmin: z.boolean().optional(),
   })
