@@ -156,3 +156,20 @@ export interface BapendaUptdsFile {
   uptds: BapendaUptdDef[];
 }
 
+// ─── banners.json ─────────────────────────────────────────────────────────────
+export interface BannerDef {
+  title: string;
+  description?: string | null;
+  imageUrl: string;
+  imageFileId?: string | null;
+  buttonText?: string | null;
+  buttonUrl?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+}
+
+export interface BannersFile {
+  banners: BannerDef[];
+}
+
+

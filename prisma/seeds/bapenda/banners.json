@@ -1,0 +1,34 @@
+{
+  "banners": [
+    {
+      "title": "Program Pemutihan Pajak Kendaraan Bermotor 2026",
+      "description": "Bebas denda PKB dan BBNKB II bagi seluruh masyarakat Provinsi Jambi. Manfaatkan kemudahan layanan di seluruh Samsat terdekat.",
+      "imageUrl": "https://ik.imagekit.io/o7kpef481o/bapenda-profile/banners/banner_pemutihan_pajak_2026.jpg",
+      "imageFileId": null,
+      "buttonText": "Cek Syarat & Jadwal",
+      "buttonUrl": "/informasi/pemutihan-pajak",
+      "sortOrder": 1,
+      "isActive": true
+    },
+    {
+      "title": "Cek Pajak Kendaraan Bermotor Lebih Cepat & Mudah",
+      "description": "Layanan pengecekan tagihan Pajak Kendaraan Bermotor (PKB) secara online tanpa harus antre di loket.",
+      "imageUrl": "https://ik.imagekit.io/o7kpef481o/bapenda-profile/banners/banner_cek_pajak_online.jpg",
+      "imageFileId": null,
+      "buttonText": "Cek Pajak Sekarang",
+      "buttonUrl": "/layanan/cek-pajak",
+      "sortOrder": 2,
+      "isActive": true
+    },
+    {
+      "title": "Bayar Pajak Daerah Mudah dengan QRIS dan e-Samsat",
+      "description": "Kini pembayaran pajak daerah dan retribusi dapat dilakukan melalui berbagai kanal pembayaran digital perbankan.",
+      "imageUrl": "https://ik.imagekit.io/o7kpef481o/bapenda-profile/banners/banner_qris_esamsat.jpg",
+      "imageFileId": null,
+      "buttonText": "Panduan Pembayaran",
+      "buttonUrl": "/panduan/pembayaran-digital",
+      "sortOrder": 3,
+      "isActive": true
+    }
+  ]
+}
