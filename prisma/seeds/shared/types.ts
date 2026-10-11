@@ -20,12 +20,13 @@ export interface PermissionDef {
 export interface ApplicationDef {
   code: string;
   name: string;
+  tagline?: string;
   description?: string;
   isActive?: boolean;
   /** Absen = INTERNAL. */
   audience?: Audience;
   logoUrl?: string;
-  /** { branding, seo } — bentuknya divalidasi ApplicationSettingsSchema di API. */
+  /** { branding, contact, seo, features, legal } — bentuknya divalidasi ApplicationSettingsSchema di API. */
   settings?: Record<string, unknown>;
   permissions: PermissionDef[];
 }

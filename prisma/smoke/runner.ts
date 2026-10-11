@@ -155,6 +155,57 @@ async function runApplicationsSuite() {
     body: { code: "test-forbidden", name: "Test App", audience: "INTERNAL" },
   });
   assert("Role viewer tanpa permission ditolak membuat aplikasi (403)", forbiddenRes.status === 403, forbiddenRes.status, 403);
+
+  // 4. Create aplikasi non-aktif (isActive: false) dengan fileId dummy -> diizinkan tanpa cek ImageKit
+  const createDraftAppRes = await request("/applications", {
+    method: "POST",
+    token: saToken || undefined,
+    body: {
+      code: "test-draft-app",
+      name: "Draft App",
+      audience: "PUBLIC",
+      isActive: false,
+      logoFileId: "dummy-non-existent-file-id",
+    },
+  });
+  assert("Aplikasi nonaktif (isActive=false) berhasil dibuat tanpa validasi ketat ImageKit (201)", createDraftAppRes.status === 201, createDraftAppRes.status, 201);
+  const draftAppId = createDraftAppRes.data?.data?.id;
+
+  // 5. Coba aktifkan aplikasi draft dengan fileId dummy -> ditolak ImageKit (400)
+  if (draftAppId) {
+    const activateFailRes = await request(`/applications/${draftAppId}/activate`, {
+      method: "PATCH",
+      token: saToken || undefined,
+      body: { isActive: true },
+    });
+    assert("Aktivasi aplikasi ditolak saat berkas ImageKit tidak ditemukan (400)", activateFailRes.status === 400, activateFailRes.status, 400);
+
+    // Bersihkan fileId dummy, lalu aktifkan -> berhasil
+    await request(`/applications/${draftAppId}`, {
+      method: "PATCH",
+      token: saToken || undefined,
+      body: { logoFileId: null },
+    });
+    const activateSuccessRes = await request(`/applications/${draftAppId}/activate`, {
+      method: "PATCH",
+      token: saToken || undefined,
+      body: { isActive: true },
+    });
+    assert("Aplikasi berhasil diaktifkan setelah fileId valid/dibersihkan (200)", activateSuccessRes.status === 200, activateSuccessRes.status, 200);
+
+    // Hapus aplikasi uji coba
+    await request(`/applications/${draftAppId}`, {
+      method: "DELETE",
+      token: saToken || undefined,
+    });
+  }
+
+  // 6. Public Config endpoint tanpa autentikasi
+  const publicConfigRes = await request("/applications/public-config/bapenda-profile");
+  assert("Public config bapenda-profile dapat diakses tanpa login (200)", publicConfigRes.status === 200, publicConfigRes.status, 200);
+  assert("Public config memuat tagline aplikasi", Boolean(publicConfigRes.data?.data?.tagline));
+  assert("Public config memuat kontak resmi", Boolean(publicConfigRes.data?.data?.settings?.contact?.email));
+  assert("Public config memuat metadata SEO", Boolean(publicConfigRes.data?.data?.settings?.seo?.canonicalUrl));
 }
 
 // ─── Test Suite: Roles & Permissions ──────────────────────────────────────────

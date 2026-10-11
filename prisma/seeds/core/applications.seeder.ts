@@ -116,6 +116,7 @@ export async function seedApplications(
     const audience = def.audience ?? "INTERNAL";
     const profile = {
       name: def.name,
+      tagline: def.tagline ?? null,
       description: def.description ?? null,
       isActive: def.isActive ?? true,
       audience,

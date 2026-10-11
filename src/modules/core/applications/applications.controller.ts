@@ -4,6 +4,7 @@ import {
   listApplications,
   listMyApplications,
   getApplicationById,
+  getPublicAppConfig,
   createApplication,
   updateApplication,
   setApplicationActiveStatus,
@@ -15,6 +16,7 @@ import type {
   CreateApplicationBody,
   UpdateApplicationBody,
   SetApplicationActiveBody,
+  PublicAppConfigParams,
 } from "./applications.schema.js";
 
 // ─── List ─────────────────────────────────────────────────────────────────────
@@ -38,6 +40,16 @@ export async function handleGetApplication(
 ): Promise<void> {
   const { id } = request.params as { id: string };
   void reply.status(200).send(ok(await getApplicationById(id)));
+}
+
+// ─── Public Config ────────────────────────────────────────────────────────────
+export async function handleGetPublicAppConfig(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { code } = request.params as PublicAppConfigParams;
+  const config = await getPublicAppConfig(code);
+  void reply.status(200).send(ok(config, "Konfigurasi publik aplikasi berhasil diambil"));
 }
 
 // ─── Milik Sendiri ────────────────────────────────────────────────────────────

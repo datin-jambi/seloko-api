@@ -34,11 +34,19 @@ model Application {
   /// Siapa yang boleh login: INTERNAL (pegawai, lewat seloko) atau PUBLIC
   /// (warga). Tidak dapat diubah setelah dibuat — akun yang sudah terdaftar
   /// akan terdampar di aplikasi yang tiba-tiba berganti jenis.
-  audience    Audience @default(INTERNAL)
-  logoUrl     String?  @map("logo_url") @db.VarChar(255)
-  /// Konfigurasi tampilan yang hanya dibaca front-end: { branding, seo }.
+  audience        Audience @default(INTERNAL)
+  tagline         String?  @db.VarChar(150)
+  logoUrl         String?  @map("logo_url") @db.VarChar(255)
+  logoFileId      String?  @map("logo_file_id") @db.VarChar(100)
+  logoDarkUrl     String?  @map("logo_dark_url") @db.VarChar(255)
+  logoDarkFileId  String?  @map("logo_dark_file_id") @db.VarChar(100)
+  faviconUrl      String?  @map("favicon_url") @db.VarChar(255)
+  faviconFileId   String?  @map("favicon_file_id") @db.VarChar(100)
+  ogImageUrl      String?  @map("og_image_url") @db.VarChar(255)
+  ogImageFileId   String?  @map("og_image_file_id") @db.VarChar(100)
+  /// Konfigurasi tampilan yang hanya dibaca front-end: { contact, seo, features, legal }.
   /// Bentuknya divalidasi Zod di modul applications, bukan di DB.
-  settings    Json     @default("{}")
+  settings        Json     @default("{}")
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()

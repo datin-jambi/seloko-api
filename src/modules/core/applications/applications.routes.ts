@@ -7,6 +7,8 @@ import {
   ListMyApplicationsResponseSchema,
   ApplicationParamsSchema,
   GetApplicationResponseSchema,
+  PublicAppConfigParamsSchema,
+  GetPublicAppConfigResponseSchema,
   CreateApplicationBodySchema,
   CreateApplicationResponseSchema,
   UpdateApplicationBodySchema,
@@ -19,6 +21,7 @@ import {
   handleListApplications,
   handleListMyApplications,
   handleGetApplication,
+  handleGetPublicAppConfig,
   handleCreateApplication,
   handleUpdateApplication,
   handleSetApplicationActive,
@@ -41,6 +44,17 @@ export async function applicationsRoutes(fastify: FastifyInstance): Promise<void
       fastify.requirePermission("application:list", { app: APP_CODES.SELOKO }),
     ],
   }, handleListApplications);
+
+  // ── GET /applications/public-config/:code ──────────────────────────────────
+  // Endpoint publik tanpa autentikasi untuk bootstrap frontend (kontak, SEO, status maintenance)
+  app.get("/public-config/:code", {
+    schema: {
+      description: "Konfigurasi publik aplikasi untuk client frontend (branding, kontak, SEO, status features)",
+      tags: ["applications"],
+      params: PublicAppConfigParamsSchema,
+      response: { 200: GetPublicAppConfigResponseSchema },
+    },
+  }, handleGetPublicAppConfig);
 
   // ── GET /applications/me ───────────────────────────────────────────────────
   // WAJIB didaftarkan sebelum "/:id": find-my-way mencocokkan rute statis lebih

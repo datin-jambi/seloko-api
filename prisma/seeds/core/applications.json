@@ -4,11 +4,18 @@
     {
       "code": "seloko",
       "name": "SELOKO CMS",
+      "tagline": "Identity Gateway & Multi-App Core Engine BPKPD Jambi",
       "description": "Konsol manajemen terpusat Bapenda Jambi",
       "isActive": true,
       "audience": "INTERNAL",
       "logoUrl": "https://cdn.bapenda.jambiprov.go.id/logo/seloko.png",
-      "settings": { "branding": { "shortName": "SELOKO", "primaryColor": "#0F766E" } },
+      "settings": {
+        "branding": { "shortName": "SELOKO", "primaryColor": "#0F766E" },
+        "contact": {
+          "email": "admin.seloko@jambiprov.go.id",
+          "address": "Gedung BPKPD Provinsi Jambi Lt. 3"
+        }
+      },
       "permissions": [
         { "module": "Pengguna", "entity": "user", "label": "Pengguna", "actions": ["content"] },
         { "module": "Akses", "entity": "role", "label": "Role", "actions": ["content"] },
@@ -21,13 +28,47 @@
     {
       "code": "bapenda-profile",
       "name": "Bapenda Profile Portal",
+      "tagline": "Portal Resmi Pengelolaan Pendapatan Daerah Provinsi Jambi",
       "description": "Portal profil dan informasi publik Bapenda Jambi",
       "isActive": true,
       "audience": "PUBLIC",
       "logoUrl": "https://cdn.bapenda.jambiprov.go.id/logo/bapenda.png",
       "settings": {
         "branding": { "shortName": "Bapenda Jambi", "primaryColor": "#1D4ED8" },
-        "seo": { "titleTemplate": "%s | Bapenda Provinsi Jambi", "description": "Portal resmi Badan Pendapatan Daerah Provinsi Jambi" }
+        "contact": {
+          "email": "bapenda@jambiprov.go.id",
+          "phone": "0741-62021",
+          "whatsapp": "08117400001",
+          "address": "Jl. K.H. Agus Salim No. 1, Kota Baru, Kota Jambi",
+          "googleMapsUrl": "https://maps.google.com/?q=Bapenda+Jambi",
+          "workingHours": "Senin - Jumat, 08.00 - 16.00 WIB",
+          "socialMedia": {
+            "instagram": "https://instagram.com/bapendajambi",
+            "facebook": "https://facebook.com/bapendajambi",
+            "youtube": "https://youtube.com/@bapendajambi"
+          }
+        },
+        "seo": {
+          "titleTemplate": "%s | BPKPD Provinsi Jambi",
+          "metaTitle": "Badan Pengelola Keuangan dan Pendapatan Daerah Provinsi Jambi",
+          "metaDescription": "Portal resmi BPKPD Provinsi Jambi - Layanan PKB, BBNKB, Pajak Bahan Bakar, Air Permukaan, dan Retribusi Daerah.",
+          "keywords": ["bapenda jambi", "bpkpd", "pajak jambi", "e-samsat", "pemprov jambi"],
+          "canonicalUrl": "https://bapenda.jambiprov.go.id"
+        },
+        "features": {
+          "maintenanceMode": false,
+          "enablePayment": true,
+          "enableRegistration": true,
+          "announcement": {
+            "isActive": true,
+            "message": "Program Pemutihan Pajak Kendaraan Bermotor Periode 2026 sedang berlangsung!",
+            "type": "info"
+          }
+        },
+        "legal": {
+          "termsUrl": "/syarat-ketentuan",
+          "privacyPolicyUrl": "/kebijakan-privasi"
+        }
       },
       "permissions": [
         { "module": "Konten", "entity": "article", "label": "Artikel", "actions": ["publishable"] },
@@ -40,13 +81,23 @@
     {
       "code": "lapak-jambi-web",
       "name": "Lapak Jambi Web",
+      "tagline": "Pasar Digital UMKM Provinsi Jambi",
       "description": "Marketplace UMKM Jambi — antarmuka web",
       "isActive": true,
       "audience": "PUBLIC",
       "logoUrl": "https://cdn.bapenda.jambiprov.go.id/logo/lapak.png",
       "settings": {
         "branding": { "shortName": "Lapak Jambi", "primaryColor": "#EA580C" },
-        "seo": { "titleTemplate": "%s | Lapak Jambi", "description": "Marketplace UMKM Provinsi Jambi" }
+        "contact": {
+          "email": "bantuan@lapak.jambiprov.go.id",
+          "whatsapp": "081234567890"
+        },
+        "seo": { "titleTemplate": "%s | Lapak Jambi", "description": "Marketplace UMKM Provinsi Jambi" },
+        "features": {
+          "maintenanceMode": false,
+          "enablePayment": true,
+          "enableRegistration": true
+        }
       },
       "permissions": [
         { "module": "Mitra", "entity": "merchant", "label": "Merchant", "actions": ["verifiable"] },

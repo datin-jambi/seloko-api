@@ -12,25 +12,81 @@ import { z } from "zod";
  */
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Warna harus hex 6 digit, mis. #0F766E");
 
+export const ApplicationContactSchema = z
+  .object({
+    email: z.string().email("Format email kontak tidak valid").max(100).optional().nullable(),
+    phone: z.string().max(30).optional().nullable(),
+    whatsapp: z.string().max(30).optional().nullable(),
+    address: z.string().max(255).optional().nullable(),
+    googleMapsUrl: z.string().url("Format URL Google Maps tidak valid").max(500).optional().nullable(),
+    workingHours: z.string().max(100).optional().nullable(),
+    socialMedia: z
+      .object({
+        instagram: z.string().url().max(255).optional().nullable(),
+        facebook: z.string().url().max(255).optional().nullable(),
+        youtube: z.string().url().max(255).optional().nullable(),
+        twitter: z.string().url().max(255).optional().nullable(),
+        tiktok: z.string().url().max(255).optional().nullable(),
+      })
+      .strict()
+      .optional()
+      .nullable(),
+  })
+  .strict();
+
+export const ApplicationSeoSchema = z
+  .object({
+    titleTemplate: z.string().max(100).optional().nullable(),
+    metaTitle: z.string().max(100).optional().nullable(),
+    metaDescription: z.string().max(300).optional().nullable(),
+    description: z.string().max(300).optional().nullable(),
+    ogImageUrl: z.string().url().max(255).optional().nullable(),
+    keywords: z.array(z.string().max(50)).max(20).optional().nullable(),
+    canonicalUrl: z.string().url().max(255).optional().nullable(),
+  })
+  .strict();
+
+export const ApplicationFeaturesSchema = z
+  .object({
+    maintenanceMode: z.boolean().default(false),
+    maintenanceMessage: z.string().max(300).optional().nullable(),
+    enablePayment: z.boolean().default(false),
+    enableRegistration: z.boolean().default(true),
+    announcement: z
+      .object({
+        isActive: z.boolean().default(false),
+        message: z.string().max(500).optional().nullable(),
+        type: z.enum(["info", "warning", "danger"]).default("info"),
+      })
+      .strict()
+      .optional()
+      .nullable(),
+  })
+  .strict();
+
+export const ApplicationLegalSchema = z
+  .object({
+    termsUrl: z.string().max(255).optional().nullable(),
+    privacyPolicyUrl: z.string().max(255).optional().nullable(),
+  })
+  .strict();
+
 export const ApplicationSettingsSchema = z
   .object({
     branding: z
       .object({
-        shortName: z.string().max(30).optional(),
-        primaryColor: hexColor.optional(),
-        faviconUrl: z.string().url().max(255).optional(),
+        shortName: z.string().max(30).optional().nullable(),
+        primaryColor: hexColor.optional().nullable(),
+        accentColor: hexColor.optional().nullable(),
+        faviconUrl: z.string().url().max(255).optional().nullable(),
       })
       .strict()
-      .optional(),
-    seo: z
-      .object({
-        /** Mis. "%s | Lapak Jambi" — %s diganti judul halaman. */
-        titleTemplate: z.string().max(100).optional(),
-        description: z.string().max(300).optional(),
-        ogImageUrl: z.string().url().max(255).optional(),
-      })
-      .strict()
-      .optional(),
+      .optional()
+      .nullable(),
+    contact: ApplicationContactSchema.optional().nullable(),
+    seo: ApplicationSeoSchema.optional().nullable(),
+    features: ApplicationFeaturesSchema.optional().nullable(),
+    legal: ApplicationLegalSchema.optional().nullable(),
   })
   .strict();
 
@@ -41,15 +97,23 @@ const audienceField = z
   .describe("INTERNAL = pegawai lewat seloko; PUBLIC = warga daftar sendiri");
 
 // ─── Shared Shapes ────────────────────────────────────────────────────────────
-const ApplicationShape = z.object({
+export const ApplicationShape = z.object({
   id: z.string(),
   code: z.string(),
   name: z.string(),
+  tagline: z.string().nullable(),
   description: z.string().nullable(),
   baseUrl: z.string().nullable(),
   icon: z.string().nullable(),
   audience: audienceField,
   logoUrl: z.string().nullable(),
+  logoFileId: z.string().nullable(),
+  logoDarkUrl: z.string().nullable(),
+  logoDarkFileId: z.string().nullable(),
+  faviconUrl: z.string().nullable(),
+  faviconFileId: z.string().nullable(),
+  ogImageUrl: z.string().nullable(),
+  ogImageFileId: z.string().nullable(),
   settings: ApplicationSettingsSchema,
   isActive: z.boolean(),
   createdAt: z.string().datetime(),
@@ -156,10 +220,13 @@ const MyApplicationShape = ApplicationShape.pick({
   id: true,
   code: true,
   name: true,
+  tagline: true,
   description: true,
   baseUrl: true,
   icon: true,
   logoUrl: true,
+  logoDarkUrl: true,
+  faviconUrl: true,
 }).extend({
   /** Role yang dipegang di aplikasi ini. Kosong untuk super admin (bypass). */
   roles: z.array(z.string()),
@@ -184,16 +251,50 @@ export const GetApplicationResponseSchema = z.object({
   data: ApplicationDetailShape,
 });
 
+// ─── Public Config ────────────────────────────────────────────────────────────
+export const PublicAppConfigParamsSchema = z.object({
+  code: z.string().min(2).max(50),
+});
+
+export const ApplicationPublicConfigShape = ApplicationShape.pick({
+  code: true,
+  name: true,
+  tagline: true,
+  description: true,
+  baseUrl: true,
+  icon: true,
+  audience: true,
+  logoUrl: true,
+  logoDarkUrl: true,
+  faviconUrl: true,
+  ogImageUrl: true,
+  settings: true,
+});
+
+export const GetPublicAppConfigResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  data: ApplicationPublicConfigShape,
+});
+
 // ─── Create ───────────────────────────────────────────────────────────────────
 export const CreateApplicationBodySchema = z.object({
   code: codeField,
   name: nameField,
   /** Wajib dan final — lihat catatan UpdateApplicationBodySchema. */
   audience: audienceField,
-  description: z.string().max(500).optional(),
-  baseUrl: baseUrlField.optional(),
-  icon: iconField.optional(),
-  logoUrl: z.string().url("Format URL logo tidak valid").max(255).optional(),
+  tagline: z.string().max(150).optional().nullable(),
+  description: z.string().max(500).optional().nullable(),
+  baseUrl: baseUrlField.optional().nullable(),
+  icon: iconField.optional().nullable(),
+  logoUrl: z.string().url("Format URL logo tidak valid").max(255).optional().nullable(),
+  logoFileId: z.string().max(100).optional().nullable(),
+  logoDarkUrl: z.string().url("Format URL logo tema gelap tidak valid").max(255).optional().nullable(),
+  logoDarkFileId: z.string().max(100).optional().nullable(),
+  faviconUrl: z.string().url("Format URL favicon tidak valid").max(255).optional().nullable(),
+  faviconFileId: z.string().max(100).optional().nullable(),
+  ogImageUrl: z.string().url("Format URL Open Graph image tidak valid").max(255).optional().nullable(),
+  ogImageFileId: z.string().max(100).optional().nullable(),
   settings: ApplicationSettingsSchema.default({}),
   isActive: z.boolean().default(true),
 });
@@ -205,28 +306,23 @@ export const CreateApplicationResponseSchema = z.object({
 });
 
 // ─── Update ───────────────────────────────────────────────────────────────────
-/**
- * `code` TIDAK bisa diubah: nilainya tertanam di header X-App-Code milik setiap
- * klien yang sudah terpasang, di refresh_tokens.app_code, dan di audit_logs
- * yang bersifat tak-termutasi. Ganti kode = putus seluruh sesi aktif dan
- * memutus jejak audit dari aplikasinya.
- *
- * `audience` juga tidak bisa diubah: mengubah aplikasi publik menjadi internal
- * membuat seluruh akun warga yang terdaftar terkunci, dan sebaliknya membuka
- * aplikasi pegawai untuk pendaftaran umum. Itu migrasi, bukan suntingan.
- *
- * `settings` diganti UTUH, bukan digabung: PATCH {settings:{seo:{…}}} menghapus
- * branding. Sengaja — layar pengaturan CMS mengirim seluruh form, dan
- * penggabungan dalam (deep merge) membuat field tidak bisa dikosongkan.
- */
 export const UpdateApplicationBodySchema = z
   .object({
     name: nameField.optional(),
+    tagline: z.string().max(150).nullable().optional(),
     description: z.string().max(500).nullable().optional(),
     baseUrl: baseUrlField.nullable().optional(),
     icon: iconField.nullable().optional(),
     logoUrl: z.string().url("Format URL logo tidak valid").max(255).nullable().optional(),
+    logoFileId: z.string().max(100).nullable().optional(),
+    logoDarkUrl: z.string().url("Format URL logo tema gelap tidak valid").max(255).nullable().optional(),
+    logoDarkFileId: z.string().max(100).nullable().optional(),
+    faviconUrl: z.string().url("Format URL favicon tidak valid").max(255).nullable().optional(),
+    faviconFileId: z.string().max(100).nullable().optional(),
+    ogImageUrl: z.string().url("Format URL Open Graph image tidak valid").max(255).nullable().optional(),
+    ogImageFileId: z.string().max(100).nullable().optional(),
     settings: ApplicationSettingsSchema.optional(),
+    isActive: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "Setidaknya satu field harus diisi untuk update",
@@ -259,6 +355,7 @@ export const DeleteApplicationResponseSchema = z.object({
 // ─── Inferred Types ───────────────────────────────────────────────────────────
 export type ListApplicationsQuery = z.infer<typeof ListApplicationsQuerySchema>;
 export type ApplicationParams = z.infer<typeof ApplicationParamsSchema>;
+export type PublicAppConfigParams = z.infer<typeof PublicAppConfigParamsSchema>;
 export type CreateApplicationBody = z.infer<typeof CreateApplicationBodySchema>;
 export type UpdateApplicationBody = z.infer<typeof UpdateApplicationBodySchema>;
 export type SetApplicationActiveBody = z.infer<typeof SetApplicationActiveBodySchema>;

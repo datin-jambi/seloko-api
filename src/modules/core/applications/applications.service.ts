@@ -1,8 +1,9 @@
 import { prisma } from "~/config/database.js";
 import { invalidateAppPermissionCaches } from "~/config/redis.js";
-import { ConflictError, NotFoundError, ForbiddenError } from "~/common/errors/index.js";
+import { ConflictError, NotFoundError, ForbiddenError, BadRequestError } from "~/common/errors/index.js";
 import { buildPaginatedResult } from "~/common/types/index.js";
 import { APP_CODES } from "~/common/constants/index.js";
+import { ImageKitService } from "~/common/services/storage/imagekit.service.js";
 import type {
   ListApplicationsQuery,
   CreateApplicationBody,
@@ -21,11 +22,19 @@ const APP_SELECT = {
   id: true,
   code: true,
   name: true,
+  tagline: true,
   description: true,
   baseUrl: true,
   icon: true,
   audience: true,
   logoUrl: true,
+  logoFileId: true,
+  logoDarkUrl: true,
+  logoDarkFileId: true,
+  faviconUrl: true,
+  faviconFileId: true,
+  ogImageUrl: true,
+  ogImageFileId: true,
   settings: true,
   isActive: true,
   createdAt: true,
@@ -48,16 +57,57 @@ type AppRow = {
   id: string;
   code: string;
   name: string;
+  tagline: string | null;
   description: string | null;
   baseUrl: string | null;
   icon: string | null;
   audience: "INTERNAL" | "PUBLIC";
   logoUrl: string | null;
+  logoFileId: string | null;
+  logoDarkUrl: string | null;
+  logoDarkFileId: string | null;
+  faviconUrl: string | null;
+  faviconFileId: string | null;
+  ogImageUrl: string | null;
+  ogImageFileId: string | null;
   settings: Prisma.JsonValue;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
+
+/**
+ * Validasi toleran berkas media ImageKit untuk aplikasi.
+ */
+async function validateImageKitMedia(
+  fileId: string | null | undefined,
+  label: string,
+  maxMb = 2,
+  minDimension = 32,
+): Promise<void> {
+  if (!fileId || !fileId.trim()) return;
+
+  const file = await ImageKitService.getFileDetails(fileId);
+  if (!file) {
+    throw new BadRequestError(`Berkas ${label} (ID: '${fileId}') tidak ditemukan di ImageKit.`);
+  }
+
+  const maxBytes = maxMb * 1024 * 1024;
+  if (file.size > maxBytes) {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+    throw new BadRequestError(
+      `Ukuran berkas ${label} terlalu besar (${sizeMb} MB). Maksimal yang diizinkan adalah ${maxMb} MB.`,
+    );
+  }
+
+  if (file.width !== undefined && file.height !== undefined) {
+    if (file.width < minDimension || file.height < minDimension) {
+      throw new BadRequestError(
+        `Dimensi berkas ${label} terlalu kecil (${file.width}x${file.height} px). Minimal ${minDimension}x${minDimension} px.`,
+      );
+    }
+  }
+}
 
 function formatApplication(app: AppRow) {
   return {
@@ -165,10 +215,13 @@ export async function listMyApplications(userId: string, isSuperAdmin: boolean) 
     id: true,
     code: true,
     name: true,
+    tagline: true,
     description: true,
     baseUrl: true,
     icon: true,
     logoUrl: true,
+    logoDarkUrl: true,
+    faviconUrl: true,
   } as const;
 
   if (isSuperAdmin) {
@@ -306,16 +359,31 @@ export async function createApplication(data: CreateApplicationBody) {
     throw new ConflictError(`Kode aplikasi "${data.code}" sudah digunakan`);
   }
 
+  if (data.isActive) {
+    if (data.logoFileId) await validateImageKitMedia(data.logoFileId, "logo", 2, 64);
+    if (data.logoDarkFileId) await validateImageKitMedia(data.logoDarkFileId, "logo tema gelap", 2, 64);
+    if (data.faviconFileId) await validateImageKitMedia(data.faviconFileId, "favicon", 1, 16);
+    if (data.ogImageFileId) await validateImageKitMedia(data.ogImageFileId, "Open Graph image", 3, 200);
+  }
+
   const app = await prisma.application.create({
     data: {
       code: data.code,
       name: data.name,
       audience: data.audience,
+      tagline: data.tagline ?? null,
       description: data.description ?? null,
       baseUrl: data.baseUrl ?? null,
       icon: data.icon ?? null,
       logoUrl: data.logoUrl ?? null,
-      settings: data.settings,
+      logoFileId: data.logoFileId ?? null,
+      logoDarkUrl: data.logoDarkUrl ?? null,
+      logoDarkFileId: data.logoDarkFileId ?? null,
+      faviconUrl: data.faviconUrl ?? null,
+      faviconFileId: data.faviconFileId ?? null,
+      ogImageUrl: data.ogImageUrl ?? null,
+      ogImageFileId: data.ogImageFileId ?? null,
+      settings: (data.settings ?? {}) as Prisma.InputJsonObject,
       isActive: data.isActive,
     },
     select: APP_SELECT,
@@ -330,24 +398,113 @@ export async function createApplication(data: CreateApplicationBody) {
  * UpdateApplicationBodySchema.
  */
 export async function updateApplication(id: string, data: UpdateApplicationBody) {
-  const exists = await prisma.application.findUnique({
+  const existing = await prisma.application.findUnique({
     where: { id },
-    select: { id: true },
+    select: {
+      id: true,
+      code: true,
+      isActive: true,
+      logoFileId: true,
+      logoDarkFileId: true,
+      faviconFileId: true,
+      ogImageFileId: true,
+    },
   });
-  if (!exists) throw new NotFoundError("Aplikasi", id);
+  if (!existing) throw new NotFoundError("Aplikasi", id);
+
+  const willBeActive =
+    data.isActive !== undefined ? data.isActive : existing.isActive;
+  const targetLogoFileId =
+    data.logoFileId !== undefined ? data.logoFileId : existing.logoFileId;
+  const targetLogoDarkFileId =
+    data.logoDarkFileId !== undefined ? data.logoDarkFileId : existing.logoDarkFileId;
+  const targetFaviconFileId =
+    data.faviconFileId !== undefined ? data.faviconFileId : existing.faviconFileId;
+  const targetOgImageFileId =
+    data.ogImageFileId !== undefined ? data.ogImageFileId : existing.ogImageFileId;
+
+  // Jika aplikasi berstatus aktif (atau diubah menjadi aktif), validasi berkas di ImageKit
+  if (willBeActive) {
+    if (
+      targetLogoFileId &&
+      (data.isActive === true || data.logoFileId !== undefined)
+    ) {
+      await validateImageKitMedia(targetLogoFileId, "logo", 2, 64);
+    }
+    if (
+      targetLogoDarkFileId &&
+      (data.isActive === true || data.logoDarkFileId !== undefined)
+    ) {
+      await validateImageKitMedia(targetLogoDarkFileId, "logo tema gelap", 2, 64);
+    }
+    if (
+      targetFaviconFileId &&
+      (data.isActive === true || data.faviconFileId !== undefined)
+    ) {
+      await validateImageKitMedia(targetFaviconFileId, "favicon", 1, 16);
+    }
+    if (
+      targetOgImageFileId &&
+      (data.isActive === true || data.ogImageFileId !== undefined)
+    ) {
+      await validateImageKitMedia(targetOgImageFileId, "Open Graph image", 3, 200);
+    }
+  }
+
+  // Jika dinonaktifkan via updateApplication, pastikan bukan aplikasi terlindungi (seloko)
+  if (data.isActive !== undefined && !data.isActive) {
+    assertNotProtected(existing.code, "dinonaktifkan");
+  }
+
+  // Auto-cleanup berkas lama di ImageKit jika diganti
+  const cleanupTasks: string[] = [];
+  if (existing.logoFileId && data.logoFileId && existing.logoFileId !== data.logoFileId) {
+    cleanupTasks.push(existing.logoFileId);
+  }
+  if (existing.logoDarkFileId && data.logoDarkFileId && existing.logoDarkFileId !== data.logoDarkFileId) {
+    cleanupTasks.push(existing.logoDarkFileId);
+  }
+  if (existing.faviconFileId && data.faviconFileId && existing.faviconFileId !== data.faviconFileId) {
+    cleanupTasks.push(existing.faviconFileId);
+  }
+  if (existing.ogImageFileId && data.ogImageFileId && existing.ogImageFileId !== data.ogImageFileId) {
+    cleanupTasks.push(existing.ogImageFileId);
+  }
+  for (const oldFileId of cleanupTasks) {
+    ImageKitService.deleteFile(oldFileId).catch((err) => {
+      console.error("[ApplicationsService] Gagal menghapus media lama di ImageKit:", err);
+    });
+  }
 
   const app = await prisma.application.update({
     where: { id },
     data: {
       ...(data.name !== undefined && { name: data.name }),
+      ...(data.tagline !== undefined && { tagline: data.tagline }),
       ...(data.description !== undefined && { description: data.description }),
       ...(data.baseUrl !== undefined && { baseUrl: data.baseUrl }),
       ...(data.icon !== undefined && { icon: data.icon }),
       ...(data.logoUrl !== undefined && { logoUrl: data.logoUrl }),
-      ...(data.settings !== undefined && { settings: data.settings }),
+      ...(data.logoFileId !== undefined && { logoFileId: data.logoFileId }),
+      ...(data.logoDarkUrl !== undefined && { logoDarkUrl: data.logoDarkUrl }),
+      ...(data.logoDarkFileId !== undefined && { logoDarkFileId: data.logoDarkFileId }),
+      ...(data.faviconUrl !== undefined && { faviconUrl: data.faviconUrl }),
+      ...(data.faviconFileId !== undefined && { faviconFileId: data.faviconFileId }),
+      ...(data.ogImageUrl !== undefined && { ogImageUrl: data.ogImageUrl }),
+      ...(data.ogImageFileId !== undefined && { ogImageFileId: data.ogImageFileId }),
+      ...(data.settings !== undefined && { settings: data.settings as Prisma.InputJsonObject }),
+      ...(data.isActive !== undefined && { isActive: data.isActive }),
     },
     select: APP_SELECT,
   });
+
+  if (data.isActive === false && existing.isActive === true) {
+    await prisma.refreshToken.updateMany({
+      where: { appCode: existing.code, isRevoked: false },
+      data: { isRevoked: true },
+    });
+    await invalidateAppPermissionCaches(existing.code);
+  }
 
   return formatApplication(app);
 }
@@ -365,11 +522,25 @@ export async function updateApplication(id: string, data: UpdateApplicationBody)
 export async function setApplicationActiveStatus(id: string, isActive: boolean) {
   const app = await prisma.application.findUnique({
     where: { id },
-    select: { code: true },
+    select: {
+      code: true,
+      logoFileId: true,
+      logoDarkFileId: true,
+      faviconFileId: true,
+      ogImageFileId: true,
+    },
   });
   if (!app) throw new NotFoundError("Aplikasi", id);
 
-  if (!isActive) assertNotProtected(app.code, "dinonaktifkan");
+  if (!isActive) {
+    assertNotProtected(app.code, "dinonaktifkan");
+  } else {
+    // Validasi berkas media ImageKit sebelum mengaktifkan aplikasi
+    if (app.logoFileId) await validateImageKitMedia(app.logoFileId, "logo", 2, 64);
+    if (app.logoDarkFileId) await validateImageKitMedia(app.logoDarkFileId, "logo tema gelap", 2, 64);
+    if (app.faviconFileId) await validateImageKitMedia(app.faviconFileId, "favicon", 1, 16);
+    if (app.ogImageFileId) await validateImageKitMedia(app.ogImageFileId, "Open Graph image", 3, 200);
+  }
 
   await prisma.application.update({ where: { id }, data: { isActive } });
 
@@ -423,4 +594,38 @@ export async function deleteApplication(id: string) {
   await prisma.application.delete({ where: { id } });
 
   return { cacheCleared: await invalidateAppPermissionCaches(app.code) };
+}
+
+// ─── Public Config ────────────────────────────────────────────────────────────
+/**
+ * Mengambil konfigurasi publik aplikasi (branding, kontak, SEO, status features)
+ * berdasarkan kode aplikasi (mis. 'bapenda-profile', 'lapak-jambi-web').
+ * Dapat diakses tanpa login oleh front-end client.
+ */
+export async function getPublicAppConfig(code: string) {
+  const app = await prisma.application.findUnique({
+    where: { code, isActive: true },
+    select: APP_SELECT,
+  });
+
+  if (!app) {
+    throw new NotFoundError("Aplikasi", code);
+  }
+
+  const formatted = formatApplication(app);
+
+  return {
+    code: formatted.code,
+    name: formatted.name,
+    tagline: formatted.tagline,
+    description: formatted.description,
+    baseUrl: formatted.baseUrl,
+    icon: formatted.icon,
+    audience: formatted.audience,
+    logoUrl: formatted.logoUrl,
+    logoDarkUrl: formatted.logoDarkUrl,
+    faviconUrl: formatted.faviconUrl,
+    ogImageUrl: formatted.ogImageUrl,
+    settings: formatted.settings,
+  };
 }
