@@ -265,22 +265,37 @@ async function runBannersSuite() {
   });
   assert("Storage GET /api/storage/:fileId menolak file yang tidak ada (404)", storageDetailRes.status === 404, storageDetailRes.status, 404);
 
-  // 4. Validasi banner active menolak fileId yang tidak ada di ImageKit
+  // 4. Validasi banner active menolak fileId yang tidak ada di ImageKit (Desktop & Mobile)
   const invalidCreateRes = await request("/bapenda/banners", {
     method: "POST",
     token: saToken || undefined,
     appCode: "seloko",
     body: {
-      title: "Banner Test Invalid FileId",
+      title: "Banner Test Invalid Desktop FileId",
       imageUrl: "https://example.com/test.jpg",
       imageFileId: "invalid_file_id_not_found_12345",
       isActive: true,
       sortOrder: 99,
     },
   });
-  assert("Membuat banner aktif dengan imageFileId palsu ditolak validasi (400)", invalidCreateRes.status === 400, invalidCreateRes.status, 400);
+  assert("Membuat banner aktif dengan imageFileId desktop palsu ditolak validasi (400)", invalidCreateRes.status === 400, invalidCreateRes.status, 400);
 
-  // 5. CMS Create Banner (Sukses jika tanpa imageFileId atau isActive false)
+  const invalidMobileRes = await request("/bapenda/banners", {
+    method: "POST",
+    token: saToken || undefined,
+    appCode: "seloko",
+    body: {
+      title: "Banner Test Invalid Mobile FileId",
+      imageUrl: "https://example.com/test.jpg",
+      mobileImageUrl: "https://example.com/mobile-test.jpg",
+      mobileImageFileId: "invalid_mobile_file_id_999",
+      isActive: true,
+      sortOrder: 99,
+    },
+  });
+  assert("Membuat banner aktif dengan mobileImageFileId palsu ditolak validasi (400)", invalidMobileRes.status === 400, invalidMobileRes.status, 400);
+
+  // 5. CMS Create Banner (Sukses dengan Desktop & Mobile URL)
   const createRes = await request("/bapenda/banners", {
     method: "POST",
     token: saToken || undefined,
@@ -288,14 +303,16 @@ async function runBannersSuite() {
     body: {
       title: "Smoke Test Temporary Banner",
       description: "Banner untuk pengujian otomatis end-to-end",
-      imageUrl: "https://example.com/banner-smoke-test.webp",
+      imageUrl: "https://example.com/banner-smoke-test-desktop.webp",
+      mobileImageUrl: "https://example.com/banner-smoke-test-mobile.webp",
       buttonText: "Klik Disini",
       buttonUrl: "https://bapenda.jambiprov.go.id",
       sortOrder: 99,
       isActive: false,
     },
   });
-  assert("Menambah banner baru untuk testing berhasil (201)", createRes.status === 201, createRes.status, 201);
+  assert("Menambah banner baru (desktop + mobile) untuk testing berhasil (201)", createRes.status === 201, createRes.status, 201);
+  assert("Response memuat mobileImageUrl", createRes.data?.data?.mobileImageUrl === "https://example.com/banner-smoke-test-mobile.webp");
   const createdId = createRes.data?.data?.id;
 
   if (createdId) {

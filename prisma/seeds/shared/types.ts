@@ -162,6 +162,8 @@ export interface BannerDef {
   description?: string | null;
   imageUrl: string;
   imageFileId?: string | null;
+  mobileImageUrl?: string | null;
+  mobileImageFileId?: string | null;
   buttonText?: string | null;
   buttonUrl?: string | null;
   sortOrder?: number;

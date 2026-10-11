@@ -19,18 +19,87 @@ async function getBapendaAppId(): Promise<string> {
 }
 
 /**
- * Memvalidasi apakah berkas gambar benar-benar ada di penyimpanan ImageKit.
- * Dipanggil secara kondisional saat banner dibuat atau diaktifkan (isActive = true).
+ * Konfigurasi batas toleransi dimensi & ukuran berkas Banner.
+ * Dibuat fleksibel (toleran) agar ramah berbagai variasi resolusi dari tim kreatif.
  */
-async function validateActiveBannerImage(imageFileId?: string | null): Promise<void> {
-  if (!imageFileId || !imageFileId.trim()) {
-    return;
-  }
+export const BANNER_IMAGE_RULES = {
+  desktop: {
+    maxSizeBytes: 3 * 1024 * 1024, // Maks 3 MB
+    minWidth: 800,                 // Min lebar 800px (agar tidak pecah di monitor)
+    maxWidth: 3840,                // Maks lebar 4K
+    minHeight: 250,                // Min tinggi 250px
+    maxHeight: 2160,               // Maks tinggi 2160px
+  },
+  mobile: {
+    maxSizeBytes: 1.5 * 1024 * 1024, // Maks 1.5 MB (ringan untuk jaringan HP warga)
+    minWidth: 360,                   // Min lebar 360px
+    maxWidth: 1600,                  // Maks lebar 1600px
+    minHeight: 300,                  // Min tinggi 300px
+    maxHeight: 2400,                 // Maks tinggi 2400px
+  },
+} as const;
 
-  const file = await ImageKitService.getFileDetails(imageFileId);
+/**
+ * Memvalidasi berkas gambar Desktop di ImageKit dengan toleransi dimensi & ukuran.
+ */
+async function validateDesktopBannerImage(fileId?: string | null): Promise<void> {
+  if (!fileId || !fileId.trim()) return;
+
+  const file = await ImageKitService.getFileDetails(fileId);
   if (!file) {
     throw new BadRequestError(
-      `Berkas gambar dengan ID '${imageFileId}' tidak ditemukan di penyimpanan ImageKit. Pastikan berkas valid sebelum mengaktifkan banner.`,
+      `Berkas gambar desktop (ID: '${fileId}') tidak ditemukan di ImageKit. Pastikan berkas valid sebelum mengaktifkan banner.`,
+    );
+  }
+
+  // 1. Validasi ukuran berkas
+  if (file.size > BANNER_IMAGE_RULES.desktop.maxSizeBytes) {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+    throw new BadRequestError(
+      `Ukuran gambar desktop terlalu besar (${sizeMb} MB). Maksimal yang diizinkan adalah 3 MB.`,
+    );
+  }
+
+  // 2. Validasi orientasi landscape & lebar minimal jika metadata dimensi tersedia
+  if (file.width !== undefined && file.height !== undefined) {
+    if (file.width < file.height) {
+      throw new BadRequestError(
+        `Gambar desktop harus berorientasi landscape/horizontal (lebar >= tinggi). Dimensi terdeteksi: ${file.width}x${file.height} px.`,
+      );
+    }
+    if (file.width < BANNER_IMAGE_RULES.desktop.minWidth) {
+      throw new BadRequestError(
+        `Lebar gambar desktop terlalu kecil (${file.width} px). Minimal lebar adalah ${BANNER_IMAGE_RULES.desktop.minWidth} px agar tidak pecah di layar laptop/PC.`,
+      );
+    }
+  }
+}
+
+/**
+ * Memvalidasi berkas gambar Mobile di ImageKit dengan toleransi dimensi & ukuran.
+ */
+async function validateMobileBannerImage(fileId?: string | null): Promise<void> {
+  if (!fileId || !fileId.trim()) return;
+
+  const file = await ImageKitService.getFileDetails(fileId);
+  if (!file) {
+    throw new BadRequestError(
+      `Berkas gambar mobile (ID: '${fileId}') tidak ditemukan di ImageKit. Pastikan berkas valid sebelum mengaktifkan banner.`,
+    );
+  }
+
+  // 1. Validasi ukuran berkas
+  if (file.size > BANNER_IMAGE_RULES.mobile.maxSizeBytes) {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+    throw new BadRequestError(
+      `Ukuran gambar mobile terlalu besar (${sizeMb} MB). Maksimal yang diizinkan adalah 1.5 MB agar cepat dimuat di ponsel warga.`,
+    );
+  }
+
+  // 2. Validasi lebar minimal jika metadata dimensi tersedia
+  if (file.width !== undefined && file.width < BANNER_IMAGE_RULES.mobile.minWidth) {
+    throw new BadRequestError(
+      `Lebar gambar mobile terlalu kecil (${file.width} px). Minimal lebar adalah ${BANNER_IMAGE_RULES.mobile.minWidth} px.`,
     );
   }
 }
@@ -115,9 +184,14 @@ export async function getBannerById(id: string) {
 
 /** Menambahkan banner baru */
 export async function createBanner(body: CreateBannerBody) {
-  // Jika banner dibuat langsung dengan status aktif dan memiliki imageFileId, verifikasi fisik di ImageKit
-  if (body.isActive && body.imageFileId) {
-    await validateActiveBannerImage(body.imageFileId);
+  // Jika banner dibuat langsung dengan status aktif, validasi gambar desktop & mobile di ImageKit
+  if (body.isActive) {
+    if (body.imageFileId) {
+      await validateDesktopBannerImage(body.imageFileId);
+    }
+    if (body.mobileImageFileId) {
+      await validateMobileBannerImage(body.mobileImageFileId);
+    }
   }
 
   const applicationId = await getBapendaAppId();
@@ -128,6 +202,8 @@ export async function createBanner(body: CreateBannerBody) {
     description: body.description ?? null,
     imageUrl: body.imageUrl,
     imageFileId: body.imageFileId ?? null,
+    mobileImageUrl: body.mobileImageUrl ?? null,
+    mobileImageFileId: body.mobileImageFileId ?? null,
     buttonText: body.buttonText ?? null,
     buttonUrl: body.buttonUrl ?? null,
     sortOrder: body.sortOrder,
@@ -143,26 +219,48 @@ export async function updateBanner(id: string, body: UpdateBannerBody) {
 
   const willBeActive =
     body.isActive !== undefined ? body.isActive : existing.isActive;
-  const targetImageFileId =
+  const targetDesktopFileId =
     body.imageFileId !== undefined ? body.imageFileId : existing.imageFileId;
+  const targetMobileFileId =
+    body.mobileImageFileId !== undefined
+      ? body.mobileImageFileId
+      : existing.mobileImageFileId;
 
-  // Jika banner berstatus aktif (atau diubah menjadi aktif) dan ada fileId baru atau diaktifkan, verifikasi di ImageKit
-  if (
-    willBeActive &&
-    targetImageFileId &&
-    (body.isActive === true || body.imageFileId !== undefined)
-  ) {
-    await validateActiveBannerImage(targetImageFileId);
+  // Jika banner berstatus aktif (atau diubah menjadi aktif), validasi berkas di ImageKit
+  if (willBeActive) {
+    if (
+      targetDesktopFileId &&
+      (body.isActive === true || body.imageFileId !== undefined)
+    ) {
+      await validateDesktopBannerImage(targetDesktopFileId);
+    }
+    if (
+      targetMobileFileId &&
+      (body.isActive === true || body.mobileImageFileId !== undefined)
+    ) {
+      await validateMobileBannerImage(targetMobileFileId);
+    }
   }
 
-  // Auto-cleanup ImageKit jika gambar diganti dengan file baru
+  // Auto-cleanup ImageKit jika gambar desktop diganti dengan file baru
   if (
     existing.imageFileId &&
     body.imageFileId &&
     existing.imageFileId !== body.imageFileId
   ) {
     ImageKitService.deleteFile(existing.imageFileId).catch((err) => {
-      console.error("[BannersService] Gagal menghapus file lama di ImageKit:", err);
+      console.error("[BannersService] Gagal menghapus file desktop lama di ImageKit:", err);
+    });
+  }
+
+  // Auto-cleanup ImageKit jika gambar mobile diganti dengan file baru
+  if (
+    existing.mobileImageFileId &&
+    body.mobileImageFileId &&
+    existing.mobileImageFileId !== body.mobileImageFileId
+  ) {
+    ImageKitService.deleteFile(existing.mobileImageFileId).catch((err) => {
+      console.error("[BannersService] Gagal menghapus file mobile lama di ImageKit:", err);
     });
   }
 
@@ -172,6 +270,8 @@ export async function updateBanner(id: string, body: UpdateBannerBody) {
   if (body.description !== undefined) data.description = body.description ?? null;
   if (body.imageUrl !== undefined) data.imageUrl = body.imageUrl;
   if (body.imageFileId !== undefined) data.imageFileId = body.imageFileId ?? null;
+  if (body.mobileImageUrl !== undefined) data.mobileImageUrl = body.mobileImageUrl ?? null;
+  if (body.mobileImageFileId !== undefined) data.mobileImageFileId = body.mobileImageFileId ?? null;
   if (body.buttonText !== undefined) data.buttonText = body.buttonText ?? null;
   if (body.buttonUrl !== undefined) data.buttonUrl = body.buttonUrl ?? null;
   if (body.sortOrder !== undefined) data.sortOrder = body.sortOrder;
@@ -187,8 +287,13 @@ export async function updateBanner(id: string, body: UpdateBannerBody) {
 export async function setBannerActive(id: string, isActive: boolean) {
   const existing = await getBannerById(id);
 
-  if (isActive && existing.imageFileId) {
-    await validateActiveBannerImage(existing.imageFileId);
+  if (isActive) {
+    if (existing.imageFileId) {
+      await validateDesktopBannerImage(existing.imageFileId);
+    }
+    if (existing.mobileImageFileId) {
+      await validateMobileBannerImage(existing.mobileImageFileId);
+    }
   }
 
   return prisma.banner.update({

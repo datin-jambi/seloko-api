@@ -11,7 +11,8 @@ Sebelum melakukan tugas pengkodean, perbaikan, atau penambahan modul pada reposi
    - Konvensi 4-layer modular monolith (`schema` $\rightarrow$ `service` $\rightarrow$ `controller` $\rightarrow$ `routes`).
    - Multi-tenancy header wajib `X-App-Code`.
    - Pemisahan akun `INTERNAL` (gateway `seloko`) vs `PUBLIC`.
-   - Integrasi centralized storage ImageKit (`/api/storage/upload`).
+   - Integrasi centralized storage ImageKit (`/api/storage/upload` & `GET /api/storage/:fileId`).
+   - Standar media: upload dua-tahap, dukungan dual-device (desktop/mobile), validasi toleran dimensi & auto-cleanup ImageKit.
    - Caching izin RBAC Redis dan invalidasi seketika.
    - Aturan ketat TypeScript (`exactOptionalPropertyTypes: true`, UUID v7).
 2. **SOP Pembuatan & Pengembangan Modul:** Buka [`.agents/skills/seloko-module-workflow/SKILL.md`](file:///.agents/skills/seloko-module-workflow/SKILL.md)
@@ -40,4 +41,3 @@ Sebelum melakukan tugas pengkodean, perbaikan, atau penambahan modul pada reposi
 3. ⏳ **Articles & Categories** (`/api/bapenda/articles`) — *Target pengerjaan berikutnya*.
 4. ⏳ **FAQs** (`/api/bapenda/faqs`).
 5. ⏳ **Regulations** (`/api/bapenda/regulations`).
-

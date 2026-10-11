@@ -41,3 +41,14 @@ Repositori ini adalah **SELOKO API** — Centralized Core API & Multi-App Engine
 - ⏳ **Articles & Categories** (`/api/bapenda/articles`) — *Target pengerjaan berikutnya*.
 - ⏳ **FAQs** (`/api/bapenda/faqs`).
 - ⏳ **Regulations** (`/api/bapenda/regulations`).
+
+---
+
+## 5. Standar Manajemen Media & Gambar (ImageKit Lifecycle)
+- **Two-Step Upload:** Upload file fisik via `/api/storage/upload` lebih dulu $\rightarrow$ dapatkan `url` & `fileId` $\rightarrow$ kirim via JSON body ke endpoint modul terkait.
+- **Dual Device Support (Desktop vs Mobile):** Konten visual publik (seperti Banner) menyediakan slot ganda: `imageUrl`/`imageFileId` (Desktop / default) dan `mobileImageUrl`/`mobileImageFileId` (Mobile opsional / fallback).
+- **Validasi Dimensi & Ukuran Toleran (Tidak Kaku):**
+  - Mengambil metadata fisik dari `ImageKitService.getFileDetails(fileId)`.
+  - Desktop: Max 3MB, orientasi landscape (`width >= height`), min lebar 800px.
+  - Mobile: Max 1.5MB, min lebar 360px.
+- **Auto-Cleanup Background:** Saat media diganti (`fileId` baru), picu `ImageKitService.deleteFile(oldFileId)` secara asinkron tanpa memblokir response HTTP.

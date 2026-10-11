@@ -38,6 +38,13 @@ export const CreateBannerBodySchema = z.object({
   description: z.string().trim().optional().nullable(),
   imageUrl: z.string().trim().url({ message: "URL gambar banner harus valid" }),
   imageFileId: z.string().trim().max(100).optional().nullable(),
+  mobileImageUrl: z
+    .string()
+    .trim()
+    .url({ message: "URL gambar banner mobile harus berupa URL valid" })
+    .optional()
+    .nullable(),
+  mobileImageFileId: z.string().trim().max(100).optional().nullable(),
   buttonText: z.string().trim().max(50).optional().nullable(),
   buttonUrl: z.string().trim().max(255).optional().nullable(),
   sortOrder: z.number().int().default(0),
@@ -72,6 +79,8 @@ export const BannerItemSchema = z.object({
   description: z.string().nullable().optional(),
   imageUrl: z.string(),
   imageFileId: z.string().nullable().optional(),
+  mobileImageUrl: z.string().nullable().optional(),
+  mobileImageFileId: z.string().nullable().optional(),
   buttonText: z.string().nullable().optional(),
   buttonUrl: z.string().nullable().optional(),
   sortOrder: z.number(),
