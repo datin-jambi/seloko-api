@@ -4,14 +4,15 @@
  * Idempoten: melakukan upsert / update data berdasarkan judul & applicationId.
  */
 import { prisma } from "../shared/utils.js";
-import { APP_CODES } from "../../../src/common/constants/index.js";
 import type { BannerDef } from "../shared/types.js";
+
+const BAPENDA_PROFILE_CODE = "bapenda-profile";
 
 export async function seedBanners(banners: BannerDef[]): Promise<void> {
   console.log(`🖼️  Seed ${banners.length} data Banner Bapenda Profile…`);
 
   const app = await prisma.application.findUniqueOrThrow({
-    where: { code: APP_CODES.BAPENDA_PROFILE },
+    where: { code: BAPENDA_PROFILE_CODE },
     select: { id: true },
   });
 

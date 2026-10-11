@@ -5,6 +5,7 @@ import type {
   UploadFileOptions,
   UploadFileResult,
   ImageKitAuthParams,
+  FileDetailsResult,
 } from "./storage.types.js";
 
 /**
@@ -129,6 +130,84 @@ export class ImageKitService {
         err instanceof Error ? err.message : err,
       );
       return false;
+    }
+  }
+
+  /**
+   * Mengambil detail dan metadata berkas dari ImageKit berdasarkan fileId.
+   */
+  public static async getFileDetails(
+    fileId: string,
+  ): Promise<FileDetailsResult | null> {
+    if (!fileId || !fileId.trim()) {
+      return null;
+    }
+
+    if (!isImageKitConfigured()) {
+      throw new AppError(
+        "Layanan penyimpanan ImageKit belum dikonfigurasi di environment (.env)",
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        "STORAGE_UNCONFIGURED",
+      );
+    }
+
+    try {
+      const response = await imagekit.getFileDetails(fileId.trim());
+      if (!response) {
+        return null;
+      }
+
+      let thumbnailUrl = response.thumbnail;
+      const isImage = Boolean(
+        response.filePath?.match(/\.(jpe?g|png|webp|gif|svg)$/i),
+      );
+      if (isImage && response.filePath) {
+        thumbnailUrl = imagekit.url({
+          path: response.filePath,
+          transformation: [{ width: 300, height: 300 }],
+        });
+      }
+
+      const result: FileDetailsResult = {
+        fileId: response.fileId,
+        name: response.name,
+        filePath: response.filePath,
+        url: response.url,
+        fileType: response.fileType,
+        size: response.size,
+      };
+
+      if (response.height !== undefined && response.height !== null) {
+        result.height = response.height;
+      }
+      if (response.width !== undefined && response.width !== null) {
+        result.width = response.width;
+      }
+      if (thumbnailUrl) {
+        result.thumbnailUrl = thumbnailUrl;
+      }
+      if (response.createdAt) {
+        result.createdAt = String(response.createdAt);
+      }
+      if (response.updatedAt) {
+        result.updatedAt = String(response.updatedAt);
+      }
+
+      return result;
+    } catch (err: unknown) {
+      const errObj = err as { status?: number; statusCode?: number; message?: string };
+      if (
+        errObj.status === 404 ||
+        errObj.statusCode === 404 ||
+        errObj.message?.toLowerCase().includes("not found")
+      ) {
+        return null;
+      }
+      console.warn(
+        `[ImageKitService] Gagal memeriksa detail berkas fileId: ${fileId}:`,
+        err instanceof Error ? err.message : err,
+      );
+      return null;
     }
   }
 

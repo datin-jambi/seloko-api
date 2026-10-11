@@ -1,5 +1,5 @@
 import { prisma } from "~/config/database.js";
-import { NotFoundError } from "~/common/errors/index.js";
+import { BadRequestError, NotFoundError } from "~/common/errors/index.js";
 import { APP_CODES } from "~/common/constants/index.js";
 import { ImageKitService } from "~/common/services/storage/imagekit.service.js";
 import type { Prisma } from "@prisma/client";
@@ -16,6 +16,23 @@ async function getBapendaAppId(): Promise<string> {
     select: { id: true },
   });
   return app.id;
+}
+
+/**
+ * Memvalidasi apakah berkas gambar benar-benar ada di penyimpanan ImageKit.
+ * Dipanggil secara kondisional saat banner dibuat atau diaktifkan (isActive = true).
+ */
+async function validateActiveBannerImage(imageFileId?: string | null): Promise<void> {
+  if (!imageFileId || !imageFileId.trim()) {
+    return;
+  }
+
+  const file = await ImageKitService.getFileDetails(imageFileId);
+  if (!file) {
+    throw new BadRequestError(
+      `Berkas gambar dengan ID '${imageFileId}' tidak ditemukan di penyimpanan ImageKit. Pastikan berkas valid sebelum mengaktifkan banner.`,
+    );
+  }
 }
 
 /** Mengambil daftar banner aktif untuk portal publik / frontend */
@@ -98,6 +115,11 @@ export async function getBannerById(id: string) {
 
 /** Menambahkan banner baru */
 export async function createBanner(body: CreateBannerBody) {
+  // Jika banner dibuat langsung dengan status aktif dan memiliki imageFileId, verifikasi fisik di ImageKit
+  if (body.isActive && body.imageFileId) {
+    await validateActiveBannerImage(body.imageFileId);
+  }
+
   const applicationId = await getBapendaAppId();
 
   const data: Prisma.BannerCreateInput = {
@@ -118,6 +140,20 @@ export async function createBanner(body: CreateBannerBody) {
 /** Memperbarui data banner */
 export async function updateBanner(id: string, body: UpdateBannerBody) {
   const existing = await getBannerById(id);
+
+  const willBeActive =
+    body.isActive !== undefined ? body.isActive : existing.isActive;
+  const targetImageFileId =
+    body.imageFileId !== undefined ? body.imageFileId : existing.imageFileId;
+
+  // Jika banner berstatus aktif (atau diubah menjadi aktif) dan ada fileId baru atau diaktifkan, verifikasi di ImageKit
+  if (
+    willBeActive &&
+    targetImageFileId &&
+    (body.isActive === true || body.imageFileId !== undefined)
+  ) {
+    await validateActiveBannerImage(targetImageFileId);
+  }
 
   // Auto-cleanup ImageKit jika gambar diganti dengan file baru
   if (
@@ -149,7 +185,11 @@ export async function updateBanner(id: string, body: UpdateBannerBody) {
 
 /** Toggle status aktif banner */
 export async function setBannerActive(id: string, isActive: boolean) {
-  await getBannerById(id);
+  const existing = await getBannerById(id);
+
+  if (isActive && existing.imageFileId) {
+    await validateActiveBannerImage(existing.imageFileId);
+  }
 
   return prisma.banner.update({
     where: { id },

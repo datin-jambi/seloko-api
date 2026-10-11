@@ -37,7 +37,7 @@ Repositori ini adalah **SELOKO API** — Centralized Core API & Multi-App Engine
 
 ## 4. Status Roadmap Modul Bapenda Profile
 - ✅ **UPTD Samsat** (`/api/bapenda/uptds`) — *Selesai & ter-seed 11 kantor Samsat se-Provinsi Jambi*.
-- ⏳ **Banners** (`/api/bapenda/banners`) — *Target pengerjaan berikutnya*.
-- ⏳ **Articles & Categories** (`/api/bapenda/articles`).
+- ✅ **Banners** (`/api/bapenda/banners`) — *Selesai, verifikasi ImageKit, & ter-seed 3 Banner*.
+- ⏳ **Articles & Categories** (`/api/bapenda/articles`) — *Target pengerjaan berikutnya*.
 - ⏳ **FAQs** (`/api/bapenda/faqs`).
 - ⏳ **Regulations** (`/api/bapenda/regulations`).

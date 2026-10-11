@@ -2,10 +2,16 @@ import path from "node:path";
 import crypto from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { ImageKitService } from "~/common/services/storage/imagekit.service.js";
-import { AppError, BadRequestError, HttpStatus } from "~/common/errors/index.js";
+import {
+  AppError,
+  BadRequestError,
+  NotFoundError,
+  HttpStatus,
+} from "~/common/errors/index.js";
 import type { UploadFileResult } from "~/common/services/storage/storage.types.js";
 import type {
   UploadMediaQuery,
+  GetMediaParams,
   DeleteMediaParams,
 } from "./storage.schema.js";
 
@@ -196,6 +202,27 @@ export async function handleUploadMedia(
       ? "Berkas berhasil diunggah ke ImageKit"
       : `${results.length} berkas berhasil diunggah ke ImageKit`,
     data: isSingle ? results[0] : results,
+  });
+}
+
+export async function handleGetMediaDetails(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { fileId } = request.params as GetMediaParams;
+  const file = await ImageKitService.getFileDetails(fileId);
+
+  if (!file) {
+    throw new NotFoundError(
+      `Berkas dengan fileId '${fileId}' tidak ditemukan di ImageKit`,
+    );
+  }
+
+  return reply.status(HttpStatus.OK).send({
+    statusCode: HttpStatus.OK,
+    code: "SUCCESS",
+    message: "Detail berkas berhasil diambil dari ImageKit",
+    data: file,
   });
 }
 

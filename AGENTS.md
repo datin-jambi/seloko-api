@@ -36,8 +36,8 @@ Sebelum melakukan tugas pengkodean, perbaikan, atau penambahan modul pada reposi
 > *(AI Agent WAJIB otomatis mengupdate status di bawah ini menjadi ✅ setelah modul selesai dan smoke test lolos)*
 
 1. ✅ **UPTD Samsat** (`/api/bapenda/uptds`) — *Selesai & ter-seed 11 Samsat*.
-2. ⏳ **Banners** (`/api/bapenda/banners`) — *Target pengerjaan berikutnya*.
-3. ⏳ **Articles & Categories** (`/api/bapenda/articles`).
+2. ✅ **Banners** (`/api/bapenda/banners`) — *Selesai, verifikasi ImageKit, & ter-seed 3 Banner*.
+3. ⏳ **Articles & Categories** (`/api/bapenda/articles`) — *Target pengerjaan berikutnya*.
 4. ⏳ **FAQs** (`/api/bapenda/faqs`).
 5. ⏳ **Regulations** (`/api/bapenda/regulations`).
 

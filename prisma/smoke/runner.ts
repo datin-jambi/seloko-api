@@ -237,6 +237,108 @@ async function runUptdsSuite() {
   assert("Membawa pagination meta (page=1, limit=5)", cmsListRes.data?.meta?.page === 1 && cmsListRes.data?.meta?.limit === 5);
 }
 
+// ─── Test Suite: Bapenda Banners ──────────────────────────────────────────────
+async function runBannersSuite() {
+  console.log("\n\x1b[36m▶ [Suite 6: Domain Bapenda - Banners & Media Verification]\x1b[0m");
+
+  // 1. Public list Banners
+  const publicListRes = await request("/bapenda/banners/public?limit=10", {
+    appCode: "bapenda-profile",
+  });
+  assert("Direktori publik Banner merespons sukses (200)", publicListRes.status === 200, publicListRes.status, 200);
+  assert("Data publik Banner memuat minimal 3 banner aktif ter-seed", (publicListRes.data?.data?.length || 0) >= 3);
+  assert("Setiap banner publik memiliki title & imageUrl valid", publicListRes.data?.data?.every((b: any) => Boolean(b.title && b.imageUrl)));
+
+  // 2. CMS List Banners (Terautentikasi Superadmin)
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const cmsListRes = await request("/bapenda/banners?page=1&limit=5", {
+    token: saToken || undefined,
+    appCode: "seloko",
+  });
+  assert("CMS endpoint /api/bapenda/banners dapat diakses admin (200)", cmsListRes.status === 200, cmsListRes.status, 200);
+  assert("Membawa pagination meta (page=1, limit=5)", cmsListRes.data?.meta?.page === 1 && cmsListRes.data?.meta?.limit === 5);
+
+  // 3. Storage Get Detail Check (ImageKit /:fileId)
+  const storageDetailRes = await request("/storage/ik_non_existent_id_test_9999", {
+    token: saToken || undefined,
+    appCode: "seloko",
+  });
+  assert("Storage GET /api/storage/:fileId menolak file yang tidak ada (404)", storageDetailRes.status === 404, storageDetailRes.status, 404);
+
+  // 4. Validasi banner active menolak fileId yang tidak ada di ImageKit
+  const invalidCreateRes = await request("/bapenda/banners", {
+    method: "POST",
+    token: saToken || undefined,
+    appCode: "seloko",
+    body: {
+      title: "Banner Test Invalid FileId",
+      imageUrl: "https://example.com/test.jpg",
+      imageFileId: "invalid_file_id_not_found_12345",
+      isActive: true,
+      sortOrder: 99,
+    },
+  });
+  assert("Membuat banner aktif dengan imageFileId palsu ditolak validasi (400)", invalidCreateRes.status === 400, invalidCreateRes.status, 400);
+
+  // 5. CMS Create Banner (Sukses jika tanpa imageFileId atau isActive false)
+  const createRes = await request("/bapenda/banners", {
+    method: "POST",
+    token: saToken || undefined,
+    appCode: "seloko",
+    body: {
+      title: "Smoke Test Temporary Banner",
+      description: "Banner untuk pengujian otomatis end-to-end",
+      imageUrl: "https://example.com/banner-smoke-test.webp",
+      buttonText: "Klik Disini",
+      buttonUrl: "https://bapenda.jambiprov.go.id",
+      sortOrder: 99,
+      isActive: false,
+    },
+  });
+  assert("Menambah banner baru untuk testing berhasil (201)", createRes.status === 201, createRes.status, 201);
+  const createdId = createRes.data?.data?.id;
+
+  if (createdId) {
+    // 6. CMS Get Detail Banner by ID
+    const detailRes = await request(`/bapenda/banners/${createdId}`, {
+      token: saToken || undefined,
+      appCode: "seloko",
+    });
+    assert("Detail banner berdasarkan ID berhasil diambil (200)", detailRes.status === 200, detailRes.status, 200);
+    assert("Judul banner sesuai", detailRes.data?.data?.title === "Smoke Test Temporary Banner");
+
+    // 7. CMS Toggle Active Banner
+    const patchActiveRes = await request(`/bapenda/banners/${createdId}/active`, {
+      method: "PATCH",
+      token: saToken || undefined,
+      appCode: "seloko",
+      body: { isActive: true },
+    });
+    assert("Toggle status banner berhasil (200)", patchActiveRes.status === 200, patchActiveRes.status, 200);
+    assert("Status berubah menjadi aktif", patchActiveRes.data?.data?.isActive === true);
+
+    // 8. CMS Reorder Banners
+    const reorderRes = await request("/bapenda/banners/reorder", {
+      method: "PATCH",
+      token: saToken || undefined,
+      appCode: "seloko",
+      body: {
+        items: [{ id: createdId, sortOrder: 10 }],
+      },
+    });
+    assert("Reorder urutan sortOrder banner massal berhasil (200)", reorderRes.status === 200, reorderRes.status, 200);
+
+    // 9. CMS Soft-Delete Banner
+    const deleteRes = await request(`/bapenda/banners/${createdId}`, {
+      method: "DELETE",
+      token: saToken || undefined,
+      appCode: "seloko",
+    });
+    assert("Hapus (soft-delete) banner berhasil (200)", deleteRes.status === 200, deleteRes.status, 200);
+    assert("Properti deleted: true dikembalikan", deleteRes.data?.data?.deleted === true);
+  }
+}
+
 // ─── Main Orchestrator ────────────────────────────────────────────────────────
 async function main() {
   const args = process.argv.slice(2);
@@ -280,6 +382,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "uptds" || targetModule === "uptd" || targetModule === "bapenda") {
       await runUptdsSuite();
+    }
+    if (!targetModule || targetModule === "banners" || targetModule === "banner") {
+      await runBannersSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

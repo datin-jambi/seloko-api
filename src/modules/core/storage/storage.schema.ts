@@ -63,6 +63,38 @@ export const UploadMediaResponseSchema = z.object({
 
 export type UploadMediaResponse = z.infer<typeof UploadMediaResponseSchema>;
 
+// ─── Get Media Params & Response ──────────────────────────────────────────────
+export const GetMediaParamsSchema = z.object({
+  fileId: z.string().min(1, { message: "fileId wajib diisi" }),
+});
+
+export type GetMediaParams = z.infer<typeof GetMediaParamsSchema>;
+
+export const FileDetailsSchema = z.object({
+  fileId: z.string(),
+  name: z.string(),
+  filePath: z.string(),
+  url: z.string(),
+  fileType: z.string(),
+  size: z.number(),
+  height: z.number().optional(),
+  width: z.number().optional(),
+  thumbnailUrl: z.string().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+}).passthrough();
+
+export type FileDetails = z.infer<typeof FileDetailsSchema>;
+
+export const GetMediaResponseSchema = z.object({
+  statusCode: z.number().default(200),
+  code: z.string().default("SUCCESS"),
+  message: z.string(),
+  data: FileDetailsSchema,
+});
+
+export type GetMediaResponse = z.infer<typeof GetMediaResponseSchema>;
+
 // ─── Delete Media Params & Response ───────────────────────────────────────────
 export const DeleteMediaParamsSchema = z.object({
   fileId: z.string().min(1, { message: "fileId wajib diisi" }),

@@ -3,11 +3,14 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import {
   UploadMediaQuerySchema,
   UploadMediaResponseSchema,
+  GetMediaParamsSchema,
+  GetMediaResponseSchema,
   DeleteMediaParamsSchema,
   DeleteMediaResponseSchema,
 } from "./storage.schema.js";
 import {
   handleUploadMedia,
+  handleGetMediaDetails,
   handleDeleteMedia,
 } from "./storage.controller.js";
 
@@ -24,6 +27,17 @@ export async function storageRoutes(fastify: FastifyInstance): Promise<void> {
     },
     preHandler: [fastify.authenticate],
   }, handleUploadMedia);
+
+  // ── GET /api/storage/:fileId ────────────────────────────────────────────────
+  app.get("/:fileId", {
+    schema: {
+      description: "Mengambil informasi detail dan metadata berkas dari ImageKit berdasarkan fileId",
+      tags: ["storage"],
+      params: GetMediaParamsSchema,
+      response: { 200: GetMediaResponseSchema },
+    },
+    preHandler: [fastify.authenticate],
+  }, handleGetMediaDetails);
 
   // ── DELETE /api/storage/:fileId ─────────────────────────────────────────────
   app.delete("/:fileId", {

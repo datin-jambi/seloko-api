@@ -20,27 +20,39 @@ import { seedApplications } from "./seeds/core/applications.seeder.js";
 import { seedMenus } from "./seeds/core/menus.seeder.js";
 import { buildRoleIndex, seedUsers } from "./seeds/core/users.seeder.js";
 import { seedBapendaUptds } from "./seeds/bapenda/uptds.seeder.js";
+import { seedBanners } from "./seeds/bapenda/banners.seeder.js";
 import type {
   ApplicationsFile,
   MenusFile,
   RolesFile,
   UsersFile,
   BapendaUptdsFile,
+  BannersFile,
 } from "./seeds/shared/types.js";
 
 /** Cetak tabel ringkasan jumlah baris tiap tabel yang disentuh seeder. */
 async function printSummary(): Promise<void> {
-  const [apps, permissions, roles, users, assignments, menus, menuRoles, uptds] =
-    await Promise.all([
-      prisma.application.count(),
-      prisma.permission.count(),
-      prisma.role.count(),
-      prisma.user.count(),
-      prisma.userAppRole.count(),
-      prisma.menuItem.count(),
-      prisma.menuRole.count(),
-      prisma.bapendaUptd.count(),
-    ]);
+  const [
+    apps,
+    permissions,
+    roles,
+    users,
+    assignments,
+    menus,
+    menuRoles,
+    uptds,
+    banners,
+  ] = await Promise.all([
+    prisma.application.count(),
+    prisma.permission.count(),
+    prisma.role.count(),
+    prisma.user.count(),
+    prisma.userAppRole.count(),
+    prisma.menuItem.count(),
+    prisma.menuRole.count(),
+    prisma.bapendaUptd.count(),
+    prisma.banner.count(),
+  ]);
 
   const rows = [
     ["applications", apps],
@@ -51,6 +63,7 @@ async function printSummary(): Promise<void> {
     ["menu_items", menus],
     ["menu_roles", menuRoles],
     ["bapenda_uptds", uptds],
+    ["banners", banners],
   ] as const;
 
   console.log("\n┌─────────────────────┬────────┐");
@@ -67,13 +80,15 @@ async function main(): Promise<void> {
 
   if (process.argv.includes("--reset")) await resetTables();
 
-  const [appsFile, rolesFile, usersFile, menusFile, uptdsFile] = await Promise.all([
-    loadJson<ApplicationsFile>("core/applications.json"),
-    loadJson<RolesFile>("core/roles.json"),
-    loadJson<UsersFile>("core/users.json"),
-    loadJson<MenusFile>("core/menus.json"),
-    loadJson<BapendaUptdsFile>("bapenda/uptds.json"),
-  ]);
+  const [appsFile, rolesFile, usersFile, menusFile, uptdsFile, bannersFile] =
+    await Promise.all([
+      loadJson<ApplicationsFile>("core/applications.json"),
+      loadJson<RolesFile>("core/roles.json"),
+      loadJson<UsersFile>("core/users.json"),
+      loadJson<MenusFile>("core/menus.json"),
+      loadJson<BapendaUptdsFile>("bapenda/uptds.json"),
+      loadJson<BannersFile>("bapenda/banners.json"),
+    ]);
 
   // Urutan WAJIB: menu dan user menautkan diri ke permission/role yang dibuat
   // tahap pertama, dicari lewat kode/nama.
@@ -97,6 +112,9 @@ async function main(): Promise<void> {
 
   console.log("");
   await seedBapendaUptds(uptdsFile.uptds);
+
+  console.log("");
+  await seedBanners(bannersFile.banners);
 
   await printSummary();
 

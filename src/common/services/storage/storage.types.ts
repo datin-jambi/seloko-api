@@ -82,3 +82,17 @@ export interface ImageKitAuthParams {
   expire: number;
   signature: string;
 }
+
+export interface FileDetailsResult {
+  fileId: string;
+  name: string;
+  filePath: string;
+  url: string;
+  fileType: string;
+  size: number;
+  height?: number;
+  width?: number;
+  thumbnailUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
