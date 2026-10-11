@@ -168,6 +168,9 @@ export interface BannerDef {
   buttonUrl?: string | null;
   sortOrder?: number;
   isActive?: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  deletedAt?: string | null;
 }
 
 export interface BannersFile {

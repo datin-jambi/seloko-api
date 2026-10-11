@@ -17,10 +17,19 @@ export async function seedBanners(banners: BannerDef[]): Promise<void> {
   });
 
   for (const def of banners) {
+    const cleanTitle = def.title.trim();
+    const cleanDescription = def.description?.trim() ? def.description.trim() : null;
+    const cleanButtonText = def.buttonText?.trim() ? def.buttonText.trim() : null;
+    const cleanButtonUrl = def.buttonUrl?.trim() ? def.buttonUrl.trim() : null;
+    const cleanDeletedAt = def.deletedAt ? new Date(def.deletedAt) : null;
+
     const existing = await prisma.banner.findFirst({
       where: {
         applicationId: app.id,
-        title: def.title,
+        OR: [
+          { title: cleanTitle },
+          { title: def.title },
+        ],
       },
     });
 
@@ -28,32 +37,37 @@ export async function seedBanners(banners: BannerDef[]): Promise<void> {
       await prisma.banner.update({
         where: { id: existing.id },
         data: {
-          description: def.description ?? null,
-          imageUrl: def.imageUrl,
+          title: cleanTitle,
+          description: cleanDescription,
+          imageUrl: def.imageUrl.trim(),
           imageFileId: def.imageFileId ?? null,
-          mobileImageUrl: def.mobileImageUrl ?? null,
+          mobileImageUrl: def.mobileImageUrl?.trim() ?? null,
           mobileImageFileId: def.mobileImageFileId ?? null,
-          buttonText: def.buttonText ?? null,
-          buttonUrl: def.buttonUrl ?? null,
+          buttonText: cleanButtonText,
+          buttonUrl: cleanButtonUrl,
           sortOrder: def.sortOrder ?? 0,
           isActive: def.isActive ?? true,
-          deletedAt: null,
+          deletedAt: cleanDeletedAt,
+          ...(def.updatedAt ? { updatedAt: new Date(def.updatedAt) } : {}),
         },
       });
     } else {
       await prisma.banner.create({
         data: {
           applicationId: app.id,
-          title: def.title,
-          description: def.description ?? null,
-          imageUrl: def.imageUrl,
+          title: cleanTitle,
+          description: cleanDescription,
+          imageUrl: def.imageUrl.trim(),
           imageFileId: def.imageFileId ?? null,
-          mobileImageUrl: def.mobileImageUrl ?? null,
+          mobileImageUrl: def.mobileImageUrl?.trim() ?? null,
           mobileImageFileId: def.mobileImageFileId ?? null,
-          buttonText: def.buttonText ?? null,
-          buttonUrl: def.buttonUrl ?? null,
+          buttonText: cleanButtonText,
+          buttonUrl: cleanButtonUrl,
           sortOrder: def.sortOrder ?? 0,
           isActive: def.isActive ?? true,
+          deletedAt: cleanDeletedAt,
+          ...(def.createdAt ? { createdAt: new Date(def.createdAt) } : {}),
+          ...(def.updatedAt ? { updatedAt: new Date(def.updatedAt) } : {}),
         },
       });
     }
