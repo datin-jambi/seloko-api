@@ -93,12 +93,14 @@ Buat folder di `src/modules/<domain>/<feature>/`:
   });
   ```
 - **Filter Soft Delete:** Selalu sertakan `where: { deletedAt: null }`.
-- **Integrasi ImageKit Cleanup:** Saat record di-update dengan gambar baru, atau di-hard delete:
+- **Integrasi ImageKit Cleanup & Validasi Bersyarat `isActive`:**
+  - Validasi fisik ImageKit (`getFileDetails`) **hanya dipicu jika entitas berstatus aktif (`isActive === true`)** atau saat status diaktifkan. Mode draft (`isActive === false`) diizinkan bypass validasi.
+  - Saat record di-update dengan media baru, hapus berkas lama secara background:
   ```typescript
   import { ImageKitService } from "~/common/services/storage/imagekit.service.js";
-  // Hapus gambar lama jika ada
+  // Hapus gambar lama jika diganti
   if (oldFileId && oldFileId !== newFileId) {
-    await ImageKitService.deleteFile(oldFileId).catch(() => null);
+    ImageKitService.deleteFile(oldFileId).catch(() => null);
   }
   ```
 - **Aturan TypeScript `exactOptionalPropertyTypes: true`:**

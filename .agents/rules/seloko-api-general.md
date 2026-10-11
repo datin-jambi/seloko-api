@@ -19,6 +19,8 @@ Repositori ini adalah **SELOKO API** — Centralized Core API & Multi-App Engine
   - `*.service.ts` (Business logic murni & Prisma query, filter `deletedAt: null`)
   - `*.controller.ts` (HTTP handler)
   - `*.routes.ts` (Pendaftaran endpoint & guard `fastify.authenticate`, `fastify.requirePermission`)
+- **Public App Config Endpoint:** Setiap aplikasi front-end publik didukung endpoint unauthenticated `GET /api/applications/public-config/:code` yang menyediakan informasi branding, kontak, SEO, dan status fitur tanpa autentikasi.
+- **Transparansi Hak Akses User:** Endpoint list users menyertakan ringkasan jumlah aplikasi per role, dan endpoint detail user memetakan secara eksplisit daftar aplikasi serta role yang dimiliki pengguna.
 
 ---
 
@@ -26,6 +28,7 @@ Repositori ini adalah **SELOKO API** — Centralized Core API & Multi-App Engine
 - `exactOptionalPropertyTypes: true`: Dilarang mengoper `{ field: undefined }` ke Prisma jika field bersifat optional/nullable. Gunakan `null` secara eksplisit untuk mengosongkan nilai atau hilangkan key tersebut.
 - Seluruh Primary Key menggunakan **UUID v7** (`@id @default(uuid(7)) @db.VarChar(36)`).
 - Slug konten unik dalam lingkup aplikasi: `@@unique([applicationId, slug])`.
+- Setiap URL media wajib memiliki padanan kolom `FileId` (misal: `avatarUrl` & `avatarFileId`, `logoUrl` & `logoFileId`, `faviconUrl` & `faviconFileId`, `ogImageUrl` & `ogImageFileId`).
 
 ---
 
@@ -51,4 +54,8 @@ Repositori ini adalah **SELOKO API** — Centralized Core API & Multi-App Engine
   - Mengambil metadata fisik dari `ImageKitService.getFileDetails(fileId)`.
   - Desktop: Max 3MB, orientasi landscape (`width >= height`), min lebar 800px.
   - Mobile: Max 1.5MB, min lebar 360px.
-- **Auto-Cleanup Background:** Saat media diganti (`fileId` baru), picu `ImageKitService.deleteFile(oldFileId)` secara asinkron tanpa memblokir response HTTP.
+- **Validasi Bersyarat Status Aktif (`isActive: true`):**
+  - Pemeriksaan `fileId` ke ImageKit **hanya dijalankan jika data berstatus aktif (`isActive === true`)** atau saat data diubah menjadi aktif.
+  - Data dalam status draft / nonaktif (`isActive === false`) diizinkan disimpan tanpa pengecekan ImageKit ketat.
+  - Saat entitas diaktifkan kembali (`isActive` dibuat `true`), sistem memvalidasi seluruh berkas `fileId` yang tersimpan ke ImageKit sebelum aktivasi disetujui.
+- **Auto-Cleanup Background:** Saat media diganti (`fileId` baru) atau dihapus, picu `ImageKitService.deleteFile(oldFileId)` secara asinkron tanpa memblokir response HTTP.
