@@ -186,6 +186,7 @@ export interface NewsCategoryDef {
   isActive?: boolean;
   sortOrder?: number;
   createdAt?: string | null;
+  updatedAt?: string | null;
   deletedAt?: string | null;
 }
 
@@ -203,6 +204,7 @@ export interface NewsDef {
   seoTitle?: string | null;
   seoDescription?: string | null;
   createdAt?: string | null;
+  updatedAt?: string | null;
   deletedAt?: string | null;
 }
 

@@ -29,6 +29,8 @@ export async function seedNews(file: NewsFile): Promise<void> {
       isActive: def.isActive ?? true,
       sortOrder: def.sortOrder ?? 0,
       deletedAt: date(def.deletedAt),
+      // Nilai eksplisit menimpa @updatedAt — riwayat app lama tetap utuh.
+      ...(def.updatedAt && { updatedAt: new Date(def.updatedAt) }),
     };
     const category = await prisma.articleCategory.upsert({
       where: { applicationId_type_slug: { applicationId, type: "NEWS", slug: def.slug } },
@@ -60,7 +62,7 @@ export async function seedNews(file: NewsFile): Promise<void> {
     const data = {
       categoryId,
       authorId,
-      title: def.title,
+      title: def.title.trim(),
       excerpt: text(def.excerpt),
       // Sumber data dari aplikasi lama yang sudah tersaring editor; sanitasi
       // tetap berlaku untuk tiap input lewat API.
@@ -71,6 +73,7 @@ export async function seedNews(file: NewsFile): Promise<void> {
       seoTitle: text(def.seoTitle),
       seoDescription: text(def.seoDescription),
       deletedAt: date(def.deletedAt),
+      ...(def.updatedAt && { updatedAt: new Date(def.updatedAt) }),
     };
     await prisma.article.upsert({
       where: { applicationId_type_slug: { applicationId, type: "NEWS", slug: def.slug } },
