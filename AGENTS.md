@@ -7,7 +7,14 @@ Sebelum melakukan tugas pengkodean, perbaikan, atau penambahan modul pada reposi
 ---
 
 ## 📌 Panduan & Aturan Resmi Proyek
-### A. Aturan Wajib (Rules):
+### A. Living PRD & Arsitektur Produk:
+- **Master PRD Index:** Buka [`.agents/prd/README.md`](file:///.agents/prd/README.md)
+  - Arsitektur Super App BPKPD Provinsi Jambi.
+  - Domain 1: Identity & Multi-Tenancy Gateway ([`01-seloko-identity.prd.md`](file:///.agents/prd/01-seloko-identity.prd.md)).
+  - Domain 2: Portal Bapenda Profile ([`02-bapenda-profile.prd.md`](file:///.agents/prd/02-bapenda-profile.prd.md)).
+  - Aturan *Living Document*: Wajib update PRD setiap kali ada pembahasan atau perubahan spesifikasi modul baru.
+
+### B. Aturan Wajib (Rules):
 1. **Arsitektur Umum & Multi-Tenancy:** Buka [`.agents/rules/seloko-api-general.md`](file:///.agents/rules/seloko-api-general.md)
    - Konvensi 4-layer modular monolith (`schema` $\rightarrow$ `service` $\rightarrow$ `controller` $\rightarrow$ `routes`).
    - Multi-tenancy header wajib `X-App-Code` & pemisahan akun `INTERNAL` vs `PUBLIC`.
@@ -25,7 +32,7 @@ Sebelum melakukan tugas pengkodean, perbaikan, atau penambahan modul pada reposi
    - Compound unique index per-tenant (`@@unique([applicationId, slug])`).
    - Timestamps PostgreSQL `timestamptz` & konvensi soft delete `deletedAt: null`.
 
-### B. Prosedur Operasional (Skills):
+### C. Prosedur Operasional (Skills):
 1. **SOP Pembuatan Modul Baru:** Buka [`.agents/skills/seloko-module-workflow/SKILL.md`](file:///.agents/skills/seloko-module-workflow/SKILL.md)
    - Tahap 1: Skema Prisma & migrasi.
    - Tahap 2: Registrasi permission di `prisma/seeds/core/applications.json`.

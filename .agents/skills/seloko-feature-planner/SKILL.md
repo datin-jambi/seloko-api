@@ -13,6 +13,14 @@ Gunakan dokumen panduan ini sebelum memulai penulisan kode pada modul baru. Pere
 
 ## 📌 Checklist Perencanaan Fitur (PRD Step-by-Step)
 
+### Langkah 0: Sinkronisasi Living PRD (`.agents/prd/`)
+Setiap fitur harus berakar dari dan dicatat ke dalam dokumen PRD domain terkait:
+- [ ] Buka [`.agents/prd/README.md`](../../prd/README.md) untuk melihat daftar domain.
+- [ ] Buka PRD domain terkait (misal: [`01-seloko-identity.prd.md`](../../prd/01-seloko-identity.prd.md) atau [`02-bapenda-profile.prd.md`](../../prd/02-bapenda-profile.prd.md)).
+- [ ] **Wajib Perbarui PRD:** Catat kesepakatan fitur hasil diskusi pengguna ke dalam berkas PRD sebelum coding (tambahkan spesifikasi modul, field database, dan alur bisnis).
+
+---
+
 ### Langkah 1: Identifikasi Domain & Audiens Target
 - [ ] **Aplikasi Pemilik:** Apakah modul ini milik `bapenda-profile`, `seloko`, atau aplikasi publik lain?
 - [ ] **Tipe Pengguna:**
@@ -70,3 +78,11 @@ Tentukan minimal 4 skenario uji coba yang wajib dimasukkan ke `prisma/smoke/runn
 2. **CMS Authorization Guard:** Pengguna tanpa permission ditolak (403 Forbidden).
 3. **Data Creation & Media Validation:** Membuat data baru dengan status aktif dan validasi ImageKit.
 4. **Lifecycle Modification:** Update, toggle active, dan soft-delete data berhasil.
+
+---
+
+### Langkah 6: Pembaruan Status Selesai pada Living PRD
+Setelah modul selesai diimplementasikan, seeder dibuat, dan `npm run db:smoke` lolos 100%:
+- [ ] Buka PRD domain di `.agents/prd/XX-<domain>.prd.md`.
+- [ ] Ubah status modul dari `🟡 In Progress` atau `⏳ Planned` menjadi `✅ Completed`.
+- [ ] Perbarui tabel status modul di [`.agents/prd/README.md`](../../prd/README.md) dan [`AGENTS.md`](../../../AGENTS.md).

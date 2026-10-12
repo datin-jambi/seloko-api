@@ -12,6 +12,11 @@ Direktori ini dirancang untuk mengubah AI Agent (maupun developer baru) menjadi 
 .agents/
 ├── README.md                       # Dokumentasi arsitektur direktori .agents/ & panduan upscaling
 │
+├── prd/                            # Living Product Requirement Documents (PRD) per domain aplikasi
+│   ├── README.md                   # Master PRD Index & arsitektur Super App BPKPD Jambi
+│   ├── 01-seloko-identity.prd.md   # Spesifikasi Core Platform & Multi-Tenancy Identity Gateway
+│   └── 02-bapenda-profile.prd.md   # Spesifikasi Portal Resmi Bapenda & CMS (UPTD, Banner, Artikel, dll)
+│
 ├── rules/                          # Guidelines & pembatas teknis (selalu aktif / terikat konteks)
 │   ├── seloko-api-general.md       # Arsitektur modular monolith, multi-tenancy X-App-Code, ImageKit lifecycle
 │   ├── coding-standards.md         # Format Zod DTO, exactOptionalPropertyTypes, respon standar, error handling
@@ -29,7 +34,21 @@ Direktori ini dirancang untuk mengubah AI Agent (maupun developer baru) menjadi 
 
 ## 🔍 Detail Setiap Modul
 
-### A. Folder `rules/` (Aturan & Konvensi Wajib)
+### A. Folder `prd/` (Living Product Requirement Documents)
+PRD di SELOKO API berfungsi sebagai **Living Document** yang terus diperbarui seiring diskusi fitur:
+
+1. **[`prd/README.md`](./prd/README.md)**:
+   - Gambaran arsitektur Super App & Multi-Tenancy Gateway BPKPD Jambi.
+   - Tabel pemetaan domain, kode aplikasi, dan status implementasi modul.
+   - Aturan *Living Document* bagi AI Agent dan developer.
+2. **[`prd/01-seloko-identity.prd.md`](./prd/01-seloko-identity.prd.md)**:
+   - Spesifikasi teknis Core Identity Engine (Applications, Auth JWT, RBAC, User Management, Menus, Storage).
+3. **[`prd/02-bapenda-profile.prd.md`](./prd/02-bapenda-profile.prd.md)**:
+   - Spesifikasi portal Bapenda Profile & CMS (UPTD Samsat, Banners, Articles & Categories, FAQs, Regulations).
+
+---
+
+### B. Folder `rules/` (Aturan & Konvensi Wajib)
 Rules dimuat secara kontekstual untuk memastikan setiap baris kode yang ditulis mematuhi standar repositori:
 
 1. **[`rules/seloko-api-general.md`](./rules/seloko-api-general.md)**:
@@ -53,7 +72,7 @@ Rules dimuat secara kontekstual untuk memastikan setiap baris kode yang ditulis 
 
 ---
 
-### B. Folder `skills/` (Prosedur Kerja On-Demand)
+### C. Folder `skills/` (Prosedur Kerja On-Demand)
 Skills bekerja dengan prinsip **Progressive Disclosure**: agen hanya memuat deskripsi ringkasnya ke memori, dan baru membaca dokumen lengkap saat tugas yang relevan dijalankan:
 
 1. **[`skills/seloko-module-workflow/SKILL.md`](./skills/seloko-module-workflow/SKILL.md)**:
@@ -69,10 +88,20 @@ Skills bekerja dengan prinsip **Progressive Disclosure**: agen hanya memuat desk
 
 ## 🚀 Tata Cara Upscaling ke Depannya (How to Scale)
 
-Ketika sistem berkembang (misalnya penambahan modul perpajakan daerah, integrasi *Payment Gateway*, antrean RabbitMQ, atau analitik PAD), ikuti tata cara berikut untuk memperluas direktori `.agents/`:
+Ketika sistem berkembang (misalnya penambahan aplikasi baru dalam ekosistem Super App BPKPD Jambi seperti modul perpajakan daerah, integrasi *Payment Gateway*, antrean RabbitMQ, atau analitik PAD), ikuti tata cara berikut:
 
-### 1. Menambahkan Aturan Baru (`rules/<nama-aturan>.md`)
-Gunakan Rules jika Anda ingin agen **selalu mematuhi batasan tertentu tanpa perlu diminta**:
+### 1. Menambahkan / Memperbarui PRD Domain Baru (`prd/XX-<domain>.prd.md`)
+PRD adalah **Living Document** yang wajib diperbarui saat diskusi maupun saat modul baru dibuat:
+- **Kapan membuat PRD baru?**
+  - Ketika ada aplikasi / domain baru yang bergabung ke ekosistem SELOKO (misal: `prd/03-simpad-pajak.prd.md` untuk e-Samsat & Pajak Daerah, atau `prd/04-lapak-jambi.prd.md` untuk marketplace UMKM).
+- **Kapan memperbarui PRD yang sudah ada?**
+  - Setiap kali ada diskusi modul/fitur baru atau perubahan spesifikasi di chat.
+  - Setelah modul selesai diuji dan lolos smoke test (update status dari `⏳ Planned` / `🟡 In Progress` menjadi `✅ Completed`).
+- **Pendaftaran:**
+  - Daftarkan dokumen baru ke tabel domain di [`prd/README.md`](./prd/README.md).
+
+### 2. Menambahkan Aturan Baru (`rules/<nama-aturan>.md`)
+Gunakan Rules jika Anda ingin agen **selalu mematuhi batasan teknis tertentu tanpa perlu diminta**:
 - **Kapan membuat rule baru?**
   - Ada integrasi pihak ketiga baru (misal: `rules/payment-gateway-conventions.md`).
   - Ada standar pelaporan log audit baru (misal: `rules/audit-logging-standards.md`).
@@ -86,7 +115,7 @@ Gunakan Rules jika Anda ingin agen **selalu mematuhi batasan tertentu tanpa perl
   ---
   ```
 
-### 2. Menambahkan Skill Baru (`skills/<nama-skill>/SKILL.md`)
+### 3. Menambahkan Skill Baru (`skills/<nama-skill>/SKILL.md`)
 Gunakan Skills jika Anda ingin mengajarkan **prosedur kerja multi-langkah atau runbook tugas khusus**:
 - **Kapan membuat skill baru?**
   - Alur integrasi gateway pembayaran perbankan (misal: `skills/seloko-bank-payment-flow/`).
@@ -108,8 +137,8 @@ Gunakan Skills jika Anda ingin mengajarkan **prosedur kerja multi-langkah atau r
   ---
   ```
 
-### 3. Sinkronisasi ke `AGENTS.md` (Indeks Induk)
-Setiap kali menambahkan berkas baru di dalam `.agents/rules/` atau `.agents/skills/`:
+### 4. Sinkronisasi ke `AGENTS.md` (Indeks Induk)
+Setiap kali menambahkan berkas baru di dalam `.agents/prd/`, `.agents/rules/`, atau `.agents/skills/`:
 1. Buka file [`AGENTS.md`](file:///c:/Users/ASUS/Documents/BPKPD/Code/seloko-api/AGENTS.md) di root workspace.
 2. Tambahkan tautan markdown link ke berkas baru tersebut pada bagian **"Panduan & Aturan Resmi Proyek"**.
 3. Pastikan deskripsi singkatnya tercatat agar agen yang baru diinisiasi langsung mengetahui keberadaan modul tersebut.
