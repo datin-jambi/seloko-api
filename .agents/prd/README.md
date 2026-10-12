@@ -34,7 +34,7 @@ PRD dipisahkan secara modular per domain/aplikasi agar mudah di-scaling saat sis
 | No | Dokumen PRD | Kode Aplikasi | Lingkup & Fitur Utama | Status Saat Ini |
 |:---:|:---|:---:|:---|:---:|
 | **1** | [**`01-seloko-identity.prd.md`**](./01-seloko-identity.prd.md) | `seloko` | Core Platform: Multi-Tenancy, Auth JWT & Token Reuse Detection, Dynamic RBAC, User Management (Internal vs Public), Sidebar Menus, Centralized ImageKit Storage. | ✅ **Stabil (Production Ready)** |
-| **2** | [**`02-bapenda-profile.prd.md`**](./02-bapenda-profile.prd.md) | `bapenda-profile` | Portal Publik & CMS (rebuild dari `Bapenda-Jambi-Profile`): UPTD Samsat, Banners, Berita (konten universal `type=NEWS`), Halaman Profil, Galeri, FAQ, Regulasi. | 🟡 **Fase Pengerjaan (Modul 3: Berita)** |
+| **2** | [**`02-bapenda-profile.prd.md`**](./02-bapenda-profile.prd.md) | `bapenda-profile` | Portal Publik & CMS (rebuild dari `Bapenda-Jambi-Profile`): UPTD Samsat, Banners, Berita (konten universal `type=NEWS`), Halaman Profil, Galeri, FAQ, Regulasi. | 🟡 **Fase Pengerjaan (Modul 4: Halaman Profil)** |
 | **3** | *`03-simpad-pajak.prd.md`* *(Upcoming)* | `simpad` | Layanan Perpajakan: Cek Pajak Kendaraan, E-Samsat Gateway, Simulasi Pajak, Rekonsiliasi Bank Jambi. | ⏳ *Rencana Masa Depan* |
 | **4** | *`04-lapak-jambi.prd.md`* *(Upcoming)* | `lapak-jambi` | E-Commerce Daerah: Produk UMKM, Pedagang, Pembayaran Digital, Integrasi Pengiriman. | ⏳ *Rencana Masa Depan* |
 

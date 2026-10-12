@@ -3,7 +3,7 @@
 - **Kode Aplikasi Tenant:** `bapenda-profile`
 - **Tipe Domain:** Portal Informasi Publik Resmi, Direktori Layanan Samsat, Publikasi Berita, Galeri, FAQ, & Regulasi
 - **Referensi Aplikasi Lama:** [`datin-jambi/Bapenda-Jambi-Profile`](https://github.com/datin-jambi/Bapenda-Jambi-Profile) (Next.js 15 + Prisma, single-tenant, ID integer, role hardcode). Lokal: `C:\Users\ASUS\Documents\BPKPD\Code\Bapeda-Jambi-Profile-CRF`.
-- **Status Modul Saat Ini:** 🟡 **Dalam Pengerjaan (Modul 3: Konten Berita)**
+- **Status Modul Saat Ini:** 🟡 **Dalam Pengerjaan (Modul 4: Halaman Profil)**
 
 ---
 
@@ -118,8 +118,8 @@ Pemetaan role lama → role SELOKO (`roles.json`):
 |:---:|:---|:---|:---:|:---|
 | **1** | **UPTD Samsat** | `/api/bapenda/uptds` | ✅ **Selesai** | `uptds.json` (11) |
 | **2** | **Carousel Banners** | `/api/bapenda/banners` | ✅ **Selesai** | `banners.json` (6) |
-| **3** | **Berita & Kategori** | `/api/bapenda/news` | ⏳ **Target Berikutnya** | `news.json` (7), `news_categories.json` (5) |
-| **4** | **Halaman Profil (Pages)** | `/api/bapenda/pages` | ⏳ *Antrean* | `pages.json` (5) |
+| **3** | **Berita & Kategori** | `/api/bapenda/news` | ✅ **Selesai** | `news.json` (7), `news_categories.json` (5) |
+| **4** | **Halaman Profil (Pages)** | `/api/bapenda/pages` | ⏳ **Target Berikutnya** | `pages.json` (5) |
 | **5** | **Galeri** | `/api/bapenda/galleries` | ⏳ *Antrean* | `galleries.json` (3), `gallery_items.json` (7) |
 | **6** | **FAQ & Kategori** | `/api/bapenda/faqs` | ⏳ *Antrean* | `faqs.json` (18), `faq_categories.json` (7) |
 | **7** | **Regulasi & Dokumen** | `/api/bapenda/regulations` | ⏳ *Antrean* | `regulations.json` (5) |
@@ -141,8 +141,10 @@ Pemetaan role lama → role SELOKO (`roles.json`):
 
 ---
 
-### C. Modul 3: Berita & Kategori (`/api/bapenda/news`) — ⏳ Target Pengerjaan
+### C. Modul 3: Berita & Kategori (`/api/bapenda/news`) — ✅ Selesai
 Memakai tabel universal `articles` / `article_categories` dengan `type = NEWS` (lihat §3).
+
+**Implementasi:** modul generik `src/modules/content/articles/` di-*mount* per jenis lewat `scope` (`appCode`, `type`, `entity`, `label`) di `src/app.ts`. Menambah jenis konten = satu `api.register(articlesRoutes, { prefix, scope })`. Migrasi `20261012095431_add_article_type`. Uji: `npm test` (`articles.check.ts`) & `npm run db:smoke -- news` (27 skenario).
 
 #### 1. Perubahan Skema (migrasi baru)
 - `enum ArticleType { NEWS ARTICLE }`.
@@ -154,8 +156,8 @@ Memakai tabel universal `articles` / `article_categories` dengan `type = NEWS` (
 - Kategori yang masih dipakai berita tidak boleh dihapus (`onDelete: Restrict` → `ConflictError`).
 
 #### 3. Entitas Berita (`Article`) — sudah ada
-`id`, `applicationId`, `type`, `categoryId`, `authorId` (user SELOKO), `title` (≤255), `slug` (≤255), `excerpt?` (≤500), `content` (HTML), `thumbnailUrl?` + `thumbnailFileId?` (ImageKit, landscape, max 3MB, min lebar 600px), `status`, `publishedAt?`, `viewCount`, `seoTitle?`, `seoDescription?`, timestamps, `deletedAt`.
-- Slug otomatis dari judul (slugify); bila bentrok, tambahkan suffix unik.
+`id`, `applicationId`, `type`, `categoryId`, `authorId` (user SELOKO), `title` (≤255), `slug` (≤255), `excerpt?` (≤1000, data lama sampai 634 karakter), `content` (HTML), `thumbnailUrl?` + `thumbnailFileId?` (ImageKit, landscape, max 3MB, min lebar 600px), `status`, `publishedAt?`, `viewCount`, `seoTitle?`, `seoDescription?`, timestamps, `deletedAt`.
+- Slug otomatis dari judul (slugify); bila bentrok, tambahkan suffix `-2`, `-3`, …. Slug yang diketik manual dan bentrok → `ConflictError`.
 - Konten HTML wajib disanitasi sebelum simpan.
 - Ganti/hapus thumbnail → auto-cleanup file ImageKit lama secara asinkron.
 - `isFeatured` & status `ARCHIVED` **tidak** dibuat (tidak ada di app lama). Tambah bila portal butuh headline.
@@ -173,7 +175,8 @@ Memakai tabel universal `articles` / `article_categories` dengan `type = NEWS` (
 
 #### 5. Permission (`applications.json`, app `bapenda-profile`)
 - `news` (grup `reviewable`), `news-category` (grup `content`).
-- Hapus entity `article` & `announcement` lama dari seed bapenda.
+- Entity `article` & `announcement` lama dihapus dari seed bapenda; menu `konten.berita`, `konten.berita.review` (`news:approve`), `konten.berita.kategori`.
+- Perubahan status dikirim ke audit lewat routing key `audit.content.status` (action `news.<aksi>`, metadata from/to/note).
 
 #### 6. Seeder
 - `prisma/seeds/bapenda/news.json` dari `prisma/data/news.json` + `news_categories.json` app lama.

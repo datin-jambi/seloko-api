@@ -12,6 +12,7 @@
  *   npm run db:smoke -- permissions  → Hanya uji modul permissions
  *   npm run db:smoke -- menus        → Hanya uji struktur sidebar menu
  *   npm run db:smoke -- uptds        → Hanya uji modul Bapenda UPTD Samsat
+ *   npm run db:smoke -- news         → Hanya uji modul Bapenda Berita & alur review
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -407,6 +408,113 @@ async function runBannersSuite() {
   }
 }
 
+// ─── Test Suite: Bapenda News (Konten Universal type=NEWS) ────────────────────
+async function runNewsSuite() {
+  console.log("\n\x1b[36m▶ [Suite 7: Domain Bapenda - Berita & Alur Review]\x1b[0m");
+  const P = { appCode: "bapenda-profile" };
+
+  // 1. Publik: hanya PUBLISHED, tanpa login
+  const pubList = await request("/bapenda/news/public?limit=20", P);
+  assert("Daftar berita publik merespons sukses (200)", pubList.status === 200, pubList.status, 200);
+  assert("Hanya berita PUBLISHED yang tampil (3 dari seed)", pubList.data?.data?.length === 3, pubList.data?.data?.length, 3);
+  assert("Semua berita publik berstatus PUBLISHED", pubList.data?.data?.every((n: any) => n.status === "PUBLISHED"));
+  assert("Penulis hanya id + fullName (tanpa email/PII)", pubList.data?.data?.every((n: any) => n.author && !("email" in n.author)));
+
+  const cats = await request("/bapenda/news/public/categories", P);
+  assert("Kategori publik hanya yang aktif (4)", cats.data?.data?.length === 4, cats.data?.data?.length, 4);
+
+  const slug = "program-pemutihan-pkb-dan-bbnkb-tahun-2026";
+  const before = await request(`/bapenda/news/public/${slug}`, P);
+  const after = await request(`/bapenda/news/public/${slug}`, P);
+  assert("Detail berita publik via slug (200)", before.status === 200, before.status, 200);
+  assert("viewCount bertambah tiap dibuka", after.data?.data?.viewCount === before.data?.data?.viewCount + 1);
+
+  const hidden = await request("/bapenda/news/public/bapenda-jambi", P);
+  assert("Berita PENDING_REVIEW tidak bisa dibuka publik (404)", hidden.status === 404, hidden.status, 404);
+
+  // 2. CMS & alur review
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const editorToken = await login("editor.profil", DEFAULT_PASSWORD, "seloko");
+  const viewerToken = await login("belum.verifikasi", DEFAULT_PASSWORD, "seloko");
+  const sa = { token: saToken || undefined };
+  const ed = { token: editorToken || undefined };
+
+  const catRes = await request("/bapenda/news/categories", sa);
+  const categoryId = catRes.data?.data?.find((c: any) => c.slug === "berita")?.id;
+  assert("CMS kategori berita dapat diakses (200)", catRes.status === 200 && Boolean(categoryId), catRes.status, 200);
+
+  const viewerCreate = await request("/bapenda/news", {
+    method: "POST",
+    token: viewerToken || undefined,
+    body: { categoryId, title: "Tidak boleh dibuat", content: "<p>Konten uji coba</p>" },
+  });
+  assert("Role viewer ditolak membuat berita (403)", viewerCreate.status === 403, viewerCreate.status, 403);
+
+  const created = await request("/bapenda/news", {
+    method: "POST",
+    ...ed,
+    body: {
+      categoryId,
+      title: "Smoke Test Berita Sementara",
+      content: '<p onclick="x()">Isi berita</p><script>alert(1)</script>',
+    },
+  });
+  const newsId = created.data?.data?.id;
+  assert("Editor membuat berita (201)", created.status === 201, created.status, 201);
+  assert("Berita baru berstatus DRAFT", created.data?.data?.status === "DRAFT");
+  assert("Slug dibentuk dari judul", created.data?.data?.slug === "smoke-test-berita-sementara", created.data?.data?.slug);
+  assert("Konten disanitasi (script & onclick dibuang)", !/script|onclick/.test(created.data?.data?.content ?? "x"));
+
+  const edList = await request("/bapenda/news?limit=100", ed);
+  const edRows = edList.data?.data ?? [];
+  assert("Editor hanya melihat berita miliknya", edRows.length > 0 && edRows.every((n: any) => n.author?.fullName === "Andi Saputra"), edRows.length);
+
+  if (newsId) {
+    const edPublish = await request(`/bapenda/news/${newsId}/status`, { method: "PATCH", ...ed, body: { action: "publish" } });
+    assert("Editor tidak bisa langsung publish (403)", edPublish.status === 403, edPublish.status, 403);
+
+    const submit = await request(`/bapenda/news/${newsId}/status`, { method: "PATCH", ...ed, body: { action: "submit" } });
+    assert("Editor mengajukan review → PENDING_REVIEW", submit.data?.data?.status === "PENDING_REVIEW", submit.data?.data?.status);
+
+    const lockedEdit = await request(`/bapenda/news/${newsId}`, { method: "PUT", ...ed, body: { title: "Ubah saat review" } });
+    assert("Editor tidak bisa mengubah berita yang sedang direview (403)", lockedEdit.status === 403, lockedEdit.status, 403);
+
+    const badFlow = await request(`/bapenda/news/${newsId}/status`, { method: "PATCH", ...sa, body: { action: "unpublish" } });
+    assert("Transisi tidak sah ditolak (400)", badFlow.status === 400, badFlow.status, 400);
+
+    const reject = await request(`/bapenda/news/${newsId}/status`, { method: "PATCH", ...sa, body: { action: "reject", note: "Lengkapi foto" } });
+    assert("Admin menolak → REJECTED", reject.data?.data?.status === "REJECTED", reject.data?.data?.status);
+
+    await request(`/bapenda/news/${newsId}/status`, { method: "PATCH", ...ed, body: { action: "submit" } });
+    const approve = await request(`/bapenda/news/${newsId}/status`, { method: "PATCH", ...sa, body: { action: "approve" } });
+    assert("Ajukan ulang lalu disetujui → APPROVED", approve.data?.data?.status === "APPROVED", approve.data?.data?.status);
+
+    const publish = await request(`/bapenda/news/${newsId}/status`, { method: "PATCH", ...sa, body: { action: "publish" } });
+    assert("Admin menerbitkan → PUBLISHED + publishedAt terisi", publish.data?.data?.status === "PUBLISHED" && Boolean(publish.data?.data?.publishedAt));
+
+    const nowPublic = await request("/bapenda/news/public/smoke-test-berita-sementara", P);
+    assert("Berita terbit muncul di portal publik (200)", nowPublic.status === 200, nowPublic.status, 200);
+
+    const unpublish = await request(`/bapenda/news/${newsId}/status`, { method: "PATCH", ...sa, body: { action: "unpublish" } });
+    assert("Unpublish → DRAFT, publishedAt dikosongkan", unpublish.data?.data?.status === "DRAFT" && unpublish.data?.data?.publishedAt === null);
+
+    const edDelete = await request(`/bapenda/news/${newsId}`, { method: "DELETE", ...ed });
+    assert("Editor tidak punya izin hapus (403)", edDelete.status === 403, edDelete.status, 403);
+
+    const del = await request(`/bapenda/news/${newsId}`, { method: "DELETE", ...sa });
+    assert("Admin menghapus (soft-delete) berita (200)", del.data?.data?.deleted === true, del.status, 200);
+  }
+
+  // 3. Kategori yang masih dipakai tidak boleh dihapus
+  if (categoryId) {
+    const delCat = await request(`/bapenda/news/categories/${categoryId}`, { method: "DELETE", ...sa });
+    assert("Kategori yang masih dipakai ditolak dihapus (409)", delCat.status === 409, delCat.status, 409);
+  }
+
+  // Bersihkan baris uji agar slug bebas di run berikutnya (soft-delete tetap memegang slug).
+  await prisma.article.deleteMany({ where: { slug: "smoke-test-berita-sementara" } });
+}
+
 // ─── Main Orchestrator ────────────────────────────────────────────────────────
 async function main() {
   const args = process.argv.slice(2);
@@ -453,6 +561,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "banners" || targetModule === "banner") {
       await runBannersSuite();
+    }
+    if (!targetModule || targetModule === "news" || targetModule === "berita") {
+      await runNewsSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

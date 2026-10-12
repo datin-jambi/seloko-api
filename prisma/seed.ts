@@ -21,6 +21,7 @@ import { seedMenus } from "./seeds/core/menus.seeder.js";
 import { buildRoleIndex, seedUsers } from "./seeds/core/users.seeder.js";
 import { seedBapendaUptds } from "./seeds/bapenda/uptds.seeder.js";
 import { seedBanners } from "./seeds/bapenda/banners.seeder.js";
+import { seedNews } from "./seeds/bapenda/news.seeder.js";
 import type {
   ApplicationsFile,
   MenusFile,
@@ -28,6 +29,7 @@ import type {
   UsersFile,
   BapendaUptdsFile,
   BannersFile,
+  NewsFile,
 } from "./seeds/shared/types.js";
 
 /** Cetak tabel ringkasan jumlah baris tiap tabel yang disentuh seeder. */
@@ -42,6 +44,8 @@ async function printSummary(): Promise<void> {
     menuRoles,
     uptds,
     banners,
+    articleCategories,
+    articles,
   ] = await Promise.all([
     prisma.application.count(),
     prisma.permission.count(),
@@ -52,6 +56,8 @@ async function printSummary(): Promise<void> {
     prisma.menuRole.count(),
     prisma.bapendaUptd.count(),
     prisma.banner.count(),
+    prisma.articleCategory.count(),
+    prisma.article.count(),
   ]);
 
   const rows = [
@@ -64,6 +70,8 @@ async function printSummary(): Promise<void> {
     ["menu_roles", menuRoles],
     ["bapenda_uptds", uptds],
     ["banners", banners],
+    ["article_categories", articleCategories],
+    ["articles", articles],
   ] as const;
 
   console.log("\n┌─────────────────────┬────────┐");
@@ -80,7 +88,7 @@ async function main(): Promise<void> {
 
   if (process.argv.includes("--reset")) await resetTables();
 
-  const [appsFile, rolesFile, usersFile, menusFile, uptdsFile, bannersFile] =
+  const [appsFile, rolesFile, usersFile, menusFile, uptdsFile, bannersFile, newsFile] =
     await Promise.all([
       loadJson<ApplicationsFile>("core/applications.json"),
       loadJson<RolesFile>("core/roles.json"),
@@ -88,6 +96,7 @@ async function main(): Promise<void> {
       loadJson<MenusFile>("core/menus.json"),
       loadJson<BapendaUptdsFile>("bapenda/uptds.json"),
       loadJson<BannersFile>("bapenda/banners.json"),
+      loadJson<NewsFile>("bapenda/news.json"),
     ]);
 
   // Urutan WAJIB: menu dan user menautkan diri ke permission/role yang dibuat
@@ -115,6 +124,9 @@ async function main(): Promise<void> {
 
   console.log("");
   await seedBanners(bannersFile.banners);
+
+  console.log("");
+  await seedNews(newsFile);
 
   await printSummary();
 

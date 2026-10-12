@@ -50,6 +50,7 @@ async function startAuditConsumer(): Promise<void> {
     ROUTING_KEYS.AUDIT_USER_LOGOUT,
     ROUTING_KEYS.AUDIT_USER_CREATED,
     ROUTING_KEYS.AUDIT_PERMISSION_CHANGED,
+    ROUTING_KEYS.AUDIT_CONTENT_STATUS,
   ];
 
   for (const key of auditRoutingKeys) {

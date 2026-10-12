@@ -16,6 +16,7 @@
     "content": ["create", "read", "update", "delete", "list"],
     "publishable": ["create", "read", "update", "delete", "list", "publish"],
     "verifiable": ["create", "read", "update", "delete", "list", "approve", "reject"],
+    "reviewable": ["create", "read", "update", "delete", "list", "approve", "reject", "publish"],
     "readonly": ["read", "list"]
   },
   "roles": [
