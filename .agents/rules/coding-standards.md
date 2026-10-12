@@ -12,7 +12,7 @@ Dokumen ini memuat standar penulisan kode TypeScript, validasi Zod DTO, format r
 
 ## 1. Konvensi 4-Layer Modular Monolith
 
-Setiap modul di `src/modules/<domain>/<feature>/` WAJIB dipisahkan ke dalam 4 berkas utama:
+Setiap modul di `src/modules/<domain>/<feature>/` atau `src/modules/shared/<group>/<feature>/` WAJIB dipisahkan ke dalam 4 berkas utama (pembagian domain vs shared: lihat `seloko-api-general.md` §1). Pengecualian: modul `shared/` hanya `*.schema.ts` + `*.service.ts`; modul domain pemakainya hanya `*.controller.ts` + `*.routes.ts`.
 
 1. **`*.schema.ts` (Zod DTO & Contracts):**
    - Mendefinisikan schema untuk Query Params, URL Params, Body, dan Responses.

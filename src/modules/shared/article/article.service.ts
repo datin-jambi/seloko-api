@@ -1,7 +1,7 @@
 /**
- * articles.service.ts — Konten universal (tabel articles) untuk semua jenis
- * ArticleType. Satu jenis konten = satu ContentScope; route memasang scope
- * yang sama untuk berita (NEWS), artikel (ARTICLE), dst.
+ * article.service.ts — Logika konten bersama (tabel articles) untuk semua
+ * jenis ArticleType (NEWS, ARTICLE, …). Tidak tahu domain mana pun: domain
+ * memanggilnya dengan ArticleScope miliknya, mis. bapenda/news.
  */
 import sanitizeHtml from "sanitize-html";
 import type { ArticleType, ContentStatus, Prisma } from "@prisma/client";
@@ -26,11 +26,11 @@ import type {
   PublicListArticlesQuery,
   UpdateArticleBody,
   UpdateCategoryBody,
-} from "./articles.schema.js";
+} from "./article.schema.js";
 
 // ─── Konteks ──────────────────────────────────────────────────────────────────
 /** Jenis konten yang dilayani satu pemasangan route. */
-export interface ContentScope {
+export interface ArticleScope {
   /** Aplikasi pemilik konten, mis. "bapenda-profile". */
   appCode: string;
   type: ArticleType;
@@ -48,7 +48,7 @@ export interface Actor {
   userAgent?: string | undefined;
 }
 
-// ─── Alur Status (murni, diuji di articles.check.ts) ──────────────────────────
+// ─── Alur Status (murni, diuji di article.check.ts) ───────────────────────────
 interface TransitionRule {
   from: ContentStatus[];
   to: ContentStatus;
@@ -123,7 +123,7 @@ async function validateThumbnail(fileId: string | null | undefined): Promise<voi
 function cleanupFile(fileId: string | null | undefined): void {
   if (!fileId) return;
   ImageKitService.deleteFile(fileId).catch((err) => {
-    console.error(`[ArticlesService] Gagal menghapus file lama ImageKit (${fileId}):`, err);
+    console.error(`[ArticleService] Gagal menghapus file lama ImageKit (${fileId}):`, err);
   });
 }
 
@@ -175,7 +175,7 @@ interface ActorAccess {
   ownOnly: boolean;
 }
 
-async function resolveAccess(scope: ContentScope, actor: Actor): Promise<ActorAccess> {
+async function resolveAccess(scope: ArticleScope, actor: Actor): Promise<ActorAccess> {
   if (actor.isSuperAdmin) return { can: () => true, ownOnly: false };
   const perms = new Set(await resolveUserPermissions(actor.userId, scope.appCode));
   const can = (action: string) => perms.has(`${scope.entity}:${action}`);
@@ -218,7 +218,7 @@ async function assertCategory(applicationId: string, type: ArticleType, category
 }
 
 // ─── Publik ───────────────────────────────────────────────────────────────────
-export async function listPublicArticles(scope: ContentScope, query: PublicListArticlesQuery) {
+export async function listPublicArticles(scope: ArticleScope, query: PublicListArticlesQuery) {
   const applicationId = await getAppId(scope.appCode);
   const { page, limit, search, category } = query;
 
@@ -251,7 +251,7 @@ export async function listPublicArticles(scope: ContentScope, query: PublicListA
 }
 
 /** Detail publik + hitung pembaca. */
-export async function getPublicArticleBySlug(scope: ContentScope, slug: string) {
+export async function getPublicArticleBySlug(scope: ArticleScope, slug: string) {
   const applicationId = await getAppId(scope.appCode);
   const found = await prisma.article.findFirst({
     where: { applicationId, type: scope.type, slug, status: "PUBLISHED", deletedAt: null },
@@ -266,7 +266,7 @@ export async function getPublicArticleBySlug(scope: ContentScope, slug: string) 
   });
 }
 
-export async function listPublicCategories(scope: ContentScope) {
+export async function listPublicCategories(scope: ArticleScope) {
   const applicationId = await getAppId(scope.appCode);
   return prisma.articleCategory.findMany({
     where: { applicationId, type: scope.type, isActive: true, deletedAt: null },
@@ -275,7 +275,7 @@ export async function listPublicCategories(scope: ContentScope) {
 }
 
 // ─── CMS: Artikel ─────────────────────────────────────────────────────────────
-export async function listArticles(scope: ContentScope, actor: Actor, query: ListArticlesQuery) {
+export async function listArticles(scope: ArticleScope, actor: Actor, query: ListArticlesQuery) {
   const applicationId = await getAppId(scope.appCode);
   const access = await resolveAccess(scope, actor);
   const { page, limit, search, status, categoryId, sortBy, sortOrder } = query;
@@ -310,7 +310,7 @@ export async function listArticles(scope: ContentScope, actor: Actor, query: Lis
 }
 
 /** Ambil konten milik scope; NotFound juga untuk konten orang lain bila ownOnly. */
-async function findOwnedArticle(scope: ContentScope, actor: Actor, id: string) {
+async function findOwnedArticle(scope: ArticleScope, actor: Actor, id: string) {
   const applicationId = await getAppId(scope.appCode);
   const access = await resolveAccess(scope, actor);
   const article = await prisma.article.findFirst({
@@ -327,11 +327,11 @@ async function findOwnedArticle(scope: ContentScope, actor: Actor, id: string) {
   return { article, access, applicationId };
 }
 
-export async function getArticleById(scope: ContentScope, actor: Actor, id: string) {
+export async function getArticleById(scope: ArticleScope, actor: Actor, id: string) {
   return (await findOwnedArticle(scope, actor, id)).article;
 }
 
-export async function createArticle(scope: ContentScope, actor: Actor, body: CreateArticleBody) {
+export async function createArticle(scope: ArticleScope, actor: Actor, body: CreateArticleBody) {
   const applicationId = await getAppId(scope.appCode);
   await assertCategory(applicationId, scope.type, body.categoryId);
   const slug = await resolveArticleSlug(applicationId, scope.type, body.title, body.slug);
@@ -357,7 +357,7 @@ export async function createArticle(scope: ContentScope, actor: Actor, body: Cre
 }
 
 export async function updateArticle(
-  scope: ContentScope,
+  scope: ArticleScope,
   actor: Actor,
   id: string,
   body: UpdateArticleBody,
@@ -402,7 +402,7 @@ export async function updateArticle(
 }
 
 export async function changeArticleStatus(
-  scope: ContentScope,
+  scope: ArticleScope,
   actor: Actor,
   id: string,
   action: ArticleAction,
@@ -449,7 +449,7 @@ export async function changeArticleStatus(
   return updated;
 }
 
-export async function deleteArticle(scope: ContentScope, actor: Actor, id: string) {
+export async function deleteArticle(scope: ArticleScope, actor: Actor, id: string) {
   const { article } = await findOwnedArticle(scope, actor, id);
   await prisma.article.update({ where: { id }, data: { deletedAt: new Date() } });
   // ponytail: file thumbnail dibiarkan saat soft-delete agar restore tetap utuh;
@@ -458,7 +458,7 @@ export async function deleteArticle(scope: ContentScope, actor: Actor, id: strin
 }
 
 // ─── CMS: Kategori ────────────────────────────────────────────────────────────
-export async function listCategories(scope: ContentScope, query: ListCategoriesQuery) {
+export async function listCategories(scope: ArticleScope, query: ListCategoriesQuery) {
   const applicationId = await getAppId(scope.appCode);
   return prisma.articleCategory.findMany({
     where: {
@@ -472,7 +472,7 @@ export async function listCategories(scope: ContentScope, query: ListCategoriesQ
   });
 }
 
-async function findCategory(scope: ContentScope, id: string) {
+async function findCategory(scope: ArticleScope, id: string) {
   const applicationId = await getAppId(scope.appCode);
   const category = await prisma.articleCategory.findFirst({
     where: { id, applicationId, type: scope.type, deletedAt: null },
@@ -497,7 +497,7 @@ async function resolveCategorySlug(
   return slug;
 }
 
-export async function createCategory(scope: ContentScope, body: CreateCategoryBody) {
+export async function createCategory(scope: ArticleScope, body: CreateCategoryBody) {
   const applicationId = await getAppId(scope.appCode);
   const slug = await resolveCategorySlug(applicationId, scope.type, body.name, body.slug);
   return prisma.articleCategory.create({
@@ -513,7 +513,7 @@ export async function createCategory(scope: ContentScope, body: CreateCategoryBo
   });
 }
 
-export async function updateCategory(scope: ContentScope, id: string, body: UpdateCategoryBody) {
+export async function updateCategory(scope: ArticleScope, id: string, body: UpdateCategoryBody) {
   const { category, applicationId } = await findCategory(scope, id);
   const data: Prisma.ArticleCategoryUpdateInput = {};
   if (body.name !== undefined) data.name = body.name;
@@ -526,12 +526,12 @@ export async function updateCategory(scope: ContentScope, id: string, body: Upda
   return prisma.articleCategory.update({ where: { id }, data });
 }
 
-export async function setCategoryActive(scope: ContentScope, id: string, isActive: boolean) {
+export async function setCategoryActive(scope: ArticleScope, id: string, isActive: boolean) {
   await findCategory(scope, id);
   return prisma.articleCategory.update({ where: { id }, data: { isActive } });
 }
 
-export async function deleteCategory(scope: ContentScope, id: string) {
+export async function deleteCategory(scope: ArticleScope, id: string) {
   const { category } = await findCategory(scope, id);
   const used = await prisma.article.count({ where: { categoryId: id, deletedAt: null } });
   if (used > 0) {

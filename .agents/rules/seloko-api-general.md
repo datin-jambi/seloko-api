@@ -19,6 +19,28 @@ Repositori ini adalah **SELOKO API** — Centralized Core API & Multi-App Engine
   - `*.service.ts` (Business logic murni & Prisma query, filter `deletedAt: null`)
   - `*.controller.ts` (HTTP handler)
   - `*.routes.ts` (Pendaftaran endpoint & guard `fastify.authenticate`, `fastify.requirePermission`)
+- **Struktur Folder Modul (Domain vs Shared):**
+  ```text
+  src/modules/
+    core/                   # identitas, RBAC, aplikasi, menu, storage (milik seloko)
+    shared/                 # logika bersama lintas aplikasi — TIDAK tahu domain mana pun
+      article/              # konten artikel universal (tabel articles; jenis via ArticleType NEWS/ARTICLE/…)
+        article.schema.ts   #   Zod DTO bersama
+        article.service.ts  #   logika & Prisma, menerima ArticleScope dari domain
+      <modul-shared-lain>/
+    <domain>/               # mis. bapenda/, lapak/ — semua fitur & route domain ada di sini
+      uptds/                # fitur khas domain: 4-layer lengkap
+      news/                 # fitur pemakai shared: hanya controller + routes
+        news.controller.ts  #   tetapkan ArticleScope domain (appCode, type, entity, label), panggil shared service
+        news.routes.ts      #   route & guard eksplisit seperti modul domain lain, schema dari shared
+  ```
+  - `shared/` hanya berisi **schema + service** (logika). Route & controller selalu milik domain, sehingga URL tetap `/api/<domain>/<fitur>` dan didaftarkan di `app.ts` seperti modul domain lain.
+  - Service shared menerima konteks lewat parameter (mis. `ArticleScope`). Dilarang menulis `APP_CODES.<domain>` di dalam `shared/`.
+  - **Kapan jadi shared:** modul dibuat di folder domain dulu. Pindahkan logikanya ke `shared/` saat domain KEDUA butuh fitur yang sama — bukan karena "mungkin nanti".
+  - **Domain butuh perilaku berbeda** — naik bertahap, berhenti di tahap pertama yang cukup:
+    1. Atur di controller/routes domain (validasi tambahan, endpoint tidak dipasang).
+    2. Tambah opsi pada scope service shared — dibuat hanya saat diminta.
+    3. Fork menjadi modul domain sendiri bila field/alur/aturan sudah jauh berbeda (biasanya disertai tabel sendiri).
 - **Public App Config Endpoint:** Setiap aplikasi front-end publik didukung endpoint unauthenticated `GET /api/applications/public-config/:code` yang menyediakan informasi branding, kontak, SEO, dan status fitur tanpa autentikasi.
 - **Transparansi Hak Akses User:** Endpoint list users menyertakan ringkasan jumlah aplikasi per role, dan endpoint detail user memetakan secara eksplisit daftar aplikasi serta role yang dimiliki pengguna.
 
@@ -41,9 +63,9 @@ Repositori ini adalah **SELOKO API** — Centralized Core API & Multi-App Engine
 ## 4. Status Roadmap Modul Bapenda Profile
 - ✅ **UPTD Samsat** (`/api/bapenda/uptds`) — *Selesai & ter-seed 11 kantor Samsat se-Provinsi Jambi*.
 - ✅ **Banners** (`/api/bapenda/banners`) — *Selesai, verifikasi ImageKit, & ter-seed 3 Banner*.
-- ⏳ **Articles & Categories** (`/api/bapenda/articles`) — *Target pengerjaan berikutnya*.
-- ⏳ **FAQs** (`/api/bapenda/faqs`).
-- ⏳ **Regulations** (`/api/bapenda/regulations`).
+- ✅ **Berita & Kategori** (`/api/bapenda/news`) — *`bapenda/news` memakai `shared/article` (type `NEWS`), alur review, ter-seed dari app lama*.
+- ⏳ **Halaman Profil** (`/api/bapenda/pages`) — *Target pengerjaan berikutnya*.
+- ⏳ **Galeri**, **FAQs**, **Regulations**, **Pengaturan Situs** — lihat `.agents/prd/02-bapenda-profile.prd.md`.
 
 ---
 

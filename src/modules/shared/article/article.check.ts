@@ -1,9 +1,9 @@
 /**
- * articles.check.ts — Uji murni alur status & sanitasi HTML (tanpa DB).
- * Jalankan: tsx src/modules/content/articles/articles.check.ts
+ * article.check.ts — Uji murni alur status & sanitasi HTML (tanpa DB).
+ * Jalankan: tsx src/modules/shared/article/article.check.ts
  */
 import assert from "node:assert/strict";
-import { AUTHOR_EDITABLE, nextStatus, sanitizeContent } from "./articles.service.js";
+import { AUTHOR_EDITABLE, nextStatus, sanitizeContent } from "./article.service.js";
 
 // Alur sah
 assert.equal(nextStatus("DRAFT", "submit"), "PENDING_REVIEW");
@@ -38,4 +38,4 @@ assert.ok(!clean.includes("onclick"), clean);
 assert.ok(!clean.includes("onerror"), clean);
 assert.ok(!clean.includes("javascript:"), clean);
 
-console.log("✓ articles.check: alur status & sanitasi HTML lolos");
+console.log("✓ article.check: alur status & sanitasi HTML lolos");

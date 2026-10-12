@@ -144,7 +144,7 @@ Pemetaan role lama → role SELOKO (`roles.json`):
 ### C. Modul 3: Berita & Kategori (`/api/bapenda/news`) — ✅ Selesai
 Memakai tabel universal `articles` / `article_categories` dengan `type = NEWS` (lihat §3).
 
-**Implementasi:** modul generik `src/modules/content/articles/` di-*mount* per jenis lewat `scope` (`appCode`, `type`, `entity`, `label`) di `src/app.ts`. Menambah jenis konten = satu `api.register(articlesRoutes, { prefix, scope })`. Migrasi `20261012095431_add_article_type`. Uji: `npm test` (`articles.check.ts`) & `npm run db:smoke -- news` (27 skenario).
+**Implementasi:** schema + service bersama di `src/modules/shared/article/`; route & controller milik Bapenda di `src/modules/bapenda/news/` (scope `bapenda-profile`, `NEWS`, `news:*`), terdaftar `/api/bapenda/news` seperti modul bapenda lain. Migrasi `20261012095431_add_article_type`. Uji: `npm test` (`article.check.ts`) & `npm run db:smoke -- news` (27 skenario).
 
 #### 1. Perubahan Skema (migrasi baru)
 - `enum ArticleType { NEWS ARTICLE }`.

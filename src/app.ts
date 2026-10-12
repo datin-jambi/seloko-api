@@ -13,7 +13,7 @@ import { pingDatabase } from "~/config/database.js";
 import { isRabbitMQConnected } from "~/config/rabbitmq.js";
 import { appCodeMiddleware } from "~/common/middlewares/index.js";
 import { permissionGuard } from "~/common/guards/index.js";
-import { APP_CODES, RATE_LIMIT } from "~/common/constants/index.js";
+import { RATE_LIMIT } from "~/common/constants/index.js";
 import { sendError, AppError, HttpStatus, TooManyRequestsError } from "~/common/errors/index.js";
 
 // ─── Application Factory ──────────────────────────────────────────────────────
@@ -252,12 +252,8 @@ export async function buildApp(): Promise<FastifyInstance> {
       const { bannersRoutes } = await import("~/modules/bapenda/banners/banners.routes.js");
       await api.register(bannersRoutes, { prefix: "/bapenda/banners" });
 
-      // Konten universal (tabel articles) — satu register per jenis konten.
-      const { articlesRoutes } = await import("~/modules/content/articles/articles.routes.js");
-      await api.register(articlesRoutes, {
-        prefix: "/bapenda/news",
-        scope: { appCode: APP_CODES.BAPENDA_PROFILE, type: "NEWS", entity: "news", label: "Berita" },
-      });
+      const { newsRoutes } = await import("~/modules/bapenda/news/news.routes.js");
+      await api.register(newsRoutes, { prefix: "/bapenda/news" });
 
       // Lapak modules
       // await api.register(merchantsRoutes, { prefix: "/merchants" });

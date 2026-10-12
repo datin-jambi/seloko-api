@@ -75,7 +75,12 @@ Gunakan SOP ini sebagai panduan lengkap saat mengimplementasikan fitur atau modu
 
 ## Tahap 3: Implementasi 4-Layer Modular Monolith
 
-Buat folder di `src/modules/<domain>/<feature>/`:
+Tentukan dulu letaknya (aturan lengkap: `.agents/rules/seloko-api-general.md` §1):
+- **Fitur khas satu domain** → `src/modules/<domain>/<feature>/` (4-layer lengkap).
+- **Fitur yang logikanya sudah ada di `src/modules/shared/`** (mis. `shared/article` untuk berita/artikel) → JANGAN salin service. Buat `src/modules/<domain>/<feature>/<feature>.controller.ts` (tetapkan scope domain, panggil service shared) + `<feature>.routes.ts` (route & guard eksplisit, schema dari shared). Contoh: `src/modules/bapenda/news/`. Daftarkan di `app.ts` dengan prefix `/<domain>/<feature>`, lalu lanjut ke Tahap 4.
+- **Domain kedua butuh fitur domain lain** → pindahkan schema + service ke `shared/<grup>/`, ganti konstanta domain dengan parameter scope; controller + routes tetap di domain.
+
+Untuk modul baru, buat folder:
 
 ### 1. `*.schema.ts` (Zod DTO & Validation)
 - Definisikan:
