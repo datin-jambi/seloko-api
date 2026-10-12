@@ -339,34 +339,46 @@ enum MediaType {
 }
 
 // ─── Artikel & Berita (Universal Content) ─────────────────────────────────────
+/// Jenis konten pada tabel universal articles. Satu jenis = satu route,
+/// permission, dan menu sendiri. Tambah nilai baru bila aplikasi butuh jenis
+/// konten lain; pengelompokan dalam satu jenis cukup lewat kategori.
+enum ArticleType {
+  NEWS
+  ARTICLE
+
+  @@map("article_type")
+}
+
 model ArticleCategory {
-  id            String    @id @default(uuid(7)) @db.VarChar(36)
-  applicationId String    @map("app_id") @db.VarChar(36)
-  name          String    @db.VarChar(100)
-  slug          String    @db.VarChar(120)
+  id            String      @id @default(uuid(7)) @db.VarChar(36)
+  applicationId String      @map("app_id") @db.VarChar(36)
+  type          ArticleType
+  name          String      @db.VarChar(100)
+  slug          String      @db.VarChar(120)
   description   String?
-  isActive      Boolean   @default(true) @map("is_active")
-  sortOrder     Int       @default(0) @map("sort_order")
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
-  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz()
+  isActive      Boolean     @default(true) @map("is_active")
+  sortOrder     Int         @default(0) @map("sort_order")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt     DateTime?   @map("deleted_at") @db.Timestamptz()
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   articles    Article[]
 
-  @@unique([applicationId, slug], map: "uq_app_article_category_slug")
-  @@index([applicationId, isActive, sortOrder])
+  @@unique([applicationId, type, slug], map: "uq_app_article_category_slug")
+  @@index([applicationId, type, isActive, sortOrder])
   @@map("article_categories")
 }
 
 model Article {
   id              String        @id @default(uuid(7)) @db.VarChar(36)
   applicationId   String        @map("app_id") @db.VarChar(36)
+  type            ArticleType
   categoryId      String        @map("category_id") @db.VarChar(36)
   authorId        String        @map("author_id") @db.VarChar(36)
   title           String        @db.VarChar(255)
   slug            String        @db.VarChar(255)
-  excerpt         String?       @db.VarChar(500)
+  excerpt         String?       @db.VarChar(1000)
   content         String        @db.Text
   thumbnailUrl    String?       @map("thumbnail_url")
   thumbnailFileId String?       @map("thumbnail_file_id") @db.VarChar(100)
@@ -383,8 +395,8 @@ model Article {
   category    ArticleCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   author      User            @relation(fields: [authorId], references: [id], onDelete: Restrict)
 
-  @@unique([applicationId, slug], map: "uq_app_article_slug")
-  @@index([applicationId, status, publishedAt])
+  @@unique([applicationId, type, slug], map: "uq_app_article_slug")
+  @@index([applicationId, type, status, publishedAt])
   @@index([categoryId])
   @@index([authorId])
   @@map("articles")

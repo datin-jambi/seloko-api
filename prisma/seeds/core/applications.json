@@ -71,8 +71,8 @@
         }
       },
       "permissions": [
-        { "module": "Konten", "entity": "article", "label": "Artikel", "actions": ["publishable"] },
-        { "module": "Konten", "entity": "announcement", "label": "Pengumuman", "actions": ["publishable"] },
+        { "module": "Konten", "entity": "news", "label": "Berita", "actions": ["reviewable"] },
+        { "module": "Konten", "entity": "news-category", "label": "Kategori Berita", "actions": ["content"] },
         { "module": "Media", "entity": "banner", "label": "Banner", "actions": ["content"] },
         { "module": "Media", "entity": "gallery", "label": "Galeri", "actions": ["content"] },
         { "module": "Layanan", "entity": "uptd", "label": "UPTD Samsat", "actions": ["content"] }

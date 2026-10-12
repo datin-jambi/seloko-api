@@ -119,26 +119,25 @@
           "icon": "file-text",
           "items": [
             {
-              "code": "konten.artikel",
-              "label": "Artikel",
+              "code": "konten.berita",
+              "label": "Berita",
               "icon": "newspaper",
-              "path": "/cms/artikel",
-              "permission": "article:list"
+              "path": "/cms/berita",
+              "permission": "news:list"
             },
             {
-              "code": "konten.artikel.terbit",
-              "label": "Antrian Terbit",
+              "code": "konten.berita.review",
+              "label": "Antrian Review",
               "icon": "send",
-              "path": "/cms/artikel/antrian",
-              "permission": "article:publish",
-              "roles": ["superadmin", "admin"]
+              "path": "/cms/berita/review",
+              "permission": "news:approve"
             },
             {
-              "code": "konten.pengumuman",
-              "label": "Pengumuman",
-              "icon": "megaphone",
-              "path": "/cms/pengumuman",
-              "permission": "announcement:list"
+              "code": "konten.berita.kategori",
+              "label": "Kategori Berita",
+              "icon": "tags",
+              "path": "/cms/berita/kategori",
+              "permission": "news-category:list"
             }
           ]
         },

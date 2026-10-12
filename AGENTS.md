@@ -62,8 +62,8 @@ Sebelum melakukan tugas pengkodean, perbaikan, atau penambahan modul pada reposi
 
 1. ✅ **UPTD Samsat** (`/api/bapenda/uptds`) — *Selesai & ter-seed 11 Samsat*.
 2. ✅ **Banners** (`/api/bapenda/banners`) — *Selesai, verifikasi ImageKit, & ter-seed 3 Banner*.
-3. ⏳ **Berita & Kategori** (`/api/bapenda/news`, tabel universal `articles` `type=NEWS`) — *Target pengerjaan berikutnya*.
-4. ⏳ **Halaman Profil** (`/api/bapenda/pages`).
+3. ✅ **Berita & Kategori** (`/api/bapenda/news`, tabel universal `articles` `type=NEWS`) — *Selesai, alur review, & ter-seed 5 kategori + 7 berita dari app lama*.
+4. ⏳ **Halaman Profil** (`/api/bapenda/pages`) — *Target pengerjaan berikutnya*.
 5. ⏳ **Galeri** (`/api/bapenda/galleries`).
 6. ⏳ **FAQs** (`/api/bapenda/faqs`).
 7. ⏳ **Regulations** (`/api/bapenda/regulations`).

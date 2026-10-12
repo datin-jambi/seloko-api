@@ -178,4 +178,39 @@ export interface BannersFile {
   banners: BannerDef[];
 }
 
+// ─── news.json ────────────────────────────────────────────────────────────────
+export interface NewsCategoryDef {
+  name: string;
+  slug: string;
+  description?: string | null;
+  isActive?: boolean;
+  sortOrder?: number;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  deletedAt?: string | null;
+}
+
+export interface NewsDef {
+  categorySlug: string;
+  /** Username user SELOKO yang menjadi penulis. */
+  authorUsername: string;
+  title: string;
+  slug: string;
+  excerpt?: string | null;
+  content: string;
+  thumbnailUrl?: string | null;
+  status: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "PUBLISHED";
+  publishedAt?: string | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  deletedAt?: string | null;
+}
+
+export interface NewsFile {
+  categories: NewsCategoryDef[];
+  news: NewsDef[];
+}
+
 

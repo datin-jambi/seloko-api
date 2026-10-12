@@ -21,6 +21,7 @@ export const ROUTING_KEYS = {
   AUDIT_USER_LOGOUT: "audit.user.logout",
   AUDIT_USER_CREATED: "audit.user.created",
   AUDIT_PERMISSION_CHANGED: "audit.permission.changed",
+  AUDIT_CONTENT_STATUS: "audit.content.status",
 
   // Notifications
   NOTIFY_EMAIL_WELCOME: "notification.email.welcome",
