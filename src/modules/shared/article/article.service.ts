@@ -3,7 +3,6 @@
  * jenis ArticleType (NEWS, ARTICLE, …). Tidak tahu domain mana pun: domain
  * memanggilnya dengan ArticleScope miliknya, mis. bapenda/news.
  */
-import sanitizeHtml from "sanitize-html";
 import type { ArticleType, ContentStatus, Prisma } from "@prisma/client";
 import { prisma } from "~/config/database.js";
 import {
@@ -13,6 +12,7 @@ import {
   NotFoundError,
 } from "~/common/errors/index.js";
 import { slugify } from "~/common/utils/index.js";
+import { sanitizeContent } from "~/common/utils/html.js";
 import { ImageKitService } from "~/common/services/storage/imagekit.service.js";
 import { resolveUserPermissions } from "~/common/guards/permission.guard.js";
 import { publishAuditEvent } from "~/workers/producers/audit.producer.js";
@@ -72,23 +72,6 @@ export function nextStatus(current: ContentStatus, action: ArticleAction): Conte
 
 /** Status yang masih boleh diubah isinya oleh penulis tanpa hak review. */
 export const AUTHOR_EDITABLE: readonly ContentStatus[] = ["DRAFT", "REJECTED"];
-
-// ─── Sanitasi HTML ────────────────────────────────────────────────────────────
-// Konten dirender apa adanya di portal publik — tanpa ini editor (atau token
-// curian) bisa menyisipkan <script>/onerror yang jalan di browser warga.
-const HTML_OPTIONS: sanitizeHtml.IOptions = {
-  allowedTags: [...sanitizeHtml.defaults.allowedTags, "img"],
-  allowedAttributes: {
-    ...sanitizeHtml.defaults.allowedAttributes,
-    img: ["src", "alt", "title", "width", "height"],
-    "*": ["class"],
-  },
-  allowedSchemes: ["http", "https", "mailto", "tel"],
-};
-
-export function sanitizeContent(html: string): string {
-  return sanitizeHtml(html, HTML_OPTIONS);
-}
 
 // ─── Media ────────────────────────────────────────────────────────────────────
 export const THUMBNAIL_RULES = { maxSizeBytes: 3 * 1024 * 1024, minWidth: 600 } as const;

@@ -213,4 +213,22 @@ export interface NewsFile {
   news: NewsDef[];
 }
 
+// ─── pages.json ───────────────────────────────────────────────────────────────
+export interface PageDef {
+  title: string;
+  slug: string;
+  content: string;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  isPublished?: boolean;
+  publishedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  deletedAt?: string | null;
+}
+
+export interface PagesFile {
+  pages: PageDef[];
+}
+
 

@@ -1,0 +1,65 @@
+{
+  "$comment": "Migrasi dari Bapenda-Jambi-Profile (prisma/data/pages.json). Waktu dump lama = WIB, disimpan di sini sebagai UTC. App lama tidak punya publishedAt — halaman terbit memakai updatedAt.",
+  "pages": [
+    {
+      "title": "Sejarah",
+      "slug": "sejarah",
+      "content": "<h1>Sejarah BapendaSejarah Badan Pendapatan Daerah (Bapenda)</h1><p>Badan Pendapatan Daerah (Bapenda) merupakan salah satu perangkat daerah yang memiliki tugas utama dalam mengelola sumber-sumber pendapatan daerah, khususnya yang berasal dari pajak daerah dan retribusi daerah. Keberadaan Bapenda merupakan bagian dari upaya pemerintah daerah dalam meningkatkan Pendapatan Asli Daerah (PAD) guna mendukung pelaksanaan pembangunan dan pelayanan kepada masyarakat.</p><h2>Latar Belakang Pembentukan</h2><p>Sebelum dikenal sebagai Bapenda, pengelolaan pendapatan daerah di berbagai wilayah Indonesia umumnya dilaksanakan oleh Dinas Pendapatan Daerah (Dispenda). Seiring dengan perkembangan sistem pemerintahan daerah dan pelaksanaan otonomi daerah, pemerintah melakukan penyesuaian terhadap struktur organisasi perangkat daerah agar lebih efektif dan efisien dalam mengelola keuangan daerah.</p><h2>Perubahan dari Dispenda Menjadi Bapenda</h2><p>Berdasarkan kebijakan penataan organisasi perangkat daerah yang mengacu pada Undang-Undang Nomor 23 Tahun 2014 tentang Pemerintahan Daerah dan Peraturan Pemerintah Nomor 18 Tahun 2016 tentang Perangkat Daerah, banyak pemerintah daerah melakukan perubahan nomenklatur dari Dinas Pendapatan Daerah (Dispenda) menjadi Badan Pendapatan Daerah (Bapenda). Perubahan ini bertujuan untuk memperkuat fungsi koordinasi, perencanaan, pengawasan, dan optimalisasi penerimaan daerah. </p><h2>Tugas dan Fungsi Bapenda</h2><p>Bapenda memiliki tugas menyusun kebijakan teknis di bidang pendapatan daerah, melakukan pendataan objek dan subjek pajak, melaksanakan pemungutan pajak daerah, melakukan pengawasan terhadap penerimaan daerah, serta menyusun laporan dan evaluasi pendapatan daerah. Selain itu, Bapenda juga berperan dalam meningkatkan kesadaran masyarakat untuk memenuhi kewajiban perpajakan daerah secara tertib dan tepat waktu.</p><h2>Peran Bapenda Saat Ini</h2><p>Saat ini Bapenda menjadi salah satu unsur penting dalam mendukung kemandirian keuangan daerah. Dengan pemanfaatan teknologi informasi dan digitalisasi pelayanan pajak daerah, Bapenda terus berupaya meningkatkan kualitas pelayanan kepada wajib pajak sekaligus mengoptimalkan penerimaan daerah untuk mendukung pembangunan yang berkelanjutan.</p>",
+      "seoTitle": "Sejarah BAPENDA Provinsi Jambi",
+      "seoDescription": "Sejarah dan latar belakang Badan Pendapatan Daerah Provinsi Jambi",
+      "isPublished": true,
+      "publishedAt": "2026-06-22T19:29:09.151Z",
+      "createdAt": "2026-06-17T04:25:46.633Z",
+      "updatedAt": "2026-06-22T19:29:09.151Z",
+      "deletedAt": null
+    },
+    {
+      "title": "Visi dan Misi",
+      "slug": "visi-misi",
+      "content": "<h2>Visi dan Misi BAPENDA / SAMSAT Tahun 2026</h2><h3>Visi</h3><p>\"Terwujudnya pelayanan pendapatan daerah yang profesional, transparan, akuntabel, berbasis digital, serta berorientasi pada peningkatan kepatuhan masyarakat untuk mendukung kemandirian fiskal dan pembangunan daerah yang berkelanjutan.\"</p><h3>Misi</h3><ol><li>Meningkatkan kualitas pelayanan pajak daerah dan administrasi kendaraan bermotor yang cepat, mudah, dan responsif.</li><li>Mengembangkan sistem pelayanan berbasis teknologi informasi guna mewujudkan pelayanan yang modern, transparan, dan terintegrasi.</li><li>Meningkatkan profesionalisme, integritas, dan kompetensi sumber daya aparatur dalam pengelolaan pendapatan daerah.</li><li>Mengoptimalkan penerimaan daerah melalui intensifikasi dan ekstensifikasi sumber-sumber pendapatan yang sah.</li><li>Memperkuat pengawasan, akuntabilitas, dan tata kelola pendapatan daerah yang efektif dan bebas dari praktik korupsi.</li><li>Meningkatkan kesadaran dan kepatuhan masyarakat dalam memenuhi kewajiban perpajakan daerah melalui edukasi dan inovasi pelayanan.</li><li>Mewujudkan sinergi dengan kepolisian, Jasa Raharja, pemerintah daerah, serta pemangku kepentingan lainnya dalam penyelenggaraan pelayanan Samsat yang prima.</li></ol>",
+      "seoTitle": "Visi Misi BAPENDA Provinsi Jambi",
+      "seoDescription": "Visi dan misi Badan Pendapatan Daerah Provinsi Jambi",
+      "isPublished": true,
+      "publishedAt": "2026-06-22T19:54:29.658Z",
+      "createdAt": "2026-06-17T04:25:46.968Z",
+      "updatedAt": "2026-06-22T19:54:29.658Z",
+      "deletedAt": null
+    },
+    {
+      "title": "Tugas Pokok dan Fungsi",
+      "slug": "tupoksi",
+      "content": "<h2>Tugas dan Fungsi BAPENDA / SAMSAT</h2><h3>Tugas Pokok</h3><p>Badan Pendapatan Daerah (BAPENDA) mempunyai tugas membantu Kepala Daerah dalam melaksanakan urusan pemerintahan di bidang pengelolaan pendapatan daerah yang meliputi perumusan kebijakan, pelaksanaan, koordinasi, pembinaan, pengawasan, pengendalian, evaluasi, dan pelaporan pendapatan daerah.</p><p>Dalam pelaksanaan pelayanan Sistem Administrasi Manunggal Satu Atap (SAMSAT), BAPENDA bekerja sama dengan Kepolisian Republik Indonesia dan PT Jasa Raharja dalam memberikan pelayanan administrasi kendaraan bermotor, pemungutan Pajak Kendaraan Bermotor (PKB), Bea Balik Nama Kendaraan Bermotor (BBNKB), serta pengelolaan penerimaan daerah lainnya yang menjadi kewenangannya.</p><h3>Fungsi BAPENDA / SAMSAT</h3><ol><li>Penyusunan dan perumusan kebijakan teknis di bidang pengelolaan pendapatan daerah.</li><li>Pelaksanaan pemungutan, penatausahaan, dan pengelolaan pajak daerah sesuai dengan peraturan perundang-undangan yang berlaku.</li><li>Pendataan, pendaftaran, penetapan, penagihan, dan pengawasan terhadap wajib pajak daerah.</li><li>Pengelolaan Pajak Kendaraan Bermotor (PKB) dan Bea Balik Nama Kendaraan Bermotor (BBNKB) melalui pelayanan SAMSAT.</li><li>Pelaksanaan pelayanan administrasi perpajakan kendaraan bermotor secara cepat, tepat, transparan, dan akuntabel.</li><li>Pengelolaan sistem informasi dan basis data perpajakan daerah untuk mendukung optimalisasi penerimaan daerah.</li><li>Pelaksanaan intensifikasi dan ekstensifikasi sumber-sumber pendapatan daerah guna meningkatkan Pendapatan Asli Daerah (PAD).</li><li>Penyusunan perencanaan, target, strategi, dan evaluasi penerimaan pendapatan daerah.</li><li>Pelaksanaan monitoring, pengawasan, dan pengendalian terhadap realisasi pendapatan daerah.</li><li>Pelaksanaan koordinasi dengan instansi terkait dalam rangka optimalisasi penerimaan pajak daerah dan peningkatan kualitas pelayanan.</li><li>Pelaksanaan sosialisasi, edukasi, dan pelayanan informasi kepada masyarakat mengenai kewajiban perpajakan daerah.</li><li>Pengembangan inovasi pelayanan berbasis digital untuk memudahkan masyarakat dalam memperoleh layanan perpajakan daerah.</li><li>Pembinaan, pengelolaan, dan peningkatan kapasitas sumber daya manusia di lingkungan BAPENDA dan Unit Pelaksana Teknis (UPT) SAMSAT.</li><li>Penyusunan laporan kinerja, laporan keuangan, dan laporan realisasi pendapatan daerah secara berkala.</li><li>Pelaksanaan tugas lain yang diberikan oleh Kepala Daerah sesuai dengan ketentuan peraturan perundang-undangan.</li></ol><h3>Tujuan Pelayanan</h3><ul><li>Meningkatkan Pendapatan Asli Daerah (PAD).</li><li>Meningkatkan kepatuhan wajib pajak daerah.</li><li>Mewujudkan pelayanan publik yang cepat, mudah, dan transparan.</li><li>Mendorong transformasi digital pelayanan perpajakan daerah.</li><li>Mendukung pembangunan daerah yang berkelanjutan.</li></ul>",
+      "seoTitle": "Tupoksi BAPENDA Provinsi Jambi",
+      "seoDescription": "Tugas pokok dan fungsi Badan Pendapatan Daerah Provinsi Jambi",
+      "isPublished": true,
+      "publishedAt": "2026-06-22T19:58:22.343Z",
+      "createdAt": "2026-06-17T04:25:48.052Z",
+      "updatedAt": "2026-06-22T19:58:22.343Z",
+      "deletedAt": null
+    },
+    {
+      "title": "Struktur Organisasi",
+      "slug": "struktur-organisasi",
+      "content": "<h2>Struktur Organisasi</h2><p>Badan Pendapatan Daerah Provinsi Jambi dipimpin oleh seorang Kepala Badan yang dibantu oleh:</p><ul><li>Sekretariat</li><li>Bidang Perencanaan,pengembangan, dan pelaporan pendapatan daerah</li><li>Bidang Pengelolaan pendapatan daerah </li><li>Bidang Pengendalian, evaluasi, dan pengelolaan Sistem Informasi Pendapatan Daerah</li><li>UPTD PPD Samsat Kab/Kota Se-Provinsi Jambi</li></ul>",
+      "seoTitle": "Struktur Organisasi BAPENDA Provinsi Jambi",
+      "seoDescription": "Struktur organisasi Badan Pendapatan Daerah Provinsi Jambi",
+      "isPublished": true,
+      "publishedAt": "2026-06-22T21:59:51.143Z",
+      "createdAt": "2026-06-17T04:25:48.267Z",
+      "updatedAt": "2026-06-22T21:59:51.143Z",
+      "deletedAt": null
+    },
+    {
+      "title": "Pejabat",
+      "slug": "pejabat",
+      "content": "<p></p><table style=\"min-width: 50px;\"><colgroup><col style=\"min-width: 25px;\"><col style=\"min-width: 25px;\"></colgroup><tbody><tr><th colspan=\"1\" rowspan=\"1\"><p><span style=\"color: rgb(255, 255, 255);\">Jabatan</span></p></th><th colspan=\"1\" rowspan=\"1\"><p><span style=\"color: rgb(255, 255, 255);\">Nama</span></p></th></tr><tr><td colspan=\"1\" rowspan=\"1\"><p>Plt.Kepala Badan</p></td><td colspan=\"1\" rowspan=\"1\"><p>Agus Pirngadi, S.Sos</p></td></tr><tr><td colspan=\"1\" rowspan=\"1\"><p>Sekertaris</p></td><td colspan=\"1\" rowspan=\"1\"><p>Roni Paslah, SE, MM</p></td></tr></tbody></table><table style=\"min-width: 50px;\"><colgroup><col style=\"min-width: 25px;\"><col style=\"min-width: 25px;\"></colgroup><tbody><tr><th colspan=\"1\" rowspan=\"1\"><p><span style=\"color: rgb(255, 255, 255);\">Jabatan</span></p></th><th colspan=\"1\" rowspan=\"1\"><p><span style=\"color: rgb(255, 255, 255);\">Nama</span></p></th></tr><tr><td colspan=\"1\" rowspan=\"1\"><p>Kabid Bidang P3PD</p></td><td colspan=\"1\" rowspan=\"1\"><p>Dr. Muhammad Ariansyah, S.IP, ME</p></td></tr><tr><td colspan=\"1\" rowspan=\"1\"><p>Kabid PPD</p></td><td colspan=\"1\" rowspan=\"1\"><p>Mabrur, SE, ME</p></td></tr><tr><td colspan=\"1\" rowspan=\"1\"><p>Kabid PEPSI</p></td><td colspan=\"1\" rowspan=\"1\"><p>Yopie Said Ramadhany, SE, M.Ak</p></td></tr></tbody></table><p><br></p>",
+      "seoTitle": "Pejabat BAPENDA Provinsi Jambi",
+      "seoDescription": "Daftar Pejabat Badan Pendapatan Daerah Provinsi Jambi",
+      "isPublished": true,
+      "publishedAt": "2026-08-16T01:22:38.034Z",
+      "createdAt": "2026-06-17T04:25:49.319Z",
+      "updatedAt": "2026-08-16T01:22:38.034Z",
+      "deletedAt": null
+    }
+  ]
+}

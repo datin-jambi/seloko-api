@@ -138,6 +138,13 @@
               "icon": "tags",
               "path": "/cms/berita/kategori",
               "permission": "news-category:list"
+            },
+            {
+              "code": "konten.halaman",
+              "label": "Halaman Profil",
+              "icon": "file",
+              "path": "/cms/halaman",
+              "permission": "page:list"
             }
           ]
         },

@@ -22,6 +22,7 @@ import { buildRoleIndex, seedUsers } from "./seeds/core/users.seeder.js";
 import { seedBapendaUptds } from "./seeds/bapenda/uptds.seeder.js";
 import { seedBanners } from "./seeds/bapenda/banners.seeder.js";
 import { seedNews } from "./seeds/bapenda/news.seeder.js";
+import { seedPages } from "./seeds/bapenda/pages.seeder.js";
 import type {
   ApplicationsFile,
   MenusFile,
@@ -30,6 +31,7 @@ import type {
   BapendaUptdsFile,
   BannersFile,
   NewsFile,
+  PagesFile,
 } from "./seeds/shared/types.js";
 
 /** Cetak tabel ringkasan jumlah baris tiap tabel yang disentuh seeder. */
@@ -46,6 +48,7 @@ async function printSummary(): Promise<void> {
     banners,
     articleCategories,
     articles,
+    pages,
   ] = await Promise.all([
     prisma.application.count(),
     prisma.permission.count(),
@@ -58,6 +61,7 @@ async function printSummary(): Promise<void> {
     prisma.banner.count(),
     prisma.articleCategory.count(),
     prisma.article.count(),
+    prisma.page.count(),
   ]);
 
   const rows = [
@@ -72,6 +76,7 @@ async function printSummary(): Promise<void> {
     ["banners", banners],
     ["article_categories", articleCategories],
     ["articles", articles],
+    ["pages", pages],
   ] as const;
 
   console.log("\n┌─────────────────────┬────────┐");
@@ -88,7 +93,7 @@ async function main(): Promise<void> {
 
   if (process.argv.includes("--reset")) await resetTables();
 
-  const [appsFile, rolesFile, usersFile, menusFile, uptdsFile, bannersFile, newsFile] =
+  const [appsFile, rolesFile, usersFile, menusFile, uptdsFile, bannersFile, newsFile, pagesFile] =
     await Promise.all([
       loadJson<ApplicationsFile>("core/applications.json"),
       loadJson<RolesFile>("core/roles.json"),
@@ -97,6 +102,7 @@ async function main(): Promise<void> {
       loadJson<BapendaUptdsFile>("bapenda/uptds.json"),
       loadJson<BannersFile>("bapenda/banners.json"),
       loadJson<NewsFile>("bapenda/news.json"),
+      loadJson<PagesFile>("bapenda/pages.json"),
     ]);
 
   // Urutan WAJIB: menu dan user menautkan diri ke permission/role yang dibuat
@@ -127,6 +133,9 @@ async function main(): Promise<void> {
 
   console.log("");
   await seedNews(newsFile);
+
+  console.log("");
+  await seedPages(pagesFile.pages);
 
   await printSummary();
 

@@ -22,7 +22,7 @@
     "db:seed:reset": "tsx prisma/seed.ts --reset",
     "db:smoke": "tsx prisma/smoke/runner.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit --project prisma/tsconfig.json",
-    "test": "tsx --env-file-if-exists=.env src/modules/core/auth/auth.check.ts && tsx --env-file-if-exists=.env src/common/utils/utils.check.ts && tsx src/config/redis.check.ts && tsx src/common/guards/access.check.ts && tsx --env-file-if-exists=.env src/common/services/storage/imagekit.check.ts && tsx --env-file-if-exists=.env src/modules/shared/article/article.check.ts"
+    "test": "tsx --env-file-if-exists=.env src/modules/core/auth/auth.check.ts && tsx --env-file-if-exists=.env src/common/utils/utils.check.ts && tsx src/common/utils/html.check.ts && tsx src/config/redis.check.ts && tsx src/common/guards/access.check.ts && tsx --env-file-if-exists=.env src/common/services/storage/imagekit.check.ts && tsx --env-file-if-exists=.env src/modules/shared/article/article.check.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11",

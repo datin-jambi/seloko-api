@@ -64,8 +64,9 @@ Repositori ini adalah **SELOKO API** — Centralized Core API & Multi-App Engine
 - ✅ **UPTD Samsat** (`/api/bapenda/uptds`) — *Selesai & ter-seed 11 kantor Samsat se-Provinsi Jambi*.
 - ✅ **Banners** (`/api/bapenda/banners`) — *Selesai, verifikasi ImageKit, & ter-seed 3 Banner*.
 - ✅ **Berita & Kategori** (`/api/bapenda/news`) — *`bapenda/news` memakai `shared/article` (type `NEWS`), alur review, ter-seed dari app lama*.
-- ⏳ **Halaman Profil** (`/api/bapenda/pages`) — *Target pengerjaan berikutnya*.
-- ⏳ **Galeri**, **FAQs**, **Regulations**, **Pengaturan Situs** — lihat `.agents/prd/02-bapenda-profile.prd.md`.
+- ✅ **Halaman Profil** (`/api/bapenda/pages`) — *Selesai & ter-seed 5 halaman dari app lama*.
+- ⏳ **Galeri** (`/api/bapenda/galleries`) — *Target pengerjaan berikutnya*.
+- ⏳ **FAQs**
 
 ---
 

@@ -73,6 +73,7 @@
       "permissions": [
         { "module": "Konten", "entity": "news", "label": "Berita", "actions": ["reviewable"] },
         { "module": "Konten", "entity": "news-category", "label": "Kategori Berita", "actions": ["content"] },
+        { "module": "Konten", "entity": "page", "label": "Halaman", "actions": ["publishable"] },
         { "module": "Media", "entity": "banner", "label": "Banner", "actions": ["content"] },
         { "module": "Media", "entity": "gallery", "label": "Galeri", "actions": ["content"] },
         { "module": "Layanan", "entity": "uptd", "label": "UPTD Samsat", "actions": ["content"] }

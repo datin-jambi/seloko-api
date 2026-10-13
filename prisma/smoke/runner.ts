@@ -13,6 +13,7 @@
  *   npm run db:smoke -- menus        → Hanya uji struktur sidebar menu
  *   npm run db:smoke -- uptds        → Hanya uji modul Bapenda UPTD Samsat
  *   npm run db:smoke -- news         → Hanya uji modul Bapenda Berita & alur review
+ *   npm run db:smoke -- pages        → Hanya uji modul Bapenda Halaman Profil
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -515,6 +516,88 @@ async function runNewsSuite() {
   await prisma.article.deleteMany({ where: { slug: "smoke-test-berita-sementara" } });
 }
 
+// ─── Test Suite: Bapenda Pages (Halaman Profil) ───────────────────────────────
+async function runPagesSuite() {
+  console.log("\n\x1b[36m▶ [Suite 8: Domain Bapenda - Halaman Profil]\x1b[0m");
+  const P = { appCode: "bapenda-profile" };
+
+  // 1. Publik
+  const pubList = await request("/bapenda/pages/public", P);
+  assert("Daftar halaman publik merespons sukses (200)", pubList.status === 200, pubList.status, 200);
+  assert("5 halaman profil terbit dari seed", pubList.data?.data?.length === 5, pubList.data?.data?.length, 5);
+  assert("Daftar publik tidak membawa isi halaman", pubList.data?.data?.every((p: any) => !("content" in p)));
+
+  const pejabat = await request("/bapenda/pages/public/pejabat", P);
+  assert("Detail halaman 'pejabat' via slug (200)", pejabat.status === 200, pejabat.status, 200);
+  assert("Tabel pejabat utuh (colspan & warna teks tetap)", /colspan="1"/.test(pejabat.data?.data?.content ?? "") && /color:/.test(pejabat.data?.data?.content ?? ""));
+
+  const missing = await request("/bapenda/pages/public/tidak-ada", P);
+  assert("Slug tidak dikenal ditolak (404)", missing.status === 404, missing.status, 404);
+
+  // 2. CMS
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const editorToken = await login("editor.profil", DEFAULT_PASSWORD, "seloko");
+  const viewerToken = await login("belum.verifikasi", DEFAULT_PASSWORD, "seloko");
+  const sa = { token: saToken || undefined };
+  const ed = { token: editorToken || undefined };
+
+  const cmsList = await request("/bapenda/pages?limit=5", { token: viewerToken || undefined });
+  assert("Viewer dapat melihat daftar halaman CMS (200)", cmsList.status === 200, cmsList.status, 200);
+
+  const viewerCreate = await request("/bapenda/pages", {
+    method: "POST",
+    token: viewerToken || undefined,
+    body: { title: "Tidak boleh", content: "<p>Konten uji coba</p>" },
+  });
+  assert("Viewer ditolak membuat halaman (403)", viewerCreate.status === 403, viewerCreate.status, 403);
+
+  const dupSlug = await request("/bapenda/pages", {
+    method: "POST",
+    ...sa,
+    body: { title: "Sejarah", content: "<p>Duplikat slug sejarah</p>" },
+  });
+  assert("Slug yang sudah dipakai ditolak (409)", dupSlug.status === 409, dupSlug.status, 409);
+
+  const created = await request("/bapenda/pages", {
+    method: "POST",
+    ...ed,
+    body: { title: "Smoke Test Halaman", content: '<p>Isi</p><script>alert(1)</script>' },
+  });
+  const pageId = created.data?.data?.id;
+  assert("Editor membuat halaman (201)", created.status === 201, created.status, 201);
+  assert("Halaman baru berstatus draft", created.data?.data?.isPublished === false);
+  assert("Konten disanitasi (script dibuang)", !/script/.test(created.data?.data?.content ?? "x"));
+
+  if (pageId) {
+    const draftPublic = await request("/bapenda/pages/public/smoke-test-halaman", P);
+    assert("Halaman draft tidak tampil publik (404)", draftPublic.status === 404, draftPublic.status, 404);
+
+    const edPublish = await request(`/bapenda/pages/${pageId}/publish`, { method: "PATCH", ...ed, body: { isPublished: true } });
+    assert("Editor tidak bisa menerbitkan halaman (403)", edPublish.status === 403, edPublish.status, 403);
+
+    const publish = await request(`/bapenda/pages/${pageId}/publish`, { method: "PATCH", ...sa, body: { isPublished: true } });
+    assert("Admin menerbitkan halaman + publishedAt terisi", publish.data?.data?.isPublished === true && Boolean(publish.data?.data?.publishedAt));
+
+    const nowPublic = await request("/bapenda/pages/public/smoke-test-halaman", P);
+    assert("Halaman terbit tampil publik (200)", nowPublic.status === 200, nowPublic.status, 200);
+
+    const upd = await request(`/bapenda/pages/${pageId}`, { method: "PUT", ...ed, body: { title: "Smoke Test Halaman Diubah" } });
+    assert("Editor mengubah judul halaman (200)", upd.data?.data?.title === "Smoke Test Halaman Diubah", upd.status, 200);
+
+    const unpublish = await request(`/bapenda/pages/${pageId}/publish`, { method: "PATCH", ...sa, body: { isPublished: false } });
+    assert("Tarik ke draft → publishedAt dikosongkan", unpublish.data?.data?.isPublished === false && unpublish.data?.data?.publishedAt === null);
+
+    const edDelete = await request(`/bapenda/pages/${pageId}`, { method: "DELETE", ...ed });
+    assert("Editor tidak punya izin hapus (403)", edDelete.status === 403, edDelete.status, 403);
+
+    const del = await request(`/bapenda/pages/${pageId}`, { method: "DELETE", ...sa });
+    assert("Admin menghapus (soft-delete) halaman (200)", del.data?.data?.deleted === true, del.status, 200);
+  }
+
+  // Bersihkan baris uji agar slug bebas di run berikutnya.
+  await prisma.page.deleteMany({ where: { slug: "smoke-test-halaman" } });
+}
+
 // ─── Main Orchestrator ────────────────────────────────────────────────────────
 async function main() {
   const args = process.argv.slice(2);
@@ -564,6 +647,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "news" || targetModule === "berita") {
       await runNewsSuite();
+    }
+    if (!targetModule || targetModule === "pages" || targetModule === "halaman") {
+      await runPagesSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

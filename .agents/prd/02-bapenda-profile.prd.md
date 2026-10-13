@@ -3,7 +3,7 @@
 - **Kode Aplikasi Tenant:** `bapenda-profile`
 - **Tipe Domain:** Portal Informasi Publik Resmi, Direktori Layanan Samsat, Publikasi Berita, Galeri, FAQ, & Regulasi
 - **Referensi Aplikasi Lama:** [`datin-jambi/Bapenda-Jambi-Profile`](https://github.com/datin-jambi/Bapenda-Jambi-Profile) (Next.js 15 + Prisma, single-tenant, ID integer, role hardcode). Lokal: `C:\Users\ASUS\Documents\BPKPD\Code\Bapeda-Jambi-Profile-CRF`.
-- **Status Modul Saat Ini:** 🟡 **Dalam Pengerjaan (Modul 4: Halaman Profil)**
+- **Status Modul Saat Ini:** 🟡 **Dalam Pengerjaan (Modul 5: Galeri)**
 
 ---
 
@@ -119,8 +119,8 @@ Pemetaan role lama → role SELOKO (`roles.json`):
 | **1** | **UPTD Samsat** | `/api/bapenda/uptds` | ✅ **Selesai** | `uptds.json` (11) |
 | **2** | **Carousel Banners** | `/api/bapenda/banners` | ✅ **Selesai** | `banners.json` (6) |
 | **3** | **Berita & Kategori** | `/api/bapenda/news` | ✅ **Selesai** | `news.json` (7), `news_categories.json` (5) |
-| **4** | **Halaman Profil (Pages)** | `/api/bapenda/pages` | ⏳ **Target Berikutnya** | `pages.json` (5) |
-| **5** | **Galeri** | `/api/bapenda/galleries` | ⏳ *Antrean* | `galleries.json` (3), `gallery_items.json` (7) |
+| **4** | **Halaman Profil (Pages)** | `/api/bapenda/pages` | ✅ **Selesai** | `pages.json` (5) |
+| **5** | **Galeri** | `/api/bapenda/galleries` | ⏳ **Target Berikutnya** | `galleries.json` (3), `gallery_items.json` (7) |
 | **6** | **FAQ & Kategori** | `/api/bapenda/faqs` | ⏳ *Antrean* | `faqs.json` (18), `faq_categories.json` (7) |
 | **7** | **Regulasi & Dokumen** | `/api/bapenda/regulations` | ⏳ *Antrean* | `regulations.json` (5) |
 | **8** | **Pengaturan Situs** | via `Application.settings` (core) | ⏳ *Antrean* | `settings.json` (18 key) |
@@ -185,12 +185,15 @@ Memakai tabel universal `articles` / `article_categories` dengan `type = NEWS` (
 
 ---
 
-### D. Modul 4: Halaman Profil (`/api/bapenda/pages`) — ⏳ Antrean
-- Halaman statis per slug: `sejarah`, `visi-misi`, `tupoksi`, `struktur-organisasi`, `pejabat`.
-- Skema `Page` sudah ada: `title`, `slug`, `content` (HTML), `seoTitle?`, `seoDescription?`, `isPublished`, `publishedAt?`.
-- Tanpa review workflow (cukup toggle publish).
-- **Publik:** `GET /public/:slug`. **CMS:** CRUD + `PATCH /:id/publish`.
-- Permission: `page` (grup `content` + `publish`).
+### D. Modul 4: Halaman Profil (`/api/bapenda/pages`) — ✅ Selesai
+- Modul khas domain `src/modules/bapenda/pages/` (4-layer). Tanpa migrasi — skema `Page` sudah ada: `title`, `slug`, `content` (HTML), `seoTitle?`, `seoDescription?`, `isPublished`, `publishedAt?`.
+- Halaman statis per slug: `sejarah`, `visi-misi`, `tupoksi`, `struktur-organisasi`, `pejabat` (ter-seed dari app lama, waktu WIB → UTC; app lama tanpa `publishedAt` → diisi `updatedAt`).
+- Tanpa review workflow: halaman baru selalu draft, terbit/tarik via `PATCH /:id/publish` `{ isPublished }` (`publishedAt` diisi saat terbit, dikosongkan saat ditarik).
+- Slug = URL tetap `/profil/<slug>`: bentrok → `ConflictError` (tanpa akhiran otomatis).
+- **Publik:** `GET /public` (daftar terbit tanpa isi, untuk menu), `GET /public/:slug`. **CMS:** list (filter `isPublished`, search), detail, create, update, publish, soft-delete.
+- Permission: `page` (grup `publishable`); menu `konten.halaman` (`page:list`).
+- Konten HTML disanitasi lewat `src/common/utils/html.ts` (dipakai bersama berita): tabel `colspan/rowspan` & `style` aman (`color`, `background-color`, `text-align`, `width`, `min-width`) dipertahankan agar tabel halaman Pejabat utuh.
+- Uji: `npm run db:smoke -- pages` (20 skenario), `src/common/utils/html.check.ts`.
 
 ### E. Modul 5: Galeri (`/api/bapenda/galleries`) — ⏳ Antrean
 - Skema `Gallery` (+ `slug`, `coverImageUrl/FileId`, `status`, `authorId`) & `GalleryItem` (`mediaType` IMAGE/VIDEO/PDF, `fileUrl/fileId`, `title?`, `description?`, `sortOrder`).
