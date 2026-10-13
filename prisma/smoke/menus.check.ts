@@ -88,6 +88,26 @@ async function main(): Promise<void> {
   const dasborCount = await prisma.menuItem.count({ where: { code: "dasbor" } });
   check("code 'dasbor' dipakai >1 aplikasi", true, dasborCount > 1);
 
+  // Path internal tiap aplikasi CMS wajib berprefix sama (/seloko/…, /bapenda/…)
+  // supaya satu frontend super app bisa merutekan semua aplikasi tanpa bentrok.
+  const prefixed = await prisma.application.findMany({
+    where: { code: { in: ["seloko", "bapenda-profile", "lapak-jambi-web"] } },
+    select: { code: true, menuItems: { where: { isExternal: false, path: { not: null } }, select: { path: true } } },
+  });
+  for (const app of prefixed) {
+    const prefixes = [...new Set(app.menuItems.map((m) => m.path!.split("/")[1]))];
+    check(`${app.code}: semua path berprefix sama`, 1, prefixes.length);
+  }
+  const expected: Record<string, string> = { seloko: "seloko", "bapenda-profile": "bapenda", "lapak-jambi-web": "lapak" };
+  for (const app of prefixed) {
+    check(`${app.code}: prefix /${expected[app.code]}`, expected[app.code], app.menuItems[0]?.path?.split("/")[1]);
+  }
+  const dashboard = await prisma.menuItem.findUniqueOrThrow({
+    where: { applicationId_code: { applicationId: seloko.id, code: "dasbor" } },
+    select: { path: true },
+  });
+  check("'dasbor' seloko → /seloko/dashboard", "/seloko/dashboard", dashboard.path);
+
   const nonaktif = await prisma.menuItem.findFirst({
     where: { code: "menu.nonaktif" },
     select: { isActive: true },

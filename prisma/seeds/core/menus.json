@@ -1,5 +1,5 @@
 {
-  "$comment": "Sidebar per aplikasi. 'code' adalah kunci upsert dalam lingkup aplikasi — ubah label sesuka hati, jangan ubah code. 'items' bersarang tanpa batas kedalaman; urutan array menentukan sortOrder. 'permission' diisi kode permission milik aplikasi yang sama (lihat applications.json) — menu hanya tampil bagi pemegang izin itu; absen berarti bebas izin. 'roles' mempersempit ke role tertentu; absen/kosong berarti seluruh role. 'path' relatif digabung dengan baseUrl aplikasi; absen berarti parent grup saja. 'icon' memakai nama ikon lucide.",
+  "$comment": "Sidebar per aplikasi. 'code' adalah kunci upsert dalam lingkup aplikasi — ubah label sesuka hati, jangan ubah code. 'items' bersarang tanpa batas kedalaman; urutan array menentukan sortOrder. 'permission' diisi kode permission milik aplikasi yang sama (lihat applications.json) — menu hanya tampil bagi pemegang izin itu; absen berarti bebas izin. 'roles' mempersempit ke role tertentu; absen/kosong berarti seluruh role. 'path' relatif digabung dengan baseUrl aplikasi dan WAJIB diawali prefix aplikasi (/seloko, /bapenda, /lapak, …), mis. /bapenda/dashboard; absen berarti parent grup saja. 'icon' memakai nama ikon lucide.",
 
   "applications": [
     {
@@ -11,7 +11,7 @@
           "code": "dasbor",
           "label": "Dasbor",
           "icon": "layout-dashboard",
-          "path": "/dasbor"
+          "path": "/seloko/dashboard"
         },
         {
           "code": "pengguna",
@@ -22,21 +22,21 @@
               "code": "pengguna.daftar",
               "label": "Daftar Pengguna",
               "icon": "user",
-              "path": "/pengguna",
+              "path": "/seloko/pengguna",
               "permission": "user:list"
             },
             {
               "code": "pengguna.tambah",
               "label": "Tambah Pengguna",
               "icon": "user-plus",
-              "path": "/pengguna/tambah",
+              "path": "/seloko/pengguna/tambah",
               "permission": "user:create"
             },
             {
               "code": "pengguna.penugasan",
               "label": "Penugasan Role",
               "icon": "user-cog",
-              "path": "/pengguna/penugasan",
+              "path": "/seloko/pengguna/penugasan",
               "permission": "user-app-role:list",
               "roles": ["superadmin", "admin", "operator-pengguna"]
             }
@@ -51,14 +51,14 @@
               "code": "akses.role",
               "label": "Role",
               "icon": "shield-check",
-              "path": "/akses/role",
+              "path": "/seloko/akses/role",
               "permission": "role:list"
             },
             {
               "code": "akses.permission",
               "label": "Permission",
               "icon": "key",
-              "path": "/akses/permission",
+              "path": "/seloko/akses/permission",
               "permission": "permission:list"
             }
           ]
@@ -72,14 +72,14 @@
               "code": "sistem.aplikasi",
               "label": "Aplikasi",
               "icon": "layout-grid",
-              "path": "/sistem/aplikasi",
+              "path": "/seloko/sistem/aplikasi",
               "permission": "application:list"
             },
             {
               "code": "sistem.menu",
               "label": "Menu Sidebar",
               "icon": "list-tree",
-              "path": "/sistem/menu",
+              "path": "/seloko/sistem/menu",
               "permission": "application:update",
               "roles": ["superadmin"]
             },
@@ -87,7 +87,7 @@
               "code": "sistem.audit",
               "label": "Log Audit",
               "icon": "scroll-text",
-              "path": "/sistem/audit",
+              "path": "/seloko/sistem/audit",
               "permission": "audit-log:list"
             }
           ]
@@ -111,7 +111,7 @@
           "code": "dasbor",
           "label": "Dasbor",
           "icon": "layout-dashboard",
-          "path": "/cms/dasbor"
+          "path": "/bapenda/dashboard"
         },
         {
           "code": "konten",
@@ -122,28 +122,28 @@
               "code": "konten.berita",
               "label": "Berita",
               "icon": "newspaper",
-              "path": "/cms/berita",
+              "path": "/bapenda/berita",
               "permission": "news:list"
             },
             {
               "code": "konten.berita.review",
               "label": "Antrian Review",
               "icon": "send",
-              "path": "/cms/berita/review",
+              "path": "/bapenda/berita/review",
               "permission": "news:approve"
             },
             {
               "code": "konten.berita.kategori",
               "label": "Kategori Berita",
               "icon": "tags",
-              "path": "/cms/berita/kategori",
+              "path": "/bapenda/berita/kategori",
               "permission": "news-category:list"
             },
             {
               "code": "konten.halaman",
               "label": "Halaman Profil",
               "icon": "file",
-              "path": "/cms/halaman",
+              "path": "/bapenda/halaman",
               "permission": "page:list"
             }
           ]
@@ -157,14 +157,14 @@
               "code": "media.banner",
               "label": "Banner",
               "icon": "panel-top",
-              "path": "/cms/banner",
+              "path": "/bapenda/banner",
               "permission": "banner:list"
             },
             {
               "code": "media.galeri",
               "label": "Galeri",
               "icon": "images",
-              "path": "/cms/galeri",
+              "path": "/bapenda/galeri",
               "permission": "gallery:list"
             }
           ]
@@ -181,7 +181,7 @@
           "code": "dasbor",
           "label": "Dasbor",
           "icon": "layout-dashboard",
-          "path": "/cms/dasbor"
+          "path": "/lapak/dashboard"
         },
         {
           "code": "mitra",
@@ -192,14 +192,14 @@
               "code": "mitra.merchant",
               "label": "Merchant",
               "icon": "store",
-              "path": "/cms/merchant",
+              "path": "/lapak/merchant",
               "permission": "merchant:list"
             },
             {
               "code": "mitra.verifikasi",
               "label": "Verifikasi Merchant",
               "icon": "badge-check",
-              "path": "/cms/merchant/verifikasi",
+              "path": "/lapak/merchant/verifikasi",
               "permission": "merchant:approve",
               "roles": ["superadmin", "admin", "verifikator"]
             }
@@ -214,14 +214,14 @@
               "code": "katalog.produk",
               "label": "Produk",
               "icon": "package",
-              "path": "/cms/produk",
+              "path": "/lapak/produk",
               "permission": "product:list"
             },
             {
               "code": "katalog.produk.verifikasi",
               "label": "Verifikasi Produk",
               "icon": "badge-check",
-              "path": "/cms/produk/verifikasi",
+              "path": "/lapak/produk/verifikasi",
               "permission": "product:approve",
               "roles": ["superadmin", "admin", "verifikator"]
             },
@@ -229,7 +229,7 @@
               "code": "katalog.kategori",
               "label": "Kategori",
               "icon": "tags",
-              "path": "/cms/kategori",
+              "path": "/lapak/kategori",
               "permission": "category:list"
             }
           ]
@@ -243,14 +243,14 @@
               "code": "transaksi.pesanan",
               "label": "Pesanan",
               "icon": "shopping-cart",
-              "path": "/cms/pesanan",
+              "path": "/lapak/pesanan",
               "permission": "order:list"
             },
             {
               "code": "transaksi.ekspor",
               "label": "Ekspor Laporan",
               "icon": "file-down",
-              "path": "/cms/pesanan/ekspor",
+              "path": "/lapak/pesanan/ekspor",
               "permission": "order:export"
             }
           ]
@@ -259,7 +259,7 @@
           "code": "menu.nonaktif",
           "label": "Menu Uji Nonaktif",
           "icon": "eye-off",
-          "path": "/cms/nonaktif",
+          "path": "/lapak/nonaktif",
           "isActive": false
         }
       ]

@@ -41,6 +41,7 @@ Repositori ini adalah **SELOKO API** — Centralized Core API & Multi-App Engine
     1. Atur di controller/routes domain (validasi tambahan, endpoint tidak dipasang).
     2. Tambah opsi pada scope service shared — dibuat hanya saat diminta.
     3. Fork menjadi modul domain sendiri bila field/alur/aturan sudah jauh berbeda (biasanya disertai tabel sendiri).
+- **Path Menu Sidebar (`prisma/seeds/core/menus.json`):** path internal menu CMS WAJIB diawali prefix aplikasi agar frontend super app dapat merutekan semua aplikasi tanpa bentrok: `/seloko/...`, `/bapenda/...`, `/lapak/...` (mis. `/seloko/dashboard`, `/bapenda/berita`). Aplikasi baru memakai prefix pendeknya sendiri. Pengecualian: tautan eksternal (`isExternal`) dan aplikasi warga non-CMS (mis. `lapak-jambi-app`). Diverifikasi `prisma/smoke/menus.check.ts`.
 - **Public App Config Endpoint:** Setiap aplikasi front-end publik didukung endpoint unauthenticated `GET /api/applications/public-config/:code` yang menyediakan informasi branding, kontak, SEO, dan status fitur tanpa autentikasi.
 - **Transparansi Hak Akses User:** Endpoint list users menyertakan ringkasan jumlah aplikasi per role, dan endpoint detail user memetakan secara eksplisit daftar aplikasi serta role yang dimiliki pengguna.
 
