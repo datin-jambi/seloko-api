@@ -139,6 +139,14 @@ async function seedBulkUsers(
   const target = requireRole(roleIndex, bulk.app, bulk.role, "pegawai massal");
   const passwordHash = await hashPassword(defaultPassword);
 
+  // Role referensi untuk simulasi pegawai multi-aplikasi (lintas OPD / unit kerja)
+  const bapendaEditor = requireRole(roleIndex, "bapenda-profile", "editor", "pegawai multi-app");
+  const bapendaVerifikator = requireRole(roleIndex, "bapenda-profile", "verifikator", "pegawai multi-app");
+  const bapendaViewer = requireRole(roleIndex, "bapenda-profile", "viewer", "pegawai multi-app");
+  const lapakWebVerifikator = requireRole(roleIndex, "lapak-jambi-web", "verifikator", "pegawai multi-app");
+  const lapakWebEditor = requireRole(roleIndex, "lapak-jambi-web", "editor", "pegawai multi-app");
+  const lapakAppViewer = requireRole(roleIndex, "lapak-jambi-app", "viewer", "pegawai multi-app");
+
   for (let i = 1; i <= bulk.count; i++) {
     const first = bulk.firstNames[i % bulk.firstNames.length] ?? "Pegawai";
     const last = bulk.lastNames[i % bulk.lastNames.length] ?? "Jambi";
@@ -164,10 +172,40 @@ async function seedBulkUsers(
       select: { id: true },
     });
 
+    // 1. Role dasar di seloko
     await assignRole(user.id, target, null);
+
+    // 2. Tepat 20 pegawai pertama (pegawai001 s/d pegawai020) memiliki akses ke >1 aplikasi
+    if (i <= 20) {
+      // Akses ke bapenda-profile untuk semua 20 user ini
+      if (i <= 8) {
+        await assignRole(user.id, bapendaEditor, null);
+      } else if (i <= 14) {
+        await assignRole(user.id, bapendaVerifikator, null);
+      } else {
+        await assignRole(user.id, bapendaViewer, null);
+      }
+
+      // Akses tambahan ke lapak-jambi-web untuk 10 user pertama (i <= 10)
+      if (i <= 5) {
+        await assignRole(user.id, lapakWebVerifikator, null);
+      } else if (i <= 10) {
+        await assignRole(user.id, lapakWebEditor, null);
+      }
+
+      // Akses tambahan ke lapak-jambi-app untuk 5 user pertama (i <= 5)
+      if (i <= 5) {
+        await assignRole(user.id, lapakAppViewer, null);
+      }
+
+      // Kasus multi-role dalam 1 aplikasi: pegawai001 & pegawai002 merangkap editor + verifikator di bapenda-profile
+      if (i <= 2) {
+        await assignRole(user.id, bapendaVerifikator, null);
+      }
+    }
   }
 
-  console.log(`✅ ${bulk.count} pegawai massal (${bulk.app}/${bulk.role})`);
+  console.log(`✅ ${bulk.count} pegawai massal (${bulk.app}/${bulk.role}, 20 di antaranya memiliki akses multi-aplikasi)`);
 }
 
 /** Seed seluruh akun uji lalu pegawai massal (bila count > 0). */
