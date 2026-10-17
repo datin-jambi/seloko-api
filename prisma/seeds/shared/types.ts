@@ -213,6 +213,24 @@ export interface NewsFile {
   news: NewsDef[];
 }
 
+// ─── organizations.json ───────────────────────────────────────────────────────
+export type OrganizationTypeDef = "OPD" | "UPTD" | "BIRO" | "LAINNYA";
+
+export interface OrganizationDef {
+  code: string;
+  name: string;
+  shortName?: string;
+  /** Absen = OPD. */
+  type?: OrganizationTypeDef;
+  /** Kode organisasi induk. */
+  parent?: string;
+  isActive?: boolean;
+}
+
+export interface OrganizationsFile {
+  organizations: OrganizationDef[];
+}
+
 // ─── pages.json ───────────────────────────────────────────────────────────────
 export interface PageDef {
   title: string;

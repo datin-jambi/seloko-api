@@ -22,34 +22,34 @@ datasource db {
 /// Aplikasi terdaftar di ekosistem SELOKO — internal maupun publik.
 /// `code` dipakai pada header X-App-Code.
 model Application {
-  id          String   @id @default(uuid(7)) @db.VarChar(36)
-  code        String   @unique @db.VarChar(50) // 'seloko', 'lapak-jambi-web', …
-  name        String   @db.VarChar(100)
-  description String?
+  id             String   @id @default(uuid(7)) @db.VarChar(36)
+  code           String   @unique @db.VarChar(50) // 'seloko', 'lapak-jambi-web', …
+  name           String   @db.VarChar(100)
+  description    String?
   /// Alamat pangkal aplikasi — menu dengan path relatif digabung ke sini.
   /// 'https://lapak.jambiprov.go.id' + '/cms/produk'
-  baseUrl     String?  @map("base_url") @db.VarChar(255)
+  baseUrl        String?  @map("base_url") @db.VarChar(255)
   /// Nama ikon aplikasi di launcher super app (kunci icon set front-end).
-  icon        String?  @db.VarChar(50)
+  icon           String?  @db.VarChar(50)
   /// Siapa yang boleh login: INTERNAL (pegawai, lewat seloko) atau PUBLIC
   /// (warga). Tidak dapat diubah setelah dibuat — akun yang sudah terdaftar
   /// akan terdampar di aplikasi yang tiba-tiba berganti jenis.
-  audience        Audience @default(INTERNAL)
-  tagline         String?  @db.VarChar(150)
-  logoUrl         String?  @map("logo_url") @db.VarChar(255)
-  logoFileId      String?  @map("logo_file_id") @db.VarChar(100)
-  logoDarkUrl     String?  @map("logo_dark_url") @db.VarChar(255)
-  logoDarkFileId  String?  @map("logo_dark_file_id") @db.VarChar(100)
-  faviconUrl      String?  @map("favicon_url") @db.VarChar(255)
-  faviconFileId   String?  @map("favicon_file_id") @db.VarChar(100)
-  ogImageUrl      String?  @map("og_image_url") @db.VarChar(255)
-  ogImageFileId   String?  @map("og_image_file_id") @db.VarChar(100)
+  audience       Audience @default(INTERNAL)
+  tagline        String?  @db.VarChar(150)
+  logoUrl        String?  @map("logo_url") @db.VarChar(255)
+  logoFileId     String?  @map("logo_file_id") @db.VarChar(100)
+  logoDarkUrl    String?  @map("logo_dark_url") @db.VarChar(255)
+  logoDarkFileId String?  @map("logo_dark_file_id") @db.VarChar(100)
+  faviconUrl     String?  @map("favicon_url") @db.VarChar(255)
+  faviconFileId  String?  @map("favicon_file_id") @db.VarChar(100)
+  ogImageUrl     String?  @map("og_image_url") @db.VarChar(255)
+  ogImageFileId  String?  @map("og_image_file_id") @db.VarChar(100)
   /// Konfigurasi tampilan yang hanya dibaca front-end: { contact, seo, features, legal }.
   /// Bentuknya divalidasi Zod di modul applications, bukan di DB.
-  settings        Json     @default("{}")
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  settings       Json     @default("{}")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   permissions       Permission[]
   roles             Role[]
@@ -218,14 +218,14 @@ model User {
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz() // Soft delete
 
-  userAppRoles     UserAppRole[]
-  refreshTokens    RefreshToken[]
-  auditLogs        AuditLog[]
-  articlesAuthored Article[]
+  userAppRoles      UserAppRole[]
+  refreshTokens     RefreshToken[]
+  auditLogs         AuditLog[]
+  articlesAuthored  Article[]
   galleriesAuthored Gallery[]
-  faqsAuthored     Faq[]                @relation("FaqAuthor")
-  faqsUpdated      Faq[]                @relation("FaqUpdatedBy")
-  vehicleTaxChecks VehicleTaxCheckLog[]
+  faqsAuthored      Faq[]                @relation("FaqAuthor")
+  faqsUpdated       Faq[]                @relation("FaqUpdatedBy")
+  vehicleTaxChecks  VehicleTaxCheckLog[]
 
   @@unique([accountType, email], map: "uq_users_account_email")
   @@index([deletedAt], map: "idx_users_deleted_at")
@@ -255,15 +255,75 @@ model UserAppRole {
   /// Penugasan berbatas waktu — null berarti permanen.
   expiresAt     DateTime? @map("expires_at") @db.Timestamptz()
 
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  role        Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user          User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application   Application               @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  role          Role                      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  /// Lingkup OPD penugasan ini. Kosong = seluruh OPD (level Bapenda).
+  organizations UserAppRoleOrganization[]
 
   @@unique([userId, applicationId, roleId], map: "uq_user_app_role")
   @@index([userId], map: "idx_user_app_roles_user")
   @@index([applicationId], map: "idx_user_app_roles_app")
   @@index([userId, applicationId])
   @@map("user_app_roles")
+}
+
+// ─── Organizations (OPD / Unit Kerja) ──────────────────────────────────────────
+/// Master unit kerja pemerintah lintas aplikasi: OPD, UPTD, biro. Dipakai untuk
+/// membatasi data per unit (mis. admin OPD di Lapak hanya melihat OPD-nya).
+/// Hierarki lewat parentId (OPD → UPTD).
+model Organization {
+  id          String           @id @default(uuid(7)) @db.VarChar(36)
+  /// Kode singkat stabil, mis. "BPSDM", "BPKPD". Kunci seeder & URL publik.
+  code        String           @unique @db.VarChar(50)
+  name        String           @db.VarChar(200)
+  /// Nama pendek untuk tampilan, mis. "BPSDM".
+  shortName   String?          @map("short_name") @db.VarChar(100)
+  type        OrganizationType @default(OPD)
+  parentId    String?          @map("parent_id") @db.VarChar(36)
+  description String?
+  address     String?
+  phone       String?          @db.VarChar(30)
+  email       String?          @db.VarChar(100)
+  website     String?          @db.VarChar(255)
+  logoUrl     String?          @map("logo_url") @db.VarChar(500)
+  logoFileId  String?          @map("logo_file_id") @db.VarChar(100)
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt   DateTime?        @map("deleted_at") @db.Timestamptz()
+
+  parent            Organization?             @relation("OrganizationTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children          Organization[]            @relation("OrganizationTree")
+  userAppRoleScopes UserAppRoleOrganization[]
+
+  @@index([parentId])
+  @@index([type, isActive])
+  @@map("organizations")
+}
+
+enum OrganizationType {
+  OPD
+  UPTD
+  BIRO
+  LAINNYA
+
+  @@map("organization_type")
+}
+
+/// Lingkup OPD sebuah penugasan role. Tanpa baris = penugasan berlaku untuk
+/// SELURUH OPD. Satu penugasan boleh mencakup banyak OPD.
+model UserAppRoleOrganization {
+  userAppRoleId  String   @map("user_app_role_id") @db.VarChar(36)
+  organizationId String   @map("organization_id") @db.VarChar(36)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  userAppRole  UserAppRole  @relation(fields: [userAppRoleId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([userAppRoleId, organizationId])
+  @@index([organizationId])
+  @@map("user_app_role_organizations")
 }
 
 // ─── Refresh Tokens ────────────────────────────────────────────────────────────
@@ -404,21 +464,21 @@ model Article {
 
 // ─── Banner Carousel (Universal Content) ──────────────────────────────────────
 model Banner {
-  id            String    @id @default(uuid(7)) @db.VarChar(36)
-  applicationId String    @map("app_id") @db.VarChar(36)
-  title         String    @db.VarChar(150)
-  description   String?
+  id                String    @id @default(uuid(7)) @db.VarChar(36)
+  applicationId     String    @map("app_id") @db.VarChar(36)
+  title             String    @db.VarChar(150)
+  description       String?
   imageUrl          String    @map("image_url")
   imageFileId       String?   @map("image_file_id") @db.VarChar(100)
   mobileImageUrl    String?   @map("mobile_image_url")
   mobileImageFileId String?   @map("mobile_image_file_id") @db.VarChar(100)
   buttonText        String?   @map("button_text") @db.VarChar(50)
-  buttonUrl     String?   @map("button_url") @db.VarChar(255)
-  sortOrder     Int       @default(0) @map("sort_order")
-  isActive      Boolean   @default(true) @map("is_active")
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
-  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz()
+  buttonUrl         String?   @map("button_url") @db.VarChar(255)
+  sortOrder         Int       @default(0) @map("sort_order")
+  isActive          Boolean   @default(true) @map("is_active")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz()
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
@@ -428,19 +488,19 @@ model Banner {
 
 // ─── Galeri Multimedia (Universal Content) ────────────────────────────────────
 model Gallery {
-  id              String        @id @default(uuid(7)) @db.VarChar(36)
-  applicationId   String        @map("app_id") @db.VarChar(36)
-  authorId        String        @map("author_id") @db.VarChar(36)
-  title           String        @db.VarChar(200)
-  slug            String        @db.VarChar(220)
-  description     String?
-  coverImageUrl   String?       @map("cover_image_url")
-  coverImageFileId String?      @map("cover_image_file_id") @db.VarChar(100)
-  status          ContentStatus @default(DRAFT)
-  publishedAt     DateTime?     @map("published_at") @db.Timestamptz()
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
-  deletedAt       DateTime?     @map("deleted_at") @db.Timestamptz()
+  id               String        @id @default(uuid(7)) @db.VarChar(36)
+  applicationId    String        @map("app_id") @db.VarChar(36)
+  authorId         String        @map("author_id") @db.VarChar(36)
+  title            String        @db.VarChar(200)
+  slug             String        @db.VarChar(220)
+  description      String?
+  coverImageUrl    String?       @map("cover_image_url")
+  coverImageFileId String?       @map("cover_image_file_id") @db.VarChar(100)
+  status           ContentStatus @default(DRAFT)
+  publishedAt      DateTime?     @map("published_at") @db.Timestamptz()
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt        DateTime?     @map("deleted_at") @db.Timestamptz()
 
   application Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   author      User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
@@ -565,34 +625,34 @@ model Faq {
 
 // ─── UPTD Samsat & Wilayah (Domain Bapenda Jambi) ──────────────────────────────
 model BapendaUptd {
-  id              String    @id @default(uuid(7)) @db.VarChar(36)
-  code            String    @unique @db.VarChar(50)
-  name            String    @db.VarChar(150)
-  description     String?
-  address         String?
-  phone           String?   @db.VarChar(30)
-  email           String?   @db.VarChar(100)
-  headName        String?   @map("head_name") @db.VarChar(150)
+  id          String  @id @default(uuid(7)) @db.VarChar(36)
+  code        String  @unique @db.VarChar(50)
+  name        String  @db.VarChar(150)
+  description String?
+  address     String?
+  phone       String? @db.VarChar(30)
+  email       String? @db.VarChar(100)
+  headName    String? @map("head_name") @db.VarChar(150)
 
   // Wilayah Administrasi
-  province        String?   @default("Jambi") @db.VarChar(50)
-  city            String?   @db.VarChar(100)
-  district        String?   @db.VarChar(100)
-  subDistrict     String?   @map("sub_district") @db.VarChar(100)
-  postalCode      String?   @map("postal_code") @db.VarChar(10)
+  province    String? @default("Jambi") @db.VarChar(50)
+  city        String? @db.VarChar(100)
+  district    String? @db.VarChar(100)
+  subDistrict String? @map("sub_district") @db.VarChar(100)
+  postalCode  String? @map("postal_code") @db.VarChar(10)
 
   // Geolokasi
-  latitude        Float?
-  longitude       Float?
-  googleMapsUrl   String?   @map("google_maps_url")
+  latitude      Float?
+  longitude     Float?
+  googleMapsUrl String? @map("google_maps_url")
 
   // Visibilitas Publik
-  isActive        Boolean   @default(true) @map("is_active")
-  showOnPublicMap Boolean   @default(false) @map("show_on_public_map")
+  isActive        Boolean @default(true) @map("is_active")
+  showOnPublicMap Boolean @default(false) @map("show_on_public_map")
 
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz()
 
   @@map("bapenda_uptds")
 }

@@ -12,6 +12,7 @@ Sebelum melakukan tugas pengkodean, perbaikan, atau penambahan modul pada reposi
   - Arsitektur Super App BPKPD Provinsi Jambi.
   - Domain 1: Identity & Multi-Tenancy Gateway ([`01-seloko-identity.prd.md`](file:///.agents/prd/01-seloko-identity.prd.md)).
   - Domain 2: Portal Bapenda Profile ([`02-bapenda-profile.prd.md`](file:///.agents/prd/02-bapenda-profile.prd.md)).
+  - Domain 4: Lapak Jambi — E-Marketplace Layanan Aset Daerah ([`04-lapak-jambi.prd.md`](file:///.agents/prd/04-lapak-jambi.prd.md)).
   - Aturan *Living Document*: Wajib update PRD setiap kali ada pembahasan atau perubahan spesifikasi modul baru.
 
 ### B. Aturan Wajib (Rules):
@@ -68,3 +69,17 @@ Sebelum melakukan tugas pengkodean, perbaikan, atau penambahan modul pada reposi
 6. ⏳ **FAQs** (`/api/bapenda/faqs`).
 7. ⏳ **Regulations** (`/api/bapenda/regulations`).
 8. ⏳ **Pengaturan Situs** (via `Application.settings`).
+
+> ⏸️ Bapenda Profile **dijeda** (2026-10-17) — fokus pindah ke Lapak Jambi. Lanjut dari Modul 5 Galeri bila kembali.
+
+---
+
+## 🛒 Roadmap Lapak Jambi (`/api/lapak`, PRD 04)
+> *(Fokus aktif. **Sumber kebenaran progres = pipeline tugas [`.agents/tasks/lapak-jambi.md`](file:///.agents/tasks/lapak-jambi.md)** — baca sebelum mulai, kerjakan satu tugas `🟡` saja, tandai ✅ hanya setelah buktinya lolos, lalu salin status fase ke sini. Aturan pipeline: [`.agents/tasks/README.md`](file:///.agents/tasks/README.md).)*
+
+0. 🟡 **Fondasi core** (`LJ-0.x`) — OPD + lingkup penugasan, API OPD, seed RBAC/menu Lapak, registrasi akun PUBLIC — *sedang dikerjakan*.
+1. ⏳ **Katalog** (`LJ-1.x`) — kategori, produk + tarif/persyaratan/media, alur persetujuan, katalog publik.
+2. ⏳ **Transaksi** (`LJ-2.x`) — ketersediaan, keranjang per OPD, checkout, SKRD, transfer manual, tiket QR.
+3. ⏳ **Monitoring PAD** (`LJ-3.x`) — dashboard, transaksi & ekspor, transparansi publik. *(MVP = Fase 0–3)*
+4. ⏳ **Pasca-MVP** (`LJ-4.x`) — konten OPD, ulasan, komentar, wishlist, target OPD.
+5. ⏳ **Lanjutan** (`LJ-5.x`) — VA/QRIS, gabung web+mobile & auth PUBLIC, mobile.

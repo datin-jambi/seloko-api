@@ -15,7 +15,12 @@ Direktori ini dirancang untuk mengubah AI Agent (maupun developer baru) menjadi 
 ├── prd/                            # Living Product Requirement Documents (PRD) per domain aplikasi
 │   ├── README.md                   # Master PRD Index & arsitektur Super App BPKPD Jambi
 │   ├── 01-seloko-identity.prd.md   # Spesifikasi Core Platform & Multi-Tenancy Identity Gateway
-│   └── 02-bapenda-profile.prd.md   # Spesifikasi Portal Resmi Bapenda & CMS (UPTD, Banner, Artikel, dll)
+│   ├── 02-bapenda-profile.prd.md   # Spesifikasi Portal Resmi Bapenda & CMS (UPTD, Banner, Artikel, dll)
+│   └── 04-lapak-jambi.prd.md       # E-Marketplace Layanan Aset Daerah (retribusi lintas OPD)
+│
+├── tasks/                          # Pipeline tugas per aplikasi (status, dependensi, bukti selesai, log)
+│   ├── README.md                   # Aturan pipeline
+│   └── lapak-jambi.md              # Pipeline Lapak Jambi (LJ-x.y)
 │
 ├── rules/                          # Guidelines & pembatas teknis (selalu aktif / terikat konteks)
 │   ├── seloko-api-general.md       # Arsitektur modular monolith, multi-tenancy X-App-Code, ImageKit lifecycle

@@ -22,7 +22,10 @@ export async function resetTables(): Promise<void> {
   await prisma.bapendaUptd.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.refreshToken.deleteMany();
+  await prisma.userAppRoleOrganization.deleteMany();
   await prisma.userAppRole.deleteMany();
+  await prisma.organization.updateMany({ data: { parentId: null } });
+  await prisma.organization.deleteMany();
   await prisma.menuRole.deleteMany();
   await prisma.menuItem.deleteMany();
   await prisma.rolePermission.deleteMany();

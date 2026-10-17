@@ -1,0 +1,14 @@
+{
+  "$comment": "Master OPD / unit kerja (tabel organizations, core). 'code' = kunci upsert, jangan diubah. Data awal dari infografis proposal Lapak Jambi (pemilik objek Sewa Gedung/Ruangan). 'parent' = code induk (mis. UPTD di bawah OPD).",
+  "organizations": [
+    { "code": "BPKPD", "name": "Badan Pengelolaan Keuangan dan Pendapatan Daerah Provinsi Jambi", "shortName": "BPKPD", "type": "OPD" },
+    { "code": "BPSDM", "name": "Badan Pengembangan Sumber Daya Manusia Provinsi Jambi", "shortName": "BPSDM", "type": "OPD" },
+    { "code": "BADAN-PENGHUBUNG", "name": "Badan Penghubung Provinsi Jambi", "shortName": "Badan Penghubung", "type": "OPD" },
+    { "code": "DISBUDPAR", "name": "Dinas Kebudayaan dan Pariwisata Provinsi Jambi", "shortName": "Disbudpar", "type": "OPD" },
+    { "code": "DINKES", "name": "Dinas Kesehatan Provinsi Jambi", "shortName": "Dinkes", "type": "OPD" },
+    { "code": "BAPELKES", "name": "Balai Pelatihan Kesehatan Provinsi Jambi", "shortName": "Bapelkes", "type": "UPTD", "parent": "DINKES" },
+    { "code": "DISKOP", "name": "Dinas Koperasi dan UKM Provinsi Jambi", "shortName": "Dinas Koperasi", "type": "OPD" },
+    { "code": "DINSOS", "name": "Dinas Sosial Provinsi Jambi", "shortName": "Dinsos", "type": "OPD" },
+    { "code": "DISHUT", "name": "Dinas Kehutanan Provinsi Jambi", "shortName": "Dinas Kehutanan", "type": "OPD" }
+  ]
+}

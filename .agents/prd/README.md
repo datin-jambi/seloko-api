@@ -18,11 +18,11 @@ SELOKO API dibangun bukan hanya untuk satu website, melainkan sebagai **Pondasi 
              │                               │                               │
              ▼                               ▼                               ▼
     [bapenda-profile]               [lapak-jambi-web]               [simpad-pajak-api]
- (Portal Resmi Bapenda)         (Marketplace UMKM Daerah)        (Sistem Pendapatan Pajak)
- - UPTD Samsat & Peta           - Katalog Lapak & Produk         - Pajak Kendaraan (PKB)
- - Banner Promosi               - Verifikasi Pedagang            - Pajak Air & BBNKB
- - Artikel Berita               - Transaksi Pembayaran           - Simulasi & Retribusi
- - Regulasi & FAQ               - Tracking Pengiriman            - Rekonsiliasi Bank
+ (Portal Resmi Bapenda)         (Marketplace Aset Daerah)          (Sistem Pendapatan Pajak)
+ - UPTD Samsat & Peta           - Katalog Layanan Aset OPD       - Pajak Kendaraan (PKB)
+ - Banner Promosi               - Pesanan & Jadwal Sewa          - Pajak Air & BBNKB
+ - Artikel Berita               - SKRD & Pembayaran              - Simulasi & Retribusi
+ - Regulasi & FAQ               - Monitoring Retribusi PAD       - Rekonsiliasi Bank
 ```
 
 ---
@@ -36,7 +36,7 @@ PRD dipisahkan secara modular per domain/aplikasi agar mudah di-scaling saat sis
 | **1** | [**`01-seloko-identity.prd.md`**](./01-seloko-identity.prd.md) | `seloko` | Core Platform: Multi-Tenancy, Auth JWT & Token Reuse Detection, Dynamic RBAC, User Management (Internal vs Public), Sidebar Menus, Centralized ImageKit Storage. | ✅ **Stabil (Production Ready)** |
 | **2** | [**`02-bapenda-profile.prd.md`**](./02-bapenda-profile.prd.md) | `bapenda-profile` | Portal Publik & CMS (rebuild dari `Bapenda-Jambi-Profile`): UPTD Samsat, Banners, Berita (konten universal `type=NEWS`), Halaman Profil, Galeri, FAQ, Regulasi. | 🟡 **Fase Pengerjaan (Modul 5: Galeri)** |
 | **3** | *`03-simpad-pajak.prd.md`* *(Upcoming)* | `simpad` | Layanan Perpajakan: Cek Pajak Kendaraan, E-Samsat Gateway, Simulasi Pajak, Rekonsiliasi Bank Jambi. | ⏳ *Rencana Masa Depan* |
-| **4** | *`04-lapak-jambi.prd.md`* *(Upcoming)* | `lapak-jambi` | E-Commerce Daerah: Produk UMKM, Pedagang, Pembayaran Digital, Integrasi Pengiriman. | ⏳ *Rencana Masa Depan* |
+| **4** | [**`04-lapak-jambi.prd.md`**](./04-lapak-jambi.prd.md) | `lapak-jambi` | E-Marketplace Layanan Aset Daerah (retribusi): 8 kategori dikelola Bapenda, produk per OPD, pesanan & jadwal, SKRD saat checkout, transfer manual (siap VA/QRIS), konten OPD, monitoring PAD. | 🟡 **Fase Perencanaan (Fase 0: Fondasi core)** |
 
 ---
 
