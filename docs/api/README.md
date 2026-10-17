@@ -145,13 +145,30 @@ Berlaku untuk developer dan AI Agent. Bagian ini yang membuat dokumentasi tidak 
 
 ## Pemeriksa Otomatis
 
-`docs/api/check.ts` dijalankan oleh `npm test` dan memastikan:
+`docs/api/check.ts` dijalankan oleh `npm test` dan memastikan **5 hal**:
 
-1. Angka **Jumlah endpoint** di setiap berkas modul sama dengan jumlah rute nyata di
-   `<modul>.routes.ts`.
-2. Setiap `METHOD` + `path` yang ada di kode muncul di tabel ringkasan dokumen.
-3. Totalnya cocok dengan `Total keseluruhan: N endpoint` di indeks ini.
-4. Setiap berkas modul tertaut dari `docs/api/<app>/README.md`.
+| # | Yang diperiksa | Menangkap kasus |
+|:--:|---|---|
+| 1 | Angka **Jumlah endpoint** di berkas modul = jumlah rute nyata di `<modul>.routes.ts` | Rute ditambah/dihapus tapi header tidak diperbarui |
+| 2 | Setiap `METHOD` + `path` di kode muncul di tabel ringkasan dokumen | Endpoint benar-benar tidak didokumentasikan |
+| 3 | Setiap **field request** (dari `querystring`/`body`/`params` di Zod) muncul sebagai nama ber-backtick di dokumen | Field baru/terhapus tidak tercatat |
+| 4 | Total cocok dengan `Total keseluruhan: N endpoint` di indeks | Indeks basi |
+| 5 | Tiap berkas modul tertaut dari `docs/api/<app>/README.md` | Berkas yatim |
+
+Pemeriksaan #3 membaca literal `z.object({...})` di `*.schema.ts`, mengikuti pewarisan
+`.partial()` / `.omit()` / `.extend()` / `.pick()`, lalu mencocokkan tiap nama field ke dokumen.
+Saat ini **331 field request** diperiksa.
+
+Contoh keluaran saat gagal:
+
+```text
+AssertionError: core/users.md: field "accountType" (dari ListUsersQuerySchema) tidak ada di dokumen
+AssertionError: core/users.md: klaim 10 endpoint, kode punya 9
+```
+
+**Yang TIDAK diperiksa otomatis** (butuh review manusia): nilai batas di dalam kolom *Aturan*
+(mis. `limit` maks 100 vs 50), tipe data, dan bentuk respons. Pemeriksa hanya menjaga
+**keberadaan** field, bukan isi selnya.
 
 Kalau Anda menambah rute lalu lupa memperbarui dokumen, `npm test` **gagal** dengan pesan yang
 menyebut modul dan rute mana. Jalankan manual kapan saja:

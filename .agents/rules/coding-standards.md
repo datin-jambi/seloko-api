@@ -34,7 +34,8 @@ Setiap modul di `src/modules/<domain>/<feature>/` atau `src/modules/shared/<grou
 
 4. **`*.routes.ts` (Routing & Guards):**
    - Mendaftarkan rute Fastify menggunakan type provider Zod (`fastify.withTypeProvider<ZodTypeProvider>()`).
-   - Menyertakan dokumentasi Swagger/OpenAPI (`description`, `tags`, `schema`).
+   - Menyertakan metadata OpenAPI (`description`, `tags`, `schema`) — wajib, karena itu satu-satunya sumber bentuk respons.
+   - **Wajib langsung memperbarui `docs/api/<app>/<modul>.md`** pada perubahan yang sama (rute baru/berubah/hapus), plus entri `CHANGELOG.md`. Lihat `docs/api/README.md` §Aturan Wajib. `npm test` akan gagal bila jumlah/rute di dokumen tidak cocok dengan kode (`docs/api/check.ts`).
    - Menetapkan guard wajib:
      - Autentikasi: `preHandler: [fastify.authenticate]`
      - RBAC: `fastify.requirePermission("<entity>:<action>", { app: APP_CODES.<APP> })`

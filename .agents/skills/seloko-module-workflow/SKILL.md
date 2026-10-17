@@ -13,6 +13,7 @@ Gunakan SOP ini sebagai panduan lengkap saat mengimplementasikan fitur atau modu
 - [ ] Tentukan domain aplikasi target (misal: `bapenda-profile`, `seloko`, atau `lapak-jambi-web`).
 - [ ] Apakah modul membutuhkan media gambar/dokumen? *(Jika ya, ikuti integrasi Storage ImageKit)*.
 - [ ] Apakah modul membutuhkan slug unik? *(Jika ya, slug harus unik per `[applicationId, slug]`)*.
+- [ ] Sudah siapkan `docs/api/<app>/<modul>.md`? *(Wajib — Tahap 5, tidak boleh ditunda.)*
 
 ---
 
@@ -157,7 +158,30 @@ Untuk modul baru, buat folder:
 
 ---
 
-## Tahap 5: Verifikasi & Smoke Testing
+## Tahap 5: Dokumentasi API (wajib, sebelum verifikasi)
+
+Setiap modul baru atau perubahan rute **wajib** didokumentasikan di repo — bukan hanya di Apidog.
+
+1. **Modul baru** → buat `docs/api/<app>/<modul>.md` mengikuti format baku di
+   [`docs/api/README.md`](../../../docs/api/README.md) §Format baku:
+   ringkasan (aplikasi, prefix, sumber kode, **jumlah endpoint**) → tabel ringkasan endpoint →
+   detail per endpoint dengan tabel **Path Parameter**, **Query Parameter**, **Request Body**
+   (kolom Wajib `✓`/`—`, Tipe, Aturan, Default, Nullable) → contoh request & response nyata →
+   daftar **Error**.
+2. **Daftarkan** berkas itu di `docs/api/<app>/README.md` dan di tabel indeks `docs/api/README.md`
+   (termasuk angka totalnya).
+3. **Endpoint berubah** → perbarui tabel parameter, contoh, dan error-nya. Tambahkan entri di
+   [`docs/api/CHANGELOG.md`](../../../docs/api/CHANGELOG.md) (Ditambah / Diubah / Error baru /
+   **breaking** / dampak ke klien).
+4. **Endpoint dihapus** → pindahkan ke bagian *Deprecated* dengan tanggal & penggantinya, lalu
+   catat di CHANGELOG. Jangan hapus begitu saja.
+5. **Sumber isi dokumen = Zod schema**, bukan ingatan. Buka `*.schema.ts`, salin batas yang
+   sebenarnya (panjang, regex, enum, default).
+6. Pastikan `npx tsx docs/api/check.ts` lolos — pemeriksa ini juga jalan di `npm test`.
+
+---
+
+## Tahap 6: Verifikasi & Smoke Testing
 
 1. **Typecheck Bebas Error:**
    ```bash
@@ -176,7 +200,13 @@ Untuk modul baru, buat folder:
    ```
    Pastikan seluruh skenario lolos (`✓`).
 
-4. **Otomatis Perbarui Roadmap di `AGENTS.md` (Langkah Penutup Wajib):**
+4. **Dokumentasi API Sudah Diperbarui (cek ulang):**
+   ```bash
+   npx tsx docs/api/check.ts
+   ```
+   Harus lolos. Bila gagal, pesannya menyebut modul & rute mana yang belum terdokumentasi.
+
+5. **Otomatis Perbarui Roadmap di `AGENTS.md` (Langkah Penutup Wajib):**
    - Setelah implementasi dan smoke test lolos, AI Agent **wajib otomatis memperbarui** [AGENTS.md](file:///c:/Users/ASUS/Documents/BPKPD/Code/seloko-api/AGENTS.md).
    - Ubah status modul yang baru selesai dari `⏳` menjadi `✅`.
    - Tandai modul berikutnya dengan label `Target pengerjaan berikutnya`.
