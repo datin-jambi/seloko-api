@@ -56,6 +56,7 @@ Authorization: Bearer <token>
 | `email` | string | — |
 | `fullName` | string | — |
 | `phoneNumber` | string \| null | — |
+| `nik` | string \| null | **Termasking** `••••••••••••1234` — nilai penuh tidak pernah dikirim |
 | `avatarUrl` | string \| null | ImageKit |
 | `avatarFileId` | string \| null | Untuk hapus berkas lama |
 | `accountType` | enum | `INTERNAL` \| `PUBLIC` |
@@ -204,6 +205,7 @@ Minimal **satu** field harus dikirim (`400` bila kosong).
 | `avatarUrl` | — | string \| null | URL valid | ✓ | — |
 | `avatarFileId` | — | string \| null | ≤100 | ✓ | Ganti = berkas lama dihapus di ImageKit |
 | `nip` | — | string \| null | ≤30, unik | ✓ | — |
+| `nik` | — | string \| null | tepat 16 digit angka, unik | ✓ | PII; dikirim termasking saat dibaca |
 | `isSuperAdmin` | — | boolean | — | — | — |
 
 > `username` dan `email` **tidak** bisa diubah lewat endpoint ini.

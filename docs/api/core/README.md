@@ -6,7 +6,7 @@ publik lintas aplikasi (Applications public-config, Organizations public).
 
 | Modul | Berkas | Endpoint | Prefix | Sumber kode |
 |---|---|:---:|---|---|
-| Auth | [auth.md](./auth.md) | 5 | `/api/auth` | `src/modules/core/auth/` |
+| Auth | [auth.md](./auth.md) | 6 | `/api/auth` | `src/modules/core/auth/` |
 | Users | [users.md](./users.md) | 9 | `/api/users` | `src/modules/core/users/` |
 | Applications | [applications.md](./applications.md) | 8 | `/api/applications` | `src/modules/core/applications/` |
 | Permissions | [permissions.md](./permissions.md) | 7 | `/api/permissions` | `src/modules/core/permissions/` |
@@ -15,7 +15,7 @@ publik lintas aplikasi (Applications public-config, Organizations public).
 | Organizations | [organizations.md](./organizations.md) | 8 | `/api/organizations` | `src/modules/core/organizations/` |
 | Storage | [storage.md](./storage.md) | 3 | `/api/storage` | `src/modules/core/storage/` |
 
-**Total: 56 endpoint.**
+**Total: 57 endpoint.**
 
 ## Peta izin aplikasi `seloko`
 

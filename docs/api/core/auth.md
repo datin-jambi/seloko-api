@@ -1,6 +1,6 @@
 # Auth
 
-- **Aplikasi:** `seloko` · **Prefix:** `/api/auth` · **Jumlah endpoint:** 5
+- **Aplikasi:** `seloko` · **Prefix:** `/api/auth` · **Jumlah endpoint:** 6
 - **Sumber kode:** `src/modules/core/auth/auth.routes.ts`
 
 ## Ringkasan Endpoint
@@ -12,6 +12,7 @@
 | 3 | `POST` | `/logout` | `authenticate` | Akhiri sesi ini |
 | 4 | `POST` | `/logout-all` | `authenticate` | Akhiri semua sesi |
 | 5 | `GET` | `/me` | `authenticate` | Profil + role & permission aktif |
+| 6 | `POST` | `/register` | rate limit | Pendaftaran mandiri akun **warga** (hanya aplikasi publik) |
 
 ---
 
@@ -191,6 +192,74 @@ Tidak ada. Aplikasi target ditentukan oleh header `X-App-Code`.
 
 **Catatan penting:** hasil `roles`/`permissions` **berbeda per header**. Pegawai yang mengelola
 Lapak cukup mengubah `X-App-Code: lapak-jambi-web` untuk melihat izinnya di sana.
+
+---
+
+## 6. POST /api/auth/register
+
+**Akses:** publik + rate limit (setara login). **Hanya** untuk aplikasi ber-audience `PUBLIC`.
+
+### Request Body
+
+| Field | Wajib | Tipe | Aturan | Keterangan |
+|---|:--:|---|---|---|
+| `email` | ✓ | string | format email, ≤100 | Unik di antara akun `PUBLIC` |
+| `password` | ✓ | string | 8–100, ≥1 huruf besar, ≥1 angka | Di-hash Argon2id |
+| `passwordConfirm` | ✓ | string | harus sama dengan `password` | — |
+| `fullName` | ✓ | string | 2–150 | — |
+| `phoneNumber` | — | string | ≤20 | — |
+| `nik` | — | string | tepat 16 digit angka, unik bila diisi | Opsional; PII |
+
+`roleName` / `role` **tidak** ada di schema — bila dikirim, diabaikan. Role ditetapkan server.
+
+```json
+{
+  "email": "warga@contoh.id",
+  "password": "RahasiaWarga2026",
+  "passwordConfirm": "RahasiaWarga2026",
+  "fullName": "Warga Baru",
+  "phoneNumber": "0812-3456-7890",
+  "nik": "1501010101900001"
+}
+```
+
+### Aturan Bisnis
+
+1. Aplikasi harus `audience: PUBLIC` dan aktif. Di aplikasi `INTERNAL` (`seloko`) → `403`.
+2. Role yang diberikan: `warga` bila ada, jika tidak role `PUBLIC` aktif pertama pada aplikasi itu.
+   Tanpa role PUBLIC sama sekali → `400` (salah konfigurasi, bukan salah pengguna).
+3. `emailVerifiedAt` dibiarkan `null` — verifikasi email/OTP masuk backlog `LJ-5.5`. Akun bisa
+   langsung dipakai sampai itu dikerjakan.
+4. Pesan konflik sengaja umum ("Email atau NIK sudah terdaftar") agar tidak membocorkan NIK
+   orang lain ke penebak.
+
+### Response 201
+
+| Field | Tipe | Keterangan |
+|---|---|---|
+| `id` | string | UUID v7 |
+| `email` | string | — |
+| `fullName` | string | — |
+| `accountType` | enum | Selalu `PUBLIC` |
+| `emailVerifiedAt` | string \| null | `null` sampai verifikasi dikerjakan |
+| `roleName` | string | Role yang diberikan server, mis. `warga` |
+
+```json
+{
+  "success": true,
+  "message": "Pendaftaran berhasil sebagai warga. Silakan masuk.",
+  "data": {
+    "id": "01a2...", "email": "warga@contoh.id", "fullName": "Warga Baru",
+    "accountType": "PUBLIC", "emailVerifiedAt": null, "roleName": "warga"
+  }
+}
+```
+
+**Error:** `400` validasi / konfirmasi password beda / aplikasi tanpa role PUBLIC ·
+`403` aplikasi INTERNAL · `409` email atau NIK sudah terdaftar · `429` rate limit.
+
+**Catatan:** respons **tidak** memuat NIK. NIK hanya bisa dibaca lewat CMS dalam bentuk
+termasking (lihat [users.md](./users.md)).
 
 ---
 

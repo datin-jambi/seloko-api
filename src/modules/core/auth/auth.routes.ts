@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import {
   LoginBodySchema,
+  RegisterBodySchema,
+  RegisterResponseSchema,
   LoginResponseSchema,
   RefreshResponseSchema,
   LogoutResponseSchema,
@@ -10,6 +12,7 @@ import {
 } from "./auth.schema.js";
 import {
   handleLogin,
+  handleRegister,
   handleRefresh,
   handleLogout,
   handleLogoutAll,
@@ -35,6 +38,20 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       rateLimit: RATE_LIMIT.LOGIN,
     },
   }, handleLogin);
+
+  // POST /auth/register — hanya aplikasi ber-audience PUBLIC
+  app.post("/register", {
+    schema: {
+      description: "Pendaftaran mandiri akun warga (PUBLIC) pada aplikasi publik; role ditetapkan server",
+      tags: ["auth"],
+      body: RegisterBodySchema,
+      response: { 201: RegisterResponseSchema },
+    },
+    config: {
+      // Setara login: endpoint terbuka yang membuat baris DB, jadi ikut dibatasi.
+      rateLimit: RATE_LIMIT.LOGIN,
+    },
+  }, handleRegister);
 
   // POST /auth/refresh
   app.post("/refresh", {

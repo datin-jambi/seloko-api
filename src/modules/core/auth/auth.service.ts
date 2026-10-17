@@ -13,9 +13,14 @@ import {
   UnauthorizedError,
   NotFoundError,
   ForbiddenError,
+  BadRequestError,
+  ConflictError,
 } from "~/common/errors/index.js";
 import type { JwtPayload } from "~/common/types/index.js";
 import type { FastifyInstance } from "fastify";
+import { publishAuditEvent } from "~/workers/producers/audit.producer.js";
+import { ROUTING_KEYS } from "~/workers/queue-names/index.js";
+import type { RegisterBody } from "./auth.schema.js";
 
 // ─── Token Helpers ────────────────────────────────────────────────────────────
 function hashToken(rawToken: string): string {
@@ -107,6 +112,136 @@ function buildAccessPayload(
 }
 
 // ─── Service Methods ──────────────────────────────────────────────────────────
+
+/**
+ * Daftarkan akun warga (PUBLIC) pada aplikasi publik.
+ *
+ * Aturan:
+ * - Hanya aplikasi ber-audience PUBLIC. Di aplikasi INTERNAL endpoint ini
+ *   menolak — akun pegawai hanya boleh lahir dari operator `/api/users`.
+ * - Role yang diberikan ditetapkan SERVER (`warga`, atau role PUBLIC pertama
+ *   yang aktif bila `warga` tidak ada), tidak pernah dari body.
+ * - Email unik di antara akun PUBLIC; NIK opsional dan unik bila diisi.
+ * - `emailVerifiedAt` dibiarkan null: verifikasi email/OTP masuk backlog
+ *   LJ-5.5, jadi akun bisa langsung dipakai sampai itu dikerjakan.
+ */
+export async function registerPublicUser(
+  fastify: FastifyInstance,
+  data: RegisterBody,
+  appCode: string,
+  ipAddress?: string,
+  userAgent?: string,
+): Promise<{
+  id: string;
+  email: string;
+  fullName: string;
+  accountType: Audience;
+  emailVerifiedAt: string | null;
+  roleName: string;
+}> {
+  const app = await prisma.application.findUnique({
+    where: { code: appCode },
+    select: { id: true, audience: true, isActive: true },
+  });
+  if (!app || !app.isActive) {
+    throw new NotFoundError(`Aplikasi "${appCode}"`);
+  }
+  if (app.audience !== "PUBLIC") {
+    throw new ForbiddenError(
+      `Pendaftaran mandiri hanya tersedia di aplikasi publik, bukan "${appCode}"`,
+    );
+  }
+
+  // Role default: `warga` bila ada, kalau tidak role PUBLIC aktif pertama.
+  const role =
+    (await prisma.role.findFirst({
+      where: { applicationId: app.id, name: "warga", audience: "PUBLIC", isActive: true },
+      select: { id: true, name: true },
+    })) ??
+    (await prisma.role.findFirst({
+      where: { applicationId: app.id, audience: "PUBLIC", isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }));
+  if (!role) {
+    // Salah konfigurasi, bukan salah pengguna: tanpa role, akun baru tidak bisa
+    // login sama sekali (assertUserCanAccessApp menolak penugasan kosong).
+    throw new BadRequestError(
+      `Aplikasi "${appCode}" belum memiliki role PUBLIC aktif — hubungi administrator`,
+    );
+  }
+
+  const email = data.email.toLowerCase();
+  const nik = data.nik ?? null;
+
+  // Pesan konflik sengaja umum: membedakan "email terpakai" dan "NIK terpakai"
+  // membocorkan data pribadi ke penebak.
+  const existing = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { accountType: "PUBLIC", email },
+        ...(nik ? [{ nik }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+  if (existing) {
+    throw new ConflictError("Email atau NIK sudah terdaftar");
+  }
+
+  const passwordHash = await argon2.hash(data.password, {
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 4,
+  });
+
+  const created = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        accountType: "PUBLIC",
+        email,
+        fullName: data.fullName,
+        phoneNumber: data.phoneNumber ?? null,
+        nik,
+        passwordHash,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        accountType: true,
+        emailVerifiedAt: true,
+      },
+    });
+
+    await tx.userAppRole.create({
+      data: { userId: user.id, applicationId: app.id, roleId: role.id },
+    });
+
+    return user;
+  });
+
+  void publishAuditEvent(ROUTING_KEYS.AUDIT_USER_LOGIN, {
+    userId: created.id,
+    appCode,
+    action: "user.register",
+    entityType: "user",
+    entityId: created.id,
+    ipAddress,
+    userAgent,
+  });
+
+  return {
+    id: created.id,
+    email: created.email,
+    fullName: created.fullName,
+    accountType: created.accountType,
+    emailVerifiedAt: created.emailVerifiedAt?.toISOString() ?? null,
+    roleName: role.name,
+  };
+}
 export interface LoginResult {
   accessToken: string;
   refreshToken: string;

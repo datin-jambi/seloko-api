@@ -48,7 +48,7 @@ ikhtisar + satu berkas per modul.
 
 | Modul | Berkas | Endpoint | Akses |
 |---|---|:---:|---|
-| Auth | [core/auth.md](./core/auth.md) | 5 | publik + bearer |
+| Auth | [core/auth.md](./core/auth.md) | 6 | publik + bearer |
 | Users | [core/users.md](./core/users.md) | 9 | `user:*`, `user-app-role:*` |
 | Applications | [core/applications.md](./core/applications.md) | 8 | publik + `application:*` |
 | Permissions | [core/permissions.md](./core/permissions.md) | 7 | `permission:*` |
@@ -57,7 +57,7 @@ ikhtisar + satu berkas per modul.
 | Organizations | [core/organizations.md](./core/organizations.md) | 8 | publik + `organization:*` |
 | Storage | [core/storage.md](./core/storage.md) | 3 | `authenticate` |
 
-**Total Core: 56 endpoint.**
+**Total Core: 57 endpoint.**
 
 ### Bapenda — aplikasi `bapenda-profile`
 
@@ -70,7 +70,7 @@ ikhtisar + satu berkas per modul.
 
 **Total Bapenda: 39 endpoint.**
 
-**Total keseluruhan: 95 endpoint.**
+**Total keseluruhan: 96 endpoint.**
 
 ---
 

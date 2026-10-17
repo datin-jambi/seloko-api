@@ -113,6 +113,7 @@ const USER_LIST_SELECT = {
   email: true,
   fullName: true,
   phoneNumber: true,
+  nik: true,
   avatarUrl: true,
   avatarFileId: true,
   accountType: true,
@@ -144,6 +145,7 @@ function formatUser(user: {
   email: string;
   fullName: string;
   phoneNumber: string | null;
+  nik: string | null;
   avatarUrl: string | null;
   avatarFileId: string | null;
   accountType: "INTERNAL" | "PUBLIC";
@@ -162,6 +164,9 @@ function formatUser(user: {
     email: user.email,
     fullName: user.fullName,
     phoneNumber: user.phoneNumber,
+    // NIK adalah PII: hanya 4 digit terakhir yang ditampilkan. Nilai penuh
+    // tidak pernah keluar lewat API daftar/detail — lihat security-guidelines.
+    nik: user.nik ? `••••••••••••${user.nik.slice(-4)}` : null,
     avatarUrl: user.avatarUrl,
     avatarFileId: user.avatarFileId,
     accountType: user.accountType,
@@ -429,6 +434,7 @@ export async function updateUser(id: string, data: UpdateUserBody) {
       ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
       ...(data.avatarFileId !== undefined && { avatarFileId: data.avatarFileId }),
       ...(data.nip !== undefined && { nip: data.nip }),
+      ...(data.nik !== undefined && { nik: data.nik }),
       ...(data.isSuperAdmin !== undefined && { isSuperAdmin: data.isSuperAdmin }),
     },
     select: {

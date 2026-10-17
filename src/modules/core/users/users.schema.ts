@@ -52,6 +52,8 @@ const UserShape = z.object({
   email: z.string().email(),
   fullName: z.string(),
   phoneNumber: z.string().nullable(),
+  /** Selalu termasking (4 digit terakhir). Nilai penuh tidak pernah dikirim. */
+  nik: z.string().nullable().describe("NIK termasking, mis. ••••••••••••1234"),
   avatarUrl: z.string().nullable(),
   avatarFileId: z.string().nullable(),
   accountType: z.enum(["INTERNAL", "PUBLIC"]),
@@ -160,6 +162,12 @@ export const UpdateUserBodySchema = z
     avatarUrl: z.string().url("Format URL avatar tidak valid").nullable().optional(),
     avatarFileId: z.string().max(100).nullable().optional(),
     nip: z.string().max(30).nullable().optional(),
+    nik: z
+      .string()
+      .regex(/^\d{16}$/, "NIK harus 16 digit angka")
+      .nullable()
+      .optional()
+      .describe("NIK opsional; null mengosongkan"),
     isSuperAdmin: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {

@@ -1,6 +1,14 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import type { LoginBody } from "./auth.schema.js";
-import { loginUser, refreshAccessToken, logoutUser, logoutAllSessions, getMe, parseExpiresIn } from "./auth.service.js";
+import type { LoginBody, RegisterBody } from "./auth.schema.js";
+import {
+  loginUser,
+  registerPublicUser,
+  refreshAccessToken,
+  logoutUser,
+  logoutAllSessions,
+  getMe,
+  parseExpiresIn,
+} from "./auth.service.js";
 import { ok, accepted } from "~/common/types/index.js";
 import { COOKIE_NAMES } from "~/common/constants/index.js";
 import { UnauthorizedError } from "~/common/errors/index.js";
@@ -63,6 +71,23 @@ export async function handleLogin(
       "Login successful",
     ),
   );
+}
+
+// ─── Register (akun warga) ────────────────────────────────────────────────────
+export async function handleRegister(
+  request: FastifyRequest<{ Body: RegisterBody }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const user = await registerPublicUser(
+    request.server,
+    request.body,
+    request.appCode,
+    request.ip,
+    request.headers["user-agent"],
+  );
+  void reply
+    .status(201)
+    .send(ok(user, `Pendaftaran berhasil sebagai ${user.roleName}. Silakan masuk.`));
 }
 
 // ─── Refresh ──────────────────────────────────────────────────────────────────

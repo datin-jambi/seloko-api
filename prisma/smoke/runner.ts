@@ -17,6 +17,7 @@
  *   npm run db:smoke -- organizations → Hanya uji master OPD (core)
  *   npm run db:smoke -- users-org    → Hanya uji penugasan role berlingkup OPD
  *   npm run db:smoke -- lapak-rbac   → Hanya uji RBAC & lingkup OPD Lapak Jambi
+ *   npm run db:smoke -- register     → Hanya uji registrasi akun warga (PUBLIC)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -859,6 +860,109 @@ async function runLapakRbacSuite() {
   assert("admin OPD TIDAK punya product:publish", !minePerms.includes("product:publish"));
 }
 
+// ─── Test Suite: Registrasi akun warga (PUBLIC) ───────────────────────────────
+async function runRegisterSuite() {
+  console.log("\n\x1b[36m▶ [Suite 12: Auth - Registrasi Akun Warga]\x1b[0m");
+  const LAPAK = "lapak-jambi-web";
+  const email = "warga.baru@contoh.id";
+  const nik = "1501010101900001";
+
+  // Bersihkan sisa run sebelumnya agar email/NIK bebas dipakai.
+  await prisma.userAppRole.deleteMany({ where: { user: { accountType: "PUBLIC", email } } });
+  await prisma.user.deleteMany({ where: { accountType: "PUBLIC", email } });
+
+  const body = {
+    email,
+    password: "RahasiaWarga2026",
+    fullName: "Warga Baru Uji",
+    phoneNumber: "0812-3456-7890",
+    nik,
+    passwordConfirm: "RahasiaWarga2026",
+  };
+
+  // 1. Bahagia: daftar di aplikasi publik.
+  const reg = await request("/auth/register", { method: "POST", appCode: LAPAK, body });
+  assert("Registrasi akun warga (201)", reg.status === 201, reg.status, 201);
+  assert("Akun bertipe PUBLIC", reg.data?.data?.accountType === "PUBLIC", reg.data?.data?.accountType);
+  assert("Role otomatis 'warga' (bukan dari body)", reg.data?.data?.roleName === "warga", reg.data?.data?.roleName);
+  assert("emailVerifiedAt null (verifikasi belum dikerjakan)", reg.data?.data?.emailVerifiedAt === null);
+  assert("Respons tidak membocorkan NIK", !JSON.stringify(reg.data ?? {}).includes(nik));
+
+  // 2. Akun yang baru daftar langsung bisa login & punya izin warga.
+  const token = await login(email, body.password, LAPAK);
+  assert("Akun baru bisa login ke Lapak", Boolean(token));
+  const me = await request("/auth/me", { token: token || undefined, appCode: LAPAK });
+  assert("Roles terbaca 'warga'", (me.data?.data?.roles ?? []).includes("warga"), me.data?.data?.roles);
+  assert("Izin warga terbatas pada order/payment/review",
+    (me.data?.data?.permissions ?? []).length > 0 &&
+    (me.data?.data?.permissions ?? []).every((p: string) => /^(order|payment|review):/.test(p)),
+    me.data?.data?.permissions);
+
+  // 3. Tidak bisa menaikkan diri sendiri: roleName di body diabaikan.
+  const escalateEmail = "warga.escalate@contoh.id";
+  await prisma.userAppRole.deleteMany({ where: { user: { accountType: "PUBLIC", email: escalateEmail } } });
+  await prisma.user.deleteMany({ where: { accountType: "PUBLIC", email: escalateEmail } });
+  const escalate = await request("/auth/register", {
+    method: "POST",
+    appCode: LAPAK,
+    body: { ...body, email: escalateEmail, nik: undefined, roleName: "admin-opd", role: "admin-opd" },
+  });
+  assert("Percobaan menyisipkan roleName diabaikan (tetap 201)", escalate.status === 201, escalate.status, 201);
+  assert("Role tetap 'warga', bukan admin-opd", escalate.data?.data?.roleName === "warga", escalate.data?.data?.roleName);
+
+  // 4. Ditolak di aplikasi INTERNAL.
+  const internal = await request("/auth/register", {
+    method: "POST",
+    appCode: "seloko",
+    body: { ...body, email: "warga.internal@contoh.id", nik: undefined },
+  });
+  assert("Registrasi di aplikasi INTERNAL ditolak (403)", internal.status === 403, internal.status, 403);
+
+  // 5. Duplikat & validasi.
+  const dup = await request("/auth/register", { method: "POST", appCode: LAPAK, body });
+  assert("Email yang sudah terdaftar ditolak (409)", dup.status === 409, dup.status, 409);
+
+  const dupNik = await request("/auth/register", {
+    method: "POST",
+    appCode: LAPAK,
+    body: { ...body, email: "warga.lain@contoh.id" },
+  });
+  assert("NIK yang sudah terdaftar ditolak (409)", dupNik.status === 409, dupNik.status, 409);
+
+  const mismatch = await request("/auth/register", {
+    method: "POST",
+    appCode: LAPAK,
+    body: { ...body, email: "warga.beda@contoh.id", nik: undefined, passwordConfirm: "BedaSekali2026" },
+  });
+  assert("Konfirmasi password berbeda ditolak (400)", mismatch.status === 400, mismatch.status, 400);
+
+  const weak = await request("/auth/register", {
+    method: "POST",
+    appCode: LAPAK,
+    body: { ...body, email: "warga.lemah@contoh.id", nik: undefined, password: "lemah", passwordConfirm: "lemah" },
+  });
+  assert("Password lemah ditolak (400)", weak.status === 400, weak.status, 400);
+
+  const badNik = await request("/auth/register", {
+    method: "POST",
+    appCode: LAPAK,
+    body: { ...body, email: "warga.nik@contoh.id", nik: "123" },
+  });
+  assert("NIK bukan 16 digit ditolak (400)", badNik.status === 400, badNik.status, 400);
+
+  // 6. NIK tersimpan & termasking di API CMS.
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const list = await request(`/users?search=${encodeURIComponent(email)}&accountType=PUBLIC`, { token: saToken || undefined });
+  const row = list.data?.data?.[0];
+  assert("CMS dapat melihat akun warga baru", Boolean(row), list.data?.data?.length);
+  assert("NIK termasking (4 digit terakhir)", row?.nik === `••••••••••••${nik.slice(-4)}`, row?.nik);
+  assert("NIK penuh tidak pernah keluar lewat API", !JSON.stringify(list.data ?? {}).includes(nik));
+
+  // 7. Bersihkan.
+  await prisma.userAppRole.deleteMany({ where: { user: { accountType: "PUBLIC", email: { in: [email, escalateEmail] } } } });
+  await prisma.user.deleteMany({ where: { accountType: "PUBLIC", email: { in: [email, escalateEmail] } } });
+}
+
 // ─── Main Orchestrator ────────────────────────────────────────────────────────
 async function main() {
   const args = process.argv.slice(2);
@@ -920,6 +1024,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-rbac" || targetModule === "lapak") {
       await runLapakRbacSuite();
+    }
+    if (!targetModule || targetModule === "register" || targetModule === "registrasi") {
+      await runRegisterSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

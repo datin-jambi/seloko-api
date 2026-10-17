@@ -206,6 +206,9 @@ model User {
   email           String    @db.VarChar(100)
   fullName        String    @map("full_name") @db.VarChar(150)
   phoneNumber     String?   @map("phone_number") @db.VarChar(20)
+  /// NIK warga — opsional, tapi bila diisi harus unik (satu orang satu akun
+  /// publik). PII: dimasking di log & daftar, lihat security-guidelines.
+  nik             String?   @unique @db.VarChar(16)
   passwordHash    String    @map("password_hash") @db.VarChar(255) // Argon2id
   avatarUrl       String?   @map("avatar_url")
   avatarFileId    String?   @map("avatar_file_id") @db.VarChar(100)

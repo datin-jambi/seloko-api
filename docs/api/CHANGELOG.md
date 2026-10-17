@@ -7,6 +7,44 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-18 — Registrasi akun warga + kolom NIK
+
+**Ditambah**
+- `POST /api/auth/register` — pendaftaran mandiri akun `PUBLIC`. Hanya di aplikasi ber-audience
+  `PUBLIC`; role ditetapkan server (default `warga`), bukan dari body. Body:
+  `email`, `password`, `passwordConfirm`, `fullName`, `phoneNumber?`, `nik?`.
+- Kolom `users.nik` (`VARCHAR(16)`, **unique**, nullable) lewat migrasi aditif
+  `20261018100000_add_user_nik`.
+
+**Diubah — aditif**
+- `GET /api/users`, `GET /api/users/:id`, `POST/PATCH` — objek user kini membawa `nik`, selalu
+  **termasking** (`••••••••••••1234`). Nilai penuh tidak pernah keluar lewat API.
+- `PATCH /api/users/:id` menerima `nik` (16 digit atau `null` untuk mengosongkan).
+
+**Dampak ke klien**
+- `nik` **wajib ada** di response schema (`string | null`) — klien yang memvalidasi ketat perlu
+  menambahkannya. Nilainya termasking, jadi tidak bisa dipakai sebagai kunci pencarian.
+- `emailVerifiedAt` pada akun hasil registrasi bernilai `null`: verifikasi email/OTP belum
+  dikerjakan (backlog `LJ-5.5`). Frontend sebaiknya tidak memblokir transaksi karenanya.
+
+---
+
+## 2026-10-18 — RBAC Lapak Jambi (aset daerah, bukan UMKM)
+
+**Diubah — breaking untuk seed RBAC Lapak**
+- Aplikasi `lapak-jambi-web`: permission `merchant:*`, `product:*` lama, `order:*` lama diganti
+  13 entity baru sesuai PRD 04 §6 (73 permission).
+- Role `pedagang` dihapus; diganti `warga` (PUBLIC) + `admin-opd`, `manajer-opd`,
+  `petugas-lokasi` (INTERNAL).
+- Menu CMS `lapak-jambi-web` disusun ulang: 20 item berawalan `/lapak` (Katalog, Transaksi,
+  Master, Konten OPD, Laporan).
+
+**Dampak ke klien**
+- Frontend Lapak harus memakai nama role & permission baru. Token lama yang memegang role
+  `pedagang` tidak valid lagi setelah seed ulang.
+
+---
+
 ## 2026-10-18 — `GET /users/:id/roles` + lingkup OPD pada penugasan role
 
 **Ditambah**
