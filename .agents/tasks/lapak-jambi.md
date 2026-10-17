@@ -3,7 +3,7 @@
 - **PRD:** [`../prd/04-lapak-jambi.prd.md`](../prd/04-lapak-jambi.prd.md) · **Aturan pipeline:** [`README.md`](./README.md)
 - **Kode aplikasi (MVP):** `lapak-jambi-web` · **Prefix API:** `/api/lapak` · **Prefix menu CMS:** `/lapak/...`
 - **Target MVP:** masyarakat dapat bertransaksi (katalog → keranjang per OPD → checkout → SKRD → transfer → tiket) dan Bapenda/OPD melihat arus penerimaan secara transparan lewat seloko-web. Frontend publik prototipe: `lj-app`.
-- **Tugas aktif:** `LJ-0.4`
+- **Tugas aktif:** `LJ-0.6`
 
 Legenda: `⏳` belum · `🟡` dikerjakan · `✅` selesai · `⛔` batal
 
@@ -15,8 +15,8 @@ Legenda: `⏳` belum · `🟡` dikerjakan · `✅` selesai · `⛔` batal
 | LJ-0.1 | Skema `organizations` (OPD/UPTD, hierarki) + `user_app_role_organizations` (lingkup penugasan) + migrasi | — | `prisma validate`, migrasi ter-deploy, drift 0, typecheck | ✅ |
 | LJ-0.2 | Seed OPD awal dari proposal (`prisma/seeds/core/organizations.json`) | 0.1 | `db:seed` 2× idempoten | ✅ |
 | LJ-0.3 | Resolver lingkup OPD `resolveOrgScope()` + `assertOrgInScope()` (`src/common/guards/org-scope.ts`) | 0.1 | `org-scope.check.ts` di `npm test` | ✅ |
-| LJ-0.4 | API core OPD `/api/organizations` (CRUD Bapenda + daftar publik), permission `organization:*` di `seloko`, menu `/seloko/...` | 0.1 | smoke `organizations` | ⏳ |
-| LJ-0.5 | Penugasan role berlingkup OPD: `POST /api/users/:id/roles` terima `organizationIds[]`, detail user menampilkan OPD per penugasan | 0.1, 0.3 | smoke `users-org` | ⏳ |
+| LJ-0.4 | API core OPD `/api/organizations` (CRUD Bapenda + daftar publik), permission `organization:*` di `seloko`, menu `/seloko/...` | 0.1 | smoke `organizations` | ✅ |
+| LJ-0.5 | Penugasan role berlingkup OPD: `POST /api/users/:id/roles` terima `organizationIds[]`, detail user menampilkan OPD per penugasan | 0.1, 0.3 | smoke `users-org` | ✅ |
 | LJ-0.6 | Seed RBAC `lapak-jambi-web` baru (permission §6 PRD, role `admin-opd`/`manajer-opd`/`petugas-lokasi`/`warga`, menu `/lapak/...`, akun uji multi-OPD); hapus merchant/pedagang | 0.2, 0.5 | `menus.check`, smoke `auth` | ⏳ |
 | LJ-0.7 | Registrasi akun PUBLIC `POST /api/auth/register` (+ kolom `users.nik` opsional, unik, dimasking) | — | smoke `register` | ⏳ |
 
@@ -77,3 +77,5 @@ Legenda: `⏳` belum · `🟡` dikerjakan · `✅` selesai · `⛔` batal
 | 2026-10-17 | LJ-0.1 | `prisma validate` ok · migrasi `20261017120000_add_organizations` deploy · drift 0 · typecheck 0 | Tabel `organizations` (+enum `organization_type`, hierarki `parent_id`) & `user_app_role_organizations`. Murni aditif — tidak menyentuh tabel lama. Shadow DB sekali pakai `seloko_shadow_lj01`, bukan `DATABASE_URL`. |
 | 2026-10-17 | LJ-0.2 | `db:seed` 2× → 9 organisasi, idempoten | Seed dari infografis proposal: BPKPD, BPSDM, Badan Penghubung, Disbudpar, Dinkes, Bapelkes (UPTD di bawah Dinkes), Diskop, Dinsos, Dishut. |
 | 2026-10-17 | LJ-0.3 | `org-scope.check` ok · `npm test` 0 · `build` 0 · `db:smoke` 99 lolos | `resolveOrgScope`, `assertOrgInScope`, `buildOrgScope`, `isOrgInScope`, `orgScopeFilter`. Aturan: tanpa baris OPD = seluruh OPD; union antar penugasan; lingkup kosong gagal tertutup (`{ in: [] }`). |
+| 2026-10-18 | LJ-0.5 | smoke `users-org` 13 lolos · total `db:smoke` 130 lolos · typecheck/test/build 0 | `POST /users/:id/roles` menerima `organizationIds[]` (mengganti lingkup, kosong = seluruh OPD; OPD tak dikenal → 400). Endpoint baru `GET /users/:id/roles` dengan paginasi + filter `applicationId`/`roleId`/`organizationId`/`status` + `sortBy` (`createdAt`/`expiresAt`/`application`) dan `summary` lintas halaman (total/aktif/kedaluwarsa/aplikasi/OPD/global). Detail user & grup aplikasi kini membawa `organizations` per penugasan. Permission `user-app-role:list`.
+| 2026-10-18 | LJ-0.4 | smoke `organizations` 18 lolos · total `db:smoke` 117 lolos · `menus.check` 22 ok · typecheck/test/build 0 | Modul core `src/modules/core/organizations/` (4-layer) + `/api/organizations` (publik: list & profil via kode; CMS: CRUD, toggle aktif, soft-delete). Permission `organization:*` (28 permission seloko), menu `sistem.organisasi`. Aturan: kode unik global; induk wajib ada; induk ≠ diri sendiri; siklus ditolak; nonaktifkan induk menonaktifkan turunan; hapus ditolak bila masih punya turunan/penugasan (abaikan yang sudah soft-delete). Dua bug ditemukan smoke & diperbaiki: respons Prisma membawa `Date` (dibungkus `iso()` di semua jalur) dan hitungan turunan ikut menghitung baris terhapus. |

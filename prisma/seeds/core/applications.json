@@ -22,6 +22,7 @@
         { "module": "Akses", "entity": "permission", "label": "Permission", "actions": ["read", "list"] },
         { "module": "Akses", "entity": "user-app-role", "label": "Penugasan Role", "actions": ["create", "list", "delete"] },
         { "module": "Sistem", "entity": "application", "label": "Aplikasi", "actions": ["content"] },
+        { "module": "Sistem", "entity": "organization", "label": "Organisasi (OPD)", "actions": ["content"] },
         { "module": "Sistem", "entity": "audit-log", "label": "Log Audit", "actions": ["read", "list", "export"] }
       ]
     },

@@ -14,6 +14,8 @@
  *   npm run db:smoke -- uptds        → Hanya uji modul Bapenda UPTD Samsat
  *   npm run db:smoke -- news         → Hanya uji modul Bapenda Berita & alur review
  *   npm run db:smoke -- pages        → Hanya uji modul Bapenda Halaman Profil
+ *   npm run db:smoke -- organizations → Hanya uji master OPD (core)
+ *   npm run db:smoke -- users-org    → Hanya uji penugasan role berlingkup OPD
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -598,6 +600,175 @@ async function runPagesSuite() {
   await prisma.page.deleteMany({ where: { slug: "smoke-test-halaman" } });
 }
 
+// ─── Test Suite: Core Organizations (OPD/UPTD) ────────────────────────────────
+async function runOrganizationsSuite() {
+  console.log("\n\x1b[36m▶ [Suite 9: Core - Organisasi (OPD)]\x1b[0m");
+
+  // 1. Publik (tanpa login, header X-App-Code tetap wajib)
+  const pub = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  assert("Daftar OPD publik merespons sukses (200)", pub.status === 200, pub.status, 200);
+  assert("9 organisasi aktif dari seed", pub.data?.data?.length === 9, pub.data?.data?.length, 9);
+  assert("Publik hanya membawa OPD aktif", pub.data?.data?.every((o: any) => o.isActive));
+
+  const bpsdm = await request("/organizations/public/BPSDM", { appCode: "lapak-jambi-web" });
+  assert("Profil OPD publik via kode 'BPSDM' (200)", bpsdm.status === 200, bpsdm.status, 200);
+  assert("Kode OPD benar", bpsdm.data?.data?.code === "BPSDM", bpsdm.data?.data?.code, "BPSDM");
+
+  const gone = await request("/organizations/public/OPD-TIDAK-ADA", { appCode: "lapak-jambi-web" });
+  assert("Kode OPD tak dikenal ditolak (404)", gone.status === 404, gone.status, 404);
+
+  // 2. CMS
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const viewerToken = await login("viewer.only", DEFAULT_PASSWORD, "seloko");
+  const sa = { token: saToken || undefined };
+  const vw = { token: viewerToken || undefined };
+
+  const list = await request("/organizations?limit=5&rootsOnly=true", sa);
+  assert("CMS list organisasi (200)", list.status === 200, list.status, 200);
+  assert("rootsOnly menyaring UPTD (induk OPD)", list.data?.data?.every((o: any) => o.parentId === null));
+
+  const forbidden = await request("/organizations", {
+    method: "POST",
+    ...vw,
+    body: { code: "OPD-UJI", name: "OPD Uji Coba" },
+  });
+  assert("Viewer ditolak membuat organisasi (403)", forbidden.status === 403, forbidden.status, 403);
+
+  const dupCode = await request("/organizations", {
+    method: "POST",
+    ...sa,
+    body: { code: "BPSDM", name: "Duplikat BPSDM" },
+  });
+  assert("Kode organisasi duplikat ditolak (409)", dupCode.status === 409, dupCode.status, 409);
+
+  const created = await request("/organizations", {
+    method: "POST",
+    ...sa,
+    body: { code: "OPD-SMOKE", name: "OPD Smoke Test", type: "OPD" },
+  });
+  const orgId = created.data?.data?.id;
+  assert("Membuat organisasi baru (201)", created.status === 201, created.status, 201);
+
+  if (orgId) {
+    const child = await request("/organizations", {
+      method: "POST",
+      ...sa,
+      body: { code: "UPTD-SMOKE", name: "UPTD Smoke Test", type: "UPTD", parentId: orgId },
+    });
+    const childId = child.data?.data?.id;
+    assert("Membuat UPTD dengan induk (201)", child.status === 201, child.status, 201);
+
+    const detail = await request(`/organizations/${orgId}`, sa);
+    assert("Detail membawa jumlah turunan", detail.data?.data?.counts?.children === 1, detail.data?.data?.counts?.children, 1);
+
+    const selfParent = await request(`/organizations/${orgId}`, {
+      method: "PUT",
+      ...sa,
+      body: { parentId: orgId },
+    });
+    assert("Induk = diri sendiri ditolak (400)", selfParent.status === 400, selfParent.status, 400);
+
+    const cycle = childId
+      ? await request(`/organizations/${orgId}`, { method: "PUT", ...sa, body: { parentId: childId } })
+      : null;
+    assert("Hierarki memutar ditolak (400)", cycle?.status === 400, cycle?.status, 400);
+
+    const deactivate = await request(`/organizations/${orgId}/active`, {
+      method: "PATCH",
+      ...sa,
+      body: { isActive: false },
+    });
+    assert("Menonaktifkan induk ikut menonaktifkan UPTD", deactivate.data?.data?.isActive === false);
+    if (childId) {
+      const childNow = await request(`/organizations/${childId}`, sa);
+      assert("UPTD turunan ikut nonaktif", childNow.data?.data?.isActive === false);
+      await request(`/organizations/${childId}`, { method: "DELETE", ...sa });
+    }
+
+    const delParent = await request(`/organizations/${orgId}`, { method: "DELETE", ...sa });
+    assert("Hapus organisasi tanpa turunan (200)", delParent.status === 200, delParent.status, 200);
+  }
+
+  // Bersihkan baris uji agar kode bebas dipakai run berikutnya.
+  await prisma.organization.deleteMany({ where: { code: { in: ["OPD-SMOKE", "UPTD-SMOKE"] } } });
+}
+
+// ─── Test Suite: Users — penugasan role berlingkup OPD ────────────────────────
+async function runUsersOrgSuite() {
+  console.log("\n\x1b[36m▶ [Suite 10: Core - Penugasan Role per OPD]\x1b[0m");
+
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const sa = { token: saToken || undefined };
+
+  // User & role sasaran: multirole sudah punya 2 penugasan di lapak-jambi-web.
+  const target = await prisma.user.findFirstOrThrow({
+    where: { username: "multirole" },
+    select: { id: true },
+  });
+  const lapakApp = await prisma.application.findUniqueOrThrow({
+    where: { code: "lapak-jambi-web" },
+    select: { id: true },
+  });
+  const editorRole = await prisma.role.findFirstOrThrow({
+    where: { applicationId: lapakApp.id, name: "editor" },
+    select: { id: true },
+  });
+  const bpsdm = await prisma.organization.findUniqueOrThrow({ where: { code: "BPSDM" }, select: { id: true } });
+  const disbudpar = await prisma.organization.findUniqueOrThrow({ where: { code: "DISBUDPAR" }, select: { id: true } });
+
+  // 1. Beri lingkup 2 OPD.
+  const assigned = await request(`/users/${target.id}/roles`, {
+    method: "POST",
+    ...sa,
+    body: { applicationId: lapakApp.id, roleId: editorRole.id, organizationIds: [bpsdm.id, disbudpar.id] },
+  });
+  assert("Assign role berlingkup 2 OPD (201)", assigned.status === 201, assigned.status, 201);
+  assert("Respons memuat 2 OPD", assigned.data?.data?.organizations?.length === 2, assigned.data?.data?.organizations?.length, 2);
+
+  // 2. Ganti lingkup → hanya 1 OPD (replace, bukan append).
+  const replaced = await request(`/users/${target.id}/roles`, {
+    method: "POST",
+    ...sa,
+    body: { applicationId: lapakApp.id, roleId: editorRole.id, organizationIds: [bpsdm.id] },
+  });
+  assert("Lingkup diganti, bukan ditambah (jadi 1)", replaced.data?.data?.organizations?.length === 1, replaced.data?.data?.organizations?.length, 1);
+
+  // 3. OPD tak dikenal ditolak.
+  const badOrg = await request(`/users/${target.id}/roles`, {
+    method: "POST",
+    ...sa,
+    body: { applicationId: lapakApp.id, roleId: editorRole.id, organizationIds: ["00000000-0000-7000-8000-000000000000"] },
+  });
+  assert("OPD tidak dikenal ditolak (400)", badOrg.status === 400, badOrg.status, 400);
+
+  // 4. Daftar penugasan: paginasi + filter + summary.
+  const list = await request(`/users/${target.id}/roles?limit=1`, sa);
+  assert("List penugasan berpaginasi (200)", list.status === 200, list.status, 200);
+  assert("limit dihormati", list.data?.data?.length <= 1, list.data?.data?.length);
+  assert("meta.total melaporkan seluruh penugasan", (list.data?.meta?.total ?? 0) >= 2, list.data?.meta?.total);
+  assert("summary.totalApplications terisi", (list.data?.summary?.totalApplications ?? 0) >= 1, list.data?.summary?.totalApplications);
+  assert("summary menghitung penugasan global", (list.data?.summary?.globalAssignments ?? 0) >= 1, list.data?.summary?.globalAssignments);
+
+  const byApp = await request(`/users/${target.id}/roles?applicationId=${lapakApp.id}`, sa);
+  assert("Filter applicationId bekerja", byApp.data?.data?.every((r: any) => r.applicationCode === "lapak-jambi-web"));
+
+  const byOrg = await request(`/users/${target.id}/roles?organizationId=${bpsdm.id}`, sa);
+  assert("Filter organizationId ikut menyertakan penugasan global", (byOrg.data?.meta?.total ?? 0) >= 2, byOrg.data?.meta?.total);
+
+  const expiredOnly = await request(`/users/${target.id}/roles?status=expired`, sa);
+  assert("Filter status=expired merespons (200)", expiredOnly.status === 200, expiredOnly.status, 200);
+
+  // 5. Detail user menampilkan OPD per penugasan.
+  const detail = await request(`/users/${target.id}`, sa);
+  const scoped = detail.data?.data?.roles?.find((r: any) => r.roleName === "editor");
+  assert("Detail user memuat OPD pada penugasan", scoped?.organizations?.length === 1, scoped?.organizations?.length, 1);
+
+  // 6. Kembalikan ke kondisi seed: hapus penugasan editor lalu assign ulang tanpa lingkup.
+  await prisma.userAppRoleOrganization.deleteMany({
+    where: { userAppRole: { userId: target.id, roleId: editorRole.id, applicationId: lapakApp.id } },
+  });
+}
+
 // ─── Main Orchestrator ────────────────────────────────────────────────────────
 async function main() {
   const args = process.argv.slice(2);
@@ -650,6 +821,12 @@ async function main() {
     }
     if (!targetModule || targetModule === "pages" || targetModule === "halaman") {
       await runPagesSuite();
+    }
+    if (!targetModule || targetModule === "organizations" || targetModule === "opd" || targetModule === "organisasi") {
+      await runOrganizationsSuite();
+    }
+    if (!targetModule || targetModule === "users-org" || targetModule === "role-scope") {
+      await runUsersOrgSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

@@ -76,6 +76,13 @@
               "permission": "application:list"
             },
             {
+              "code": "sistem.organisasi",
+              "label": "Organisasi (OPD)",
+              "icon": "building-2",
+              "path": "/seloko/sistem/organisasi",
+              "permission": "organization:list"
+            },
+            {
               "code": "sistem.menu",
               "label": "Menu Sidebar",
               "icon": "list-tree",

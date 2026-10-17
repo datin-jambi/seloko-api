@@ -1,6 +1,14 @@
 import { z } from "zod";
 
 // ─── Shared User Shape ────────────────────────────────────────────────────────
+/** OPD yang membatasi sebuah penugasan role (kosong = seluruh OPD). */
+export const OrganizationRefShape = z.object({
+  id: z.string(),
+  code: z.string(),
+  name: z.string(),
+  shortName: z.string().nullable(),
+});
+
 const UserRoleShape = z.object({
   id: z.string(),
   roleId: z.string(),
@@ -10,6 +18,8 @@ const UserRoleShape = z.object({
   applicationName: z.string(),
   expiresAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
+  /** Lingkup OPD penugasan. Array kosong = berlaku untuk SEMUA OPD. */
+  organizations: z.array(OrganizationRefShape),
 });
 
 export const UserApplicationSummaryShape = z.object({
@@ -24,6 +34,7 @@ export const UserApplicationRoleItemShape = z.object({
   roleName: z.string(),
   expiresAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
+  organizations: z.array(OrganizationRefShape).describe("Lingkup OPD; kosong = semua OPD"),
 });
 
 export const UserApplicationGroupShape = z.object({
@@ -180,20 +191,83 @@ export const DeleteUserResponseSchema = z.object({
 });
 
 // ─── Assign Role ──────────────────────────────────────────────────────────────
-export const AssignRoleBodySchema = z.object({
-  applicationId: z.string().uuid("Application ID harus berformat UUID"),
-  roleId: z.string().uuid("Role ID harus berformat UUID"),
-  expiresAt: z
-    .string()
-    .datetime({ message: "Format datetime tidak valid (ISO 8601)" })
-    .optional()
-    .describe("Waktu kadaluarsa penugasan role — null berarti permanen"),
-});
+export const AssignRoleBodySchema = z
+  .object({
+    applicationId: z.string().uuid("Application ID harus berformat UUID"),
+    roleId: z.string().uuid("Role ID harus berformat UUID"),
+    expiresAt: z
+      .string()
+      .datetime({ message: "Format datetime tidak valid (ISO 8601)" })
+      .optional()
+      .nullable()
+      .describe("Waktu kadaluarsa penugasan role — null berarti permanen"),
+    /**
+     * Lingkup OPD. Kosong/absen = berlaku untuk SELURUH OPD (level Bapenda);
+     * diisi = hanya OPD tersebut (mis. admin OPD). Mengirim ulang daftar yang
+     * sama MENGGANTI lingkup sebelumnya, bukan menambah.
+     */
+    organizationIds: z
+      .array(z.string().uuid("Setiap organizationIds harus UUID valid"))
+      .max(50, "Maksimal 50 OPD per penugasan")
+      .optional()
+      .describe("OPD yang dibatasi; kosong = seluruh OPD"),
+  })
+  .refine((d) => !d.organizationIds || new Set(d.organizationIds).size === d.organizationIds.length, {
+    message: "organizationIds tidak boleh berisi duplikat",
+    path: ["organizationIds"],
+  });
 
 export const AssignRoleResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   data: UserRoleShape,
+});
+
+// ─── List Role Assignments ────────────────────────────────────────────────────
+/**
+ * Daftar penugasan role milik SATU user, siap untuk tabel CMS.
+ *
+ * `status` menyaring menurut masa berlaku: `active` (permanen atau belum
+ * kedaluwarsa), `expired`, atau `all`. Bawaannya `active` — yang kedaluwarsa
+ * tidak menarik perhatian tapi tetap bisa diaudit.
+ */
+export const ListRoleAssignmentsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  applicationId: z.string().uuid("Application ID harus berformat UUID").optional(),
+  roleId: z.string().uuid("Role ID harus berformat UUID").optional(),
+  /** Saring penugasan yang mencakup OPD ini (termasuk yang berlaku semua OPD). */
+  organizationId: z.string().uuid("Organization ID harus berformat UUID").optional(),
+  status: z
+    .enum(["active", "expired", "all"])
+    .default("active")
+    .describe("active = permanen/belum kedaluwarsa, expired = sudah lewat, all = semua"),
+  sortBy: z.enum(["createdAt", "expiresAt", "application"]).default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+});
+
+export const ListRoleAssignmentsResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  data: z.array(UserRoleShape),
+  meta: z.object({
+    page: z.number(),
+    limit: z.number(),
+    total: z.number(),
+    totalPages: z.number(),
+    hasNextPage: z.boolean(),
+    hasPreviousPage: z.boolean(),
+  }),
+  /** Ringkasan lintas halaman, untuk badge & kartu ringkas di CMS. */
+  summary: z.object({
+    totalAssignments: z.number(),
+    activeAssignments: z.number(),
+    expiredAssignments: z.number(),
+    totalApplications: z.number(),
+    totalOrganizations: z.number(),
+    /** Penugasan yang berlaku untuk seluruh OPD. */
+    globalAssignments: z.number(),
+  }),
 });
 
 // ─── Revoke Role ──────────────────────────────────────────────────────────────
@@ -216,3 +290,4 @@ export type UpdateUserBody = z.infer<typeof UpdateUserBodySchema>;
 export type SetActiveBody = z.infer<typeof SetActiveBodySchema>;
 export type AssignRoleBody = z.infer<typeof AssignRoleBodySchema>;
 export type RevokeRoleParams = z.infer<typeof RevokeRoleParamsSchema>;
+export type ListRoleAssignmentsQuery = z.infer<typeof ListRoleAssignmentsQuerySchema>;

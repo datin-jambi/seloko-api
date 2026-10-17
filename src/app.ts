@@ -243,6 +243,9 @@ export async function buildApp(): Promise<FastifyInstance> {
       const { storageRoutes } = await import("~/modules/core/storage/storage.routes.js");
       await api.register(storageRoutes, { prefix: "/storage" });
 
+      const { organizationsRoutes } = await import("~/modules/core/organizations/organizations.routes.js");
+      await api.register(organizationsRoutes, { prefix: "/organizations" });
+
       // await api.register(rbacRoutes, { prefix: "/rbac" });
 
       // Bapenda modules

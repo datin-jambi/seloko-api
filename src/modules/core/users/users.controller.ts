@@ -9,6 +9,7 @@ import {
   softDeleteUser,
   assignRole,
   revokeRole,
+  listRoleAssignments,
   CACHE_DEGRADED_NOTE,
 } from "./users.service.js";
 import type {
@@ -17,6 +18,7 @@ import type {
   UpdateUserBody,
   SetActiveBody,
   AssignRoleBody,
+  ListRoleAssignmentsQuery,
 } from "./users.schema.js";
 
 // ─── List Users ───────────────────────────────────────────────────────────────
@@ -106,6 +108,22 @@ export async function handleAssignRole(
   void reply
     .status(201)
     .send(ok(uar, `Role berhasil ditugaskan${cacheCleared ? "" : CACHE_DEGRADED_NOTE}`));
+}
+
+// ─── List Role Assignments ────────────────────────────────────────────────────
+export async function handleListRoleAssignments(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { id } = request.params as { id: string };
+  const result = await listRoleAssignments(id, request.query as ListRoleAssignmentsQuery);
+  void reply.status(200).send({
+    success: true,
+    message: "Daftar penugasan role berhasil diambil",
+    data: result.data,
+    meta: result.meta,
+    summary: result.summary,
+  });
 }
 
 // ─── Revoke Role ──────────────────────────────────────────────────────────────

@@ -1,10 +1,17 @@
 import argon2 from "argon2";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "~/config/database.js";
 import { invalidateAllUserPermissionCaches } from "~/config/redis.js";
 import { ConflictError, NotFoundError, ForbiddenError, BadRequestError } from "~/common/errors/index.js";
 import { buildPaginatedResult } from "~/common/types/index.js";
 import { ImageKitService } from "~/common/services/storage/imagekit.service.js";
-import type { ListUsersQuery, CreateUserBody, UpdateUserBody, AssignRoleBody } from "./users.schema.js";
+import type {
+  ListUsersQuery,
+  ListRoleAssignmentsQuery,
+  CreateUserBody,
+  UpdateUserBody,
+  AssignRoleBody,
+} from "./users.schema.js";
 
 // Dipakai controller saat invalidasi cache gagal (Redis down): aksi di DB sudah
 // permanen, tapi izin lama masih terbaca dari cache sampai TTL-nya habis.
@@ -14,9 +21,16 @@ export const CACHE_DEGRADED_NOTE =
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-/**
- * Memformat satu baris UserAppRole menjadi shape respons yang konsisten.
- */
+/** Select ringkas OPD — dipakai di setiap penugasan role. */
+const ORG_REF_SELECT = {
+  select: { organization: { select: { id: true, code: true, name: true, shortName: true } } },
+  orderBy: { organization: { name: "asc" as const } },
+} as const;
+
+const ORG_REF_REL = {
+  organizations: ORG_REF_SELECT,
+} as const;
+
 function formatRole(uar: {
   id: string;
   roleId: string;
@@ -24,6 +38,7 @@ function formatRole(uar: {
   createdAt: Date;
   role: { name: string };
   application: { id: string; code: string; name: string };
+  organizations: Array<{ organization: { id: string; code: string; name: string; shortName: string | null } }>;
 }) {
   return {
     id: uar.id,
@@ -34,6 +49,8 @@ function formatRole(uar: {
     applicationName: uar.application.name,
     expiresAt: uar.expiresAt?.toISOString() ?? null,
     createdAt: uar.createdAt.toISOString(),
+    // Kosong = penugasan berlaku untuk seluruh OPD (level Bapenda).
+    organizations: uar.organizations.map((o) => o.organization),
   };
 }
 
@@ -48,6 +65,7 @@ function groupUserApplications(userAppRoles: Array<{
   createdAt: Date;
   role: { name: string };
   application: { id: string; code: string; name: string };
+  organizations: Array<{ organization: { id: string; code: string; name: string; shortName: string | null } }>;
 }>) {
   const appMap = new Map<string, {
     id: string;
@@ -59,6 +77,7 @@ function groupUserApplications(userAppRoles: Array<{
       roleName: string;
       expiresAt: string | null;
       createdAt: string;
+      organizations: Array<{ id: string; code: string; name: string; shortName: string | null }>;
     }>;
   }>();
 
@@ -79,6 +98,7 @@ function groupUserApplications(userAppRoles: Array<{
       roleName: uar.role.name,
       expiresAt: uar.expiresAt?.toISOString() ?? null,
       createdAt: uar.createdAt.toISOString(),
+      organizations: uar.organizations.map((o) => o.organization),
     });
   }
 
@@ -111,6 +131,7 @@ const ROLES_INCLUDE = {
     include: {
       role: { select: { name: true } },
       application: { select: { id: true, code: true, name: true } },
+      ...ORG_REF_REL,
     },
     orderBy: { createdAt: "asc" as const },
   },
@@ -527,6 +548,20 @@ export async function assignRole(
     );
   }
 
+  // Lingkup OPD: pastikan semuanya ada & aktif sebelum menyentuh penugasan,
+  // supaya kegagalan tidak meninggalkan penugasan setengah jadi.
+  const organizationIds = data.organizationIds ?? [];
+  if (organizationIds.length > 0) {
+    const found = await prisma.organization.findMany({
+      where: { id: { in: organizationIds }, deletedAt: null },
+      select: { id: true },
+    });
+    if (found.length !== organizationIds.length) {
+      const missing = organizationIds.filter((id) => !found.some((o) => o.id === id));
+      throw new BadRequestError(`Organisasi tidak ditemukan: ${missing.join(", ")}`);
+    }
+  }
+
   const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
 
   // Upsert — jika sudah ada, update expiresAt saja
@@ -549,13 +584,110 @@ export async function assignRole(
     include: {
       role: { select: { name: true } },
       application: { select: { id: true, code: true, name: true } },
+      ...ORG_REF_REL,
+    },
+  });
+
+  // Lingkup OPD diganti utuh (bukan ditambah): mengirim daftar baru berarti
+  // "hanya OPD ini", mengirim kosong berarti "seluruh OPD".
+  await prisma.$transaction([
+    prisma.userAppRoleOrganization.deleteMany({ where: { userAppRoleId: uar.id } }),
+    prisma.userAppRoleOrganization.createMany({
+      data: organizationIds.map((organizationId) => ({
+        userAppRoleId: uar.id,
+        organizationId,
+      })),
+      skipDuplicates: true,
+    }),
+  ]);
+
+  const withOrgs = await prisma.userAppRole.findUniqueOrThrow({
+    where: { id: uar.id },
+    include: {
+      role: { select: { name: true } },
+      application: { select: { id: true, code: true, name: true } },
+      ...ORG_REF_REL,
     },
   });
 
   // Buang cache permission agar perubahan langsung efektif
   const cacheCleared = await invalidateAllUserPermissionCaches(userId);
 
-  return { ...formatRole(uar), cacheCleared };
+  return { ...formatRole(withOrgs), cacheCleared };
+}
+
+// ─── List Role Assignments (berpaginasi & berfilter) ──────────────────────────
+/**
+ * Daftar penugasan role satu user untuk tabel CMS.
+ *
+ * `summary` dihitung dari SELURUH penugasan user (bukan hanya halaman ini) —
+ * itulah yang dipakai badge "3 aplikasi · 5 role · 2 OPD" di kartu user.
+ */
+export async function listRoleAssignments(userId: string, query: ListRoleAssignmentsQuery) {
+  const { page, limit, applicationId, roleId, organizationId, status, sortBy, sortOrder } = query;
+
+  const user = await prisma.user.findFirst({ where: { id: userId, deletedAt: null }, select: { id: true } });
+  if (!user) throw new NotFoundError("User", userId);
+
+  const now = new Date();
+  const notExpired = { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] };
+  const expired = { expiresAt: { lte: now } };
+
+  const where: Prisma.UserAppRoleWhereInput = {
+    userId,
+    ...(applicationId !== undefined && { applicationId }),
+    ...(roleId !== undefined && { roleId }),
+    // Penugasan tanpa baris OPD berlaku untuk SEMUA OPD, jadi ikut cocok.
+    ...(organizationId !== undefined && {
+      OR: [{ organizations: { none: {} } }, { organizations: { some: { organizationId } } }],
+    }),
+    ...(status === "active" && notExpired),
+    ...(status === "expired" && expired),
+  };
+
+  const orderBy: Prisma.UserAppRoleOrderByWithRelationInput =
+    sortBy === "application" ? { application: { name: sortOrder } } : { [sortBy]: sortOrder };
+
+  const [rows, total, all, appGroups, orgGroups, globalCount] = await Promise.all([
+    prisma.userAppRole.findMany({
+      where,
+      include: {
+        role: { select: { name: true } },
+        application: { select: { id: true, code: true, name: true } },
+        ...ORG_REF_REL,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy,
+    }),
+    prisma.userAppRole.count({ where }),
+    prisma.userAppRole.count({ where: { userId } }),
+    prisma.userAppRole.findMany({
+      where: { userId },
+      select: { applicationId: true },
+      distinct: ["applicationId"],
+    }),
+    prisma.userAppRoleOrganization.findMany({
+      where: { userAppRole: { userId } },
+      select: { organizationId: true },
+      distinct: ["organizationId"],
+    }),
+    prisma.userAppRole.count({ where: { userId, organizations: { none: {} } } }),
+  ]);
+
+  const activeCount = await prisma.userAppRole.count({ where: { userId, ...notExpired } });
+
+  return {
+    ...buildPaginatedResult(rows.map(formatRole), total, page, limit),
+    summary: {
+      totalAssignments: all,
+      activeAssignments: activeCount,
+      expiredAssignments: all - activeCount,
+      totalApplications: appGroups.length,
+      totalOrganizations: orgGroups.length,
+      globalAssignments: globalCount,
+    },
+  };
 }
 
 // ─── Revoke Role ──────────────────────────────────────────────────────────────

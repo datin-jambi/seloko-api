@@ -15,6 +15,8 @@ import {
   DeleteUserResponseSchema,
   AssignRoleBodySchema,
   AssignRoleResponseSchema,
+  ListRoleAssignmentsQuerySchema,
+  ListRoleAssignmentsResponseSchema,
   RevokeRoleParamsSchema,
   RevokeRoleResponseSchema,
 } from "./users.schema.js";
@@ -26,6 +28,7 @@ import {
   handleSetActive,
   handleDeleteUser,
   handleAssignRole,
+  handleListRoleAssignments,
   handleRevokeRole,
 } from "./users.controller.js";
 
@@ -118,10 +121,26 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     ],
   }, handleDeleteUser);
 
+  // ── GET /users/:id/roles ──────────────────────────────────────────────────
+  // Didaftarkan sebelum POST agar maksudnya jelas; path-nya berbeda method.
+  app.get("/:id/roles", {
+    schema: {
+      description: "Daftar penugasan role user dengan paginasi, filter aplikasi/role/OPD/status",
+      tags: ["users"],
+      params: UserParamsSchema,
+      querystring: ListRoleAssignmentsQuerySchema,
+      response: { 200: ListRoleAssignmentsResponseSchema },
+    },
+    preHandler: [
+      fastify.authenticate,
+      fastify.requirePermission("user-app-role:list", { app: APP_CODES.SELOKO }),
+    ],
+  }, handleListRoleAssignments);
+
   // ── POST /users/:id/roles ──────────────────────────────────────────────────
   app.post("/:id/roles", {
     schema: {
-      description: "Tugaskan role ke pengguna pada aplikasi tertentu",
+      description: "Tugaskan role ke pengguna pada aplikasi tertentu, opsional dibatasi ke OPD tertentu",
       tags: ["users"],
       params: UserParamsSchema,
       body: AssignRoleBodySchema,
