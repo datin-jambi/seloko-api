@@ -19,7 +19,7 @@ import { resetTables } from "./seeds/shared/reset.js";
 import { seedApplications } from "./seeds/core/applications.seeder.js";
 import { seedMenus } from "./seeds/core/menus.seeder.js";
 import { seedOrganizations } from "./seeds/core/organizations.seeder.js";
-import { buildRoleIndex, seedUsers } from "./seeds/core/users.seeder.js";
+import { buildOrgIndex, buildRoleIndex, seedUsers } from "./seeds/core/users.seeder.js";
 import { seedBapendaUptds } from "./seeds/bapenda/uptds.seeder.js";
 import { seedBanners } from "./seeds/bapenda/banners.seeder.js";
 import { seedNews } from "./seeds/bapenda/news.seeder.js";
@@ -133,6 +133,7 @@ async function main(): Promise<void> {
     usersFile.bulk,
     usersFile.defaultPassword,
     await buildRoleIndex(),
+    await buildOrgIndex(),
   );
 
   console.log("");

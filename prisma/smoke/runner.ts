@@ -16,6 +16,7 @@
  *   npm run db:smoke -- pages        → Hanya uji modul Bapenda Halaman Profil
  *   npm run db:smoke -- organizations → Hanya uji master OPD (core)
  *   npm run db:smoke -- users-org    → Hanya uji penugasan role berlingkup OPD
+ *   npm run db:smoke -- lapak-rbac   → Hanya uji RBAC & lingkup OPD Lapak Jambi
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -769,6 +770,95 @@ async function runUsersOrgSuite() {
   });
 }
 
+// ─── Test Suite: RBAC Lapak Jambi ─────────────────────────────────────────────
+async function runLapakRbacSuite() {
+  console.log("\n\x1b[36m▶ [Suite 11: Lapak Jambi - RBAC & Lingkup OPD]\x1b[0m");
+  const LAPAK = "lapak-jambi-web";
+
+  // 1. Permission lama benar-benar hilang, yang baru ada.
+  const lapakApp = await prisma.application.findUniqueOrThrow({
+    where: { code: LAPAK },
+    select: { id: true, isActive: true, audience: true },
+  });
+  const codes = (
+    await prisma.permission.findMany({ where: { applicationId: lapakApp.id }, select: { code: true } })
+  ).map((p) => p.code);
+
+  assert("Aplikasi Lapak aktif & PUBLIC", lapakApp.isActive && lapakApp.audience === "PUBLIC");
+  assert("Permission lama 'merchant:*' sudah tidak ada", !codes.some((c) => c.startsWith("merchant:")), codes.filter((c) => c.startsWith("merchant:")));
+  assert("Permission 'product:publish' tersedia", codes.includes("product:publish"), codes.includes("product:publish"));
+  assert("Permission 'skrd-setting:create' tersedia (master Bapenda)", codes.includes("skrd-setting:create"));
+
+  // 2. Role lama hilang, role baru lengkap.
+  const roleNames = (
+    await prisma.role.findMany({ where: { applicationId: lapakApp.id }, select: { name: true } })
+  ).map((r) => r.name);
+  for (const expected of ["admin-opd", "manajer-opd", "petugas-lokasi", "warga", "admin", "superadmin"]) {
+    assert(`Role '${expected}' ada`, roleNames.includes(expected), roleNames);
+  }
+  assert("Role lama 'pedagang' sudah tidak ada", !roleNames.includes("pedagang"), roleNames);
+
+  // 3. Wewenang master tidak bocor ke admin OPD; manajer boleh publish.
+  const permsOf = async (role: string) =>
+    (
+      await prisma.rolePermission.findMany({
+        where: { role: { applicationId: lapakApp.id, name: role } },
+        select: { permission: { select: { code: true } } },
+      })
+    ).map((r) => r.permission.code);
+
+  const adminOpd = await permsOf("admin-opd");
+  const manajer = await permsOf("manajer-opd");
+  const warga = await permsOf("warga");
+  assert("admin-opd TIDAK boleh category:create (master Bapenda)", !adminOpd.includes("category:create"), adminOpd.filter((c) => c.startsWith("category:")));
+  assert("admin-opd TIDAK boleh retribution-object:create", !adminOpd.includes("retribution-object:create"));
+  assert("admin-opd boleh product:approve", adminOpd.includes("product:approve"));
+  assert("admin-opd TIDAK boleh product:publish", !adminOpd.includes("product:publish"), adminOpd.filter((c) => c.startsWith("product:")));
+  assert("manajer-opd boleh product:publish", manajer.includes("product:publish"));
+  assert("manajer-opd TIDAK boleh delete", !manajer.some((c) => c.endsWith(":delete")));
+  assert("warga hanya order/payment/review", warga.every((c) => /^(order|payment|review):/.test(c)), warga);
+  assert("warga TIDAK boleh product:list", !warga.includes("product:list"));
+
+  // 4. Lingkup OPD tersimpan benar.
+  const scoped = await prisma.user.findFirstOrThrow({
+    where: { username: "admin.multiopd" },
+    select: {
+      userAppRoles: { select: { role: { select: { name: true } }, organizations: { select: { organization: { select: { code: true } } } } } },
+    },
+  });
+  const codesOf = scoped.userAppRoles[0]?.organizations.map((o) => o.organization.code).sort() ?? [];
+  assert("admin.multiopd dibatasi 2 OPD (BPSDM + DISBUDPAR)", codesOf.join(",") === "BPSDM,DISBUDPAR", codesOf);
+
+  const global = await prisma.user.findFirstOrThrow({
+    where: { username: "bapenda.lapak" },
+    select: { userAppRoles: { where: { application: { code: LAPAK } }, select: { organizations: { select: { organizationId: true } } } } },
+  });
+  assert("bapenda.lapak berlaku seluruh OPD (tanpa lingkup)", global.userAppRoles[0]?.organizations.length === 0, global.userAppRoles[0]?.organizations.length);
+
+  // 5. Login & gerbang akses nyata.
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, LAPAK);
+  assert("Akun PUBLIC bisa login ke Lapak", Boolean(wargaToken));
+  const wargaSeloko = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "seloko");
+  assert("Akun PUBLIC ditolak login ke seloko", wargaSeloko === null, wargaSeloko);
+
+  // Pegawai SELALU login lewat seloko (gateway INTERNAL), meski modul yang
+  // dikelolanya milik aplikasi lain. Izin modul dibaca dari aplikasi PEMILIK
+  // lewat GET /permissions/:applicationId/me — bukan dari header X-App-Code.
+  const adminOpdToken = await login("admin.bpsdm", DEFAULT_PASSWORD, "seloko");
+  assert("Pegawai admin OPD login lewat seloko", Boolean(adminOpdToken));
+
+  const adminOpdLapak = await login("admin.bpsdm", DEFAULT_PASSWORD, LAPAK);
+  assert("Pegawai DITOLAK login langsung ke aplikasi publik Lapak", adminOpdLapak === null, adminOpdLapak);
+
+  const mine = await request(`/permissions/${lapakApp.id}/me`, { token: adminOpdToken || undefined });
+  assert("Izin Lapak terbaca dari aplikasi pemilik (200)", mine.status === 200, mine.status, 200);
+  const minePerms: string[] = mine.data?.data?.permissions ?? [];
+  assert("admin OPD punya product:list", minePerms.includes("product:list"), minePerms.length);
+  assert("admin OPD TIDAK punya category:create", !minePerms.includes("category:create"));
+  assert("admin OPD punya product:approve", minePerms.includes("product:approve"));
+  assert("admin OPD TIDAK punya product:publish", !minePerms.includes("product:publish"));
+}
+
 // ─── Main Orchestrator ────────────────────────────────────────────────────────
 async function main() {
   const args = process.argv.slice(2);
@@ -827,6 +917,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "users-org" || targetModule === "role-scope") {
       await runUsersOrgSuite();
+    }
+    if (!targetModule || targetModule === "lapak-rbac" || targetModule === "lapak") {
+      await runLapakRbacSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

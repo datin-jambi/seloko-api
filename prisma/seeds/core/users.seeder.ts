@@ -6,6 +6,15 @@
 import { prisma, hashPassword, resolveExpiry } from "../shared/utils.js";
 import type { BulkDef, RoleRef, UserDef } from "../shared/types.js";
 
+/** Indeks id organisasi per `code`, dipakai penugasan berlingkup OPD. */
+export async function buildOrgIndex(): Promise<Map<string, string>> {
+  const orgs = await prisma.organization.findMany({
+    where: { deletedAt: null },
+    select: { id: true, code: true },
+  });
+  return new Map(orgs.map((o) => [o.code, o.id]));
+}
+
 /** Indeks id role per "appCode/roleName" agar tidak query berulang per user. */
 export async function buildRoleIndex(): Promise<Map<string, RoleRef>> {
   const roles = await prisma.role.findMany({
@@ -53,8 +62,9 @@ async function assignRole(
   userId: string,
   target: RoleRef,
   expiresAt: Date | null,
+  organizationIds: string[] = [],
 ): Promise<void> {
-  await prisma.userAppRole.upsert({
+  const uar = await prisma.userAppRole.upsert({
     where: {
       userId_applicationId_roleId: {
         userId,
@@ -69,13 +79,26 @@ async function assignRole(
       roleId: target.roleId,
       expiresAt,
     },
+    select: { id: true },
   });
+
+  // Lingkup OPD disinkron penuh tiap seed: cabut lalu pasang ulang, supaya
+  // menghapus `organizationCodes` dari JSON benar-benar mengembalikan penugasan
+  // ke "seluruh OPD" alih-alih menyisakan lingkup lama.
+  await prisma.userAppRoleOrganization.deleteMany({ where: { userAppRoleId: uar.id } });
+  if (organizationIds.length > 0) {
+    await prisma.userAppRoleOrganization.createMany({
+      data: organizationIds.map((organizationId) => ({ userAppRoleId: uar.id, organizationId })),
+      skipDuplicates: true,
+    });
+  }
 }
 
 async function seedUser(
   def: UserDef,
   defaultPassword: string,
   roleIndex: Map<string, RoleRef>,
+  orgIndex: Map<string, string>,
 ): Promise<void> {
   const plain =
     (def.passwordEnv ? process.env[def.passwordEnv] : undefined) ??
@@ -126,7 +149,16 @@ async function seedUser(
       assignment.role,
       `user "${label}"`,
     );
-    await assignRole(user.id, target, resolveExpiry(assignment.expiresAt));
+    const organizationIds = (assignment.organizationCodes ?? []).map((code) => {
+      const id = orgIndex.get(code);
+      if (!id) {
+        throw new Error(
+          `Organisasi "${code}" (user "${label}") tidak ada. Periksa core/organizations.json.`,
+        );
+      }
+      return id;
+    });
+    await assignRole(user.id, target, resolveExpiry(assignment.expiresAt), organizationIds);
   }
 }
 
@@ -143,8 +175,8 @@ async function seedBulkUsers(
   const bapendaEditor = requireRole(roleIndex, "bapenda-profile", "editor", "pegawai multi-app");
   const bapendaVerifikator = requireRole(roleIndex, "bapenda-profile", "verifikator", "pegawai multi-app");
   const bapendaViewer = requireRole(roleIndex, "bapenda-profile", "viewer", "pegawai multi-app");
-  const lapakWebVerifikator = requireRole(roleIndex, "lapak-jambi-web", "verifikator", "pegawai multi-app");
-  const lapakWebEditor = requireRole(roleIndex, "lapak-jambi-web", "editor", "pegawai multi-app");
+  const lapakWebAdminOpd = requireRole(roleIndex, "lapak-jambi-web", "admin-opd", "pegawai multi-app");
+  const lapakWebManajerOpd = requireRole(roleIndex, "lapak-jambi-web", "manajer-opd", "pegawai multi-app");
   const lapakAppViewer = requireRole(roleIndex, "lapak-jambi-app", "viewer", "pegawai multi-app");
 
   for (let i = 1; i <= bulk.count; i++) {
@@ -188,9 +220,9 @@ async function seedBulkUsers(
 
       // Akses tambahan ke lapak-jambi-web untuk 10 user pertama (i <= 10)
       if (i <= 5) {
-        await assignRole(user.id, lapakWebVerifikator, null);
+        await assignRole(user.id, lapakWebManajerOpd, null);
       } else if (i <= 10) {
-        await assignRole(user.id, lapakWebEditor, null);
+        await assignRole(user.id, lapakWebAdminOpd, null);
       }
 
       // Akses tambahan ke lapak-jambi-app untuk 5 user pertama (i <= 5)
@@ -214,9 +246,10 @@ export async function seedUsers(
   bulk: BulkDef | undefined,
   defaultPassword: string,
   roleIndex: Map<string, RoleRef>,
+  orgIndex: Map<string, string>,
 ): Promise<void> {
   for (const def of users) {
-    await seedUser(def, defaultPassword, roleIndex);
+    await seedUser(def, defaultPassword, roleIndex, orgIndex);
   }
   console.log(`✅ ${users.length} akun uji`);
 

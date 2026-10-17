@@ -256,8 +256,8 @@
       "phoneNumber": "0819-7488-020",
       "isActive": true,
       "emailVerified": true,
-      "$note": "Warga terdaftar di lapak-jambi-web sebagai pedagang. Uji: login lapak 200; login seloko & bapenda-profile 403; token lapak tidak bisa menyentuh modul inti seloko.",
-      "roles": [{ "app": "lapak-jambi-web", "role": "pedagang" }]
+      "$note": "Warga terdaftar di lapak-jambi-web sebagai pemesan (role warga). Uji: login lapak 200; login seloko & bapenda-profile 403; token lapak tidak bisa menyentuh modul inti seloko.",
+      "roles": [{ "app": "lapak-jambi-web", "role": "warga" }]
     },
     {
       "accountType": "PUBLIC",
@@ -266,7 +266,73 @@
       "isActive": true,
       "emailVerified": true,
       "$note": "Email SAMA dengan pegawai viewer.only — akun warga terpisah. Uji: email identik di dua accountType tidak bentrok, dan login di aplikasi publik mengambil baris warga, bukan pegawai.",
-      "roles": [{ "app": "lapak-jambi-web", "role": "pedagang" }]
+      "roles": [{ "app": "lapak-jambi-web", "role": "warga" }]
+    },
+    {
+      "username": "admin.bpsdm",
+      "email": "admin.bpsdm@gmail.com",
+      "fullName": "Rina Kartika (Admin BPSDM)",
+      "nip": "198501152010012003",
+      "phoneNumber": "0813-7500-101",
+      "isActive": true,
+      "emailVerified": true,
+      "$note": "Admin OPD di lapak-jambi-web, DIBATASI ke OPD BPSDM. Uji: hanya melihat produk/pesanan BPSDM; OPD lain 403.",
+      "roles": [
+        { "app": "lapak-jambi-web", "role": "admin-opd", "organizationCodes": ["BPSDM"] }
+      ]
+    },
+    {
+      "username": "manajer.bpsdm",
+      "email": "manajer.bpsdm@gmail.com",
+      "fullName": "Agus Pirngadi (Kepala BPSDM)",
+      "nip": "197803102006041002",
+      "phoneNumber": "0813-7500-102",
+      "isActive": true,
+      "emailVerified": true,
+      "$note": "Manajer OPD BPSDM. Uji: boleh product:publish untuk BPSDM, tidak boleh menghapus.",
+      "roles": [
+        { "app": "lapak-jambi-web", "role": "manajer-opd", "organizationCodes": ["BPSDM"] }
+      ]
+    },
+    {
+      "username": "admin.multiopd",
+      "email": "admin.multiopd@gmail.com",
+      "fullName": "Sari Dewi (Admin BPSDM & Disbudpar)",
+      "nip": "199002202015032004",
+      "phoneNumber": "0813-7500-103",
+      "isActive": true,
+      "emailVerified": true,
+      "$note": "Satu penugasan, DUA OPD (BPSDM + DISBUDPAR). Uji: lingkup gabungan (union) pada user_app_role_organizations.",
+      "roles": [
+        { "app": "lapak-jambi-web", "role": "admin-opd", "organizationCodes": ["BPSDM", "DISBUDPAR"] }
+      ]
+    },
+    {
+      "username": "petugas.samsat",
+      "email": "petugas.samsat@gmail.com",
+      "fullName": "Joko Susilo (Petugas Lokasi)",
+      "nip": "199205052018011005",
+      "phoneNumber": "0813-7500-104",
+      "isActive": true,
+      "emailVerified": true,
+      "$note": "Petugas lokasi lintas OPD (tanpa organizationCodes) — hanya ticket/order read+update.",
+      "roles": [
+        { "app": "lapak-jambi-web", "role": "petugas-lokasi" }
+      ]
+    },
+    {
+      "username": "bapenda.lapak",
+      "email": "bapenda.lapak@gmail.com",
+      "fullName": "Dedi Kurniawan (Admin Bapenda Lapak)",
+      "nip": "198707072012011006",
+      "phoneNumber": "0813-7500-105",
+      "isActive": true,
+      "emailVerified": true,
+      "$note": "Admin level Bapenda: SELURUH OPD (tanpa organizationCodes) + wewenang master (kategori, objek retribusi, SKRD).",
+      "roles": [
+        { "app": "seloko", "role": "viewer" },
+        { "app": "lapak-jambi-web", "role": "admin" }
+      ]
     }
   ],
   "bulk": {

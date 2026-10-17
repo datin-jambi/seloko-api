@@ -41,6 +41,12 @@ export interface RoleDef {
   description: string;
   /** null = seluruh permission aplikasi. */
   allowedActions: string[] | null;
+  /**
+   * Batasi ke entity tertentu (mis. `["product", "order", "ticket"]`).
+   * Absen/null = semua entity. Dipakai memisahkan wewenang master (Bapenda)
+   * dari wewenang operasional OPD saat aksi keduanya sama.
+   */
+  allowedEntities?: string[] | null;
   /** Kode aplikasi tempat role dibuat. Absen = semua aplikasi. */
   apps?: string[];
   isActive?: boolean;
@@ -60,6 +66,11 @@ export interface RoleAssignmentDef {
   role: string;
   /** null/absen = permanen, "expired", "+30d", atau ISO date. */
   expiresAt?: string | null;
+  /**
+   * Kode OPD yang membatasi penugasan (dari organizations.json).
+   * Absen/kosong = berlaku untuk SELURUH OPD (level Bapenda).
+   */
+  organizationCodes?: string[];
 }
 
 export interface UserDef {

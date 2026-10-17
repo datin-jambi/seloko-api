@@ -182,7 +182,7 @@
     {
       "code": "lapak-jambi-web",
       "baseUrl": "http://localhost:3003",
-      "icon": "store",
+      "icon": "shopping-bag",
       "items": [
         {
           "code": "dasbor",
@@ -191,50 +191,28 @@
           "path": "/lapak/dashboard"
         },
         {
-          "code": "mitra",
-          "label": "Mitra",
-          "icon": "handshake",
-          "items": [
-            {
-              "code": "mitra.merchant",
-              "label": "Merchant",
-              "icon": "store",
-              "path": "/lapak/merchant",
-              "permission": "merchant:list"
-            },
-            {
-              "code": "mitra.verifikasi",
-              "label": "Verifikasi Merchant",
-              "icon": "badge-check",
-              "path": "/lapak/merchant/verifikasi",
-              "permission": "merchant:approve",
-              "roles": ["superadmin", "admin", "verifikator"]
-            }
-          ]
-        },
-        {
           "code": "katalog",
           "label": "Katalog",
           "icon": "package",
           "items": [
             {
               "code": "katalog.produk",
-              "label": "Produk",
+              "label": "Produk & Layanan",
               "icon": "package",
               "path": "/lapak/produk",
               "permission": "product:list"
             },
             {
-              "code": "katalog.produk.verifikasi",
-              "label": "Verifikasi Produk",
+              "code": "katalog.produk.review",
+              "label": "Persetujuan Produk",
               "icon": "badge-check",
-              "path": "/lapak/produk/verifikasi",
+              "path": "/lapak/produk/persetujuan",
               "permission": "product:approve",
-              "roles": ["superadmin", "admin", "verifikator"]
+              "roles": ["superadmin", "admin", "manajer-opd"]
             },
             {
               "code": "katalog.kategori",
-              "label": "Kategori",
+              "label": "Kategori Layanan",
               "icon": "tags",
               "path": "/lapak/kategori",
               "permission": "category:list"
@@ -254,11 +232,88 @@
               "permission": "order:list"
             },
             {
-              "code": "transaksi.ekspor",
-              "label": "Ekspor Laporan",
-              "icon": "file-down",
-              "path": "/lapak/pesanan/ekspor",
-              "permission": "order:export"
+              "code": "transaksi.pembayaran",
+              "label": "Pembayaran",
+              "icon": "wallet",
+              "path": "/lapak/pembayaran",
+              "permission": "payment:list"
+            },
+            {
+              "code": "transaksi.tiket",
+              "label": "Tiket & Check-in",
+              "icon": "ticket",
+              "path": "/lapak/tiket",
+              "permission": "ticket:list"
+            }
+          ]
+        },
+        {
+          "code": "master",
+          "label": "Master",
+          "icon": "database",
+          "items": [
+            {
+              "code": "master.objek-retribusi",
+              "label": "Objek Retribusi",
+              "icon": "landmark",
+              "path": "/lapak/objek-retribusi",
+              "permission": "retribution-object:list"
+            },
+            {
+              "code": "master.skrd",
+              "label": "Pengaturan SKRD",
+              "icon": "file-signature",
+              "path": "/lapak/pengaturan-skrd",
+              "permission": "skrd-setting:list"
+            }
+          ]
+        },
+        {
+          "code": "konten",
+          "label": "Konten OPD",
+          "icon": "newspaper",
+          "items": [
+            {
+              "code": "konten.berita",
+              "label": "Berita",
+              "icon": "file-text",
+              "path": "/lapak/berita",
+              "permission": "news:list"
+            },
+            {
+              "code": "konten.artikel",
+              "label": "Artikel",
+              "icon": "book-open",
+              "path": "/lapak/artikel",
+              "permission": "article:list"
+            },
+            {
+              "code": "konten.galeri",
+              "label": "Galeri",
+              "icon": "images",
+              "path": "/lapak/galeri",
+              "permission": "gallery:list"
+            },
+            {
+              "code": "konten.banner",
+              "label": "Banner",
+              "icon": "panel-top",
+              "path": "/lapak/banner",
+              "permission": "banner:list"
+            }
+          ]
+        },
+        {
+          "code": "laporan",
+          "label": "Laporan",
+          "icon": "chart-column",
+          "items": [
+            {
+              "code": "laporan.penerimaan",
+              "label": "Penerimaan",
+              "icon": "trending-up",
+              "path": "/lapak/laporan",
+              "permission": "report:list"
             }
           ]
         },

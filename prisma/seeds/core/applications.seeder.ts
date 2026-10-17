@@ -87,9 +87,18 @@ async function syncRoles(
         ? null
         : new Set(expandActions(roleDef.allowedActions, actionGroups));
 
+    // Penyaring entity: tanpa ini `admin-opd` yang boleh `content` otomatis ikut
+    // memegang `category:create`/`retribution-object:create` milik Bapenda.
+    const entities =
+      roleDef.allowedEntities && roleDef.allowedEntities.length > 0
+        ? new Set(roleDef.allowedEntities)
+        : null;
+
     const granted = allPermissions.filter((p) => {
+      const [entity, action] = p.code.split(":");
+      if (entities !== null && !entities.has(entity ?? "")) return false;
       if (allowed === null) return true;
-      return allowed.has(p.code.split(":")[1] ?? "");
+      return allowed.has(action ?? "");
     });
 
     // Sinkron penuh: cabut yang tidak lagi berlaku, lalu tambahkan sisanya.
@@ -141,6 +150,43 @@ export async function seedApplications(
       actionGroups,
     );
     const roleCount = await syncRoles(def.code, app.id, audience, roles, actionGroups);
+
+    // Pangkas yang DIHAPUS dari JSON. Tanpa ini, entity/role lama (mis.
+    // `merchant` & role `pedagang` saat Lapak beralih ke aset daerah) tetap
+    // hidup di DB dan terus memberi izin. Hanya role sistem yang dipangkas —
+    // role buatan operator lewat CMS tidak pernah disentuh seeder.
+    const expectedPermissions = new Set(
+      def.permissions.flatMap((perm) =>
+        expandActions(perm.actions, actionGroups).map((action) => `${perm.entity}:${action}`),
+      ),
+    );
+    const stalePermissions = (
+      await prisma.permission.findMany({ where: { applicationId: app.id }, select: { id: true, code: true } })
+    ).filter((perm) => !expectedPermissions.has(perm.code));
+    if (stalePermissions.length > 0) {
+      await prisma.permission.deleteMany({
+        where: { id: { in: stalePermissions.map((perm) => perm.id) } },
+      });
+      console.log(
+        `   ↳ ${stalePermissions.length} permission usang dihapus: ${stalePermissions.map((perm) => perm.code).join(", ")}`,
+      );
+    }
+
+    const expectedRoles = new Set(
+      roles
+        .filter((role) => !role.apps || role.apps.length === 0 || role.apps.includes(def.code))
+        .map((role) => role.name),
+    );
+    const staleRoles = (
+      await prisma.role.findMany({
+        where: { applicationId: app.id, isSystemRole: true },
+        select: { id: true, name: true },
+      })
+    ).filter((role) => !expectedRoles.has(role.name));
+    if (staleRoles.length > 0) {
+      await prisma.role.deleteMany({ where: { id: { in: staleRoles.map((role) => role.id) } } });
+      console.log(`   ↳ ${staleRoles.length} role usang dihapus: ${staleRoles.map((role) => role.name).join(", ")}`);
+    }
 
     const status = def.isActive === false ? " (NONAKTIF)" : "";
     console.log(

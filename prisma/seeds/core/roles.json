@@ -33,7 +33,11 @@
     {
       "name": "editor",
       "description": "Membuat dan mengubah konten, tanpa hapus/terbit",
-      "allowedActions": ["create", "read", "update", "list"]
+      "allowedActions": ["create", "read", "update", "list"],
+      "allowedEntities": [
+        "news", "news-category", "page", "banner", "gallery", "uptd",
+        "product", "order", "payment", "ticket", "article", "review", "report"
+      ]
     },
     {
       "name": "verifikator",
@@ -59,11 +63,36 @@
       "allowedActions": null
     },
     {
-      "name": "pedagang",
-      "description": "Warga pemilik lapak: kelola produk dan pesanannya sendiri",
+      "name": "warga",
+      "description": "Masyarakat: memesan layanan, membayar, dan mengulas",
       "audience": "PUBLIC",
       "apps": ["lapak-jambi-web"],
-      "allowedActions": ["create", "read", "update", "list"]
+      "allowedActions": ["create", "read", "list"],
+      "allowedEntities": ["order", "payment", "review"]
+    },
+    {
+      "name": "admin-opd",
+      "description": "Pengelola operasional OPD: produk, pesanan, pembayaran, tiket, konten OPD",
+      "apps": ["lapak-jambi-web"],
+      "allowedActions": ["create", "read", "update", "list", "approve", "reject", "export"],
+      "allowedEntities": [
+        "product", "order", "payment", "ticket",
+        "news", "article", "gallery", "banner", "review", "report"
+      ]
+    },
+    {
+      "name": "manajer-opd",
+      "description": "Kepala OPD: menyetujui & menerbitkan produk serta konten OPD",
+      "apps": ["lapak-jambi-web"],
+      "allowedActions": ["read", "list", "approve", "reject", "publish"],
+      "allowedEntities": ["product", "news", "article", "report"]
+    },
+    {
+      "name": "petugas-lokasi",
+      "description": "Petugas di lokasi: memindai tiket dan mencatat pemakaian",
+      "apps": ["lapak-jambi-web"],
+      "allowedActions": ["read", "list", "update"],
+      "allowedEntities": ["ticket", "order"]
     }
   ]
 }

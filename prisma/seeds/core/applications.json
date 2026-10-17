@@ -102,23 +102,31 @@
         }
       },
       "permissions": [
-        { "module": "Mitra", "entity": "merchant", "label": "Merchant", "actions": ["verifiable"] },
-        { "module": "Katalog", "entity": "product", "label": "Produk", "actions": ["verifiable"] },
-        { "module": "Katalog", "entity": "category", "label": "Kategori", "actions": ["content"] },
-        { "module": "Transaksi", "entity": "order", "label": "Pesanan", "actions": ["read", "list", "update", "export"] }
+        { "module": "Master", "entity": "category", "label": "Kategori Layanan", "actions": ["content"] },
+        { "module": "Master", "entity": "retribution-object", "label": "Objek Retribusi", "actions": ["content"] },
+        { "module": "Master", "entity": "skrd-setting", "label": "Pengaturan SKRD", "actions": ["content"] },
+        { "module": "Katalog", "entity": "product", "label": "Produk & Layanan", "actions": ["reviewable"] },
+        { "module": "Transaksi", "entity": "order", "label": "Pesanan", "actions": ["verifiable", "export"] },
+        { "module": "Transaksi", "entity": "payment", "label": "Pembayaran", "actions": ["verifiable"] },
+        { "module": "Transaksi", "entity": "ticket", "label": "Tiket & Check-in", "actions": ["read", "list", "update"] },
+        { "module": "Konten", "entity": "news", "label": "Berita", "actions": ["reviewable"] },
+        { "module": "Konten", "entity": "article", "label": "Artikel", "actions": ["reviewable"] },
+        { "module": "Media", "entity": "gallery", "label": "Galeri", "actions": ["content"] },
+        { "module": "Media", "entity": "banner", "label": "Banner", "actions": ["content"] },
+        { "module": "Keterlibatan", "entity": "review", "label": "Ulasan", "actions": ["read", "list", "update"] },
+        { "module": "Laporan", "entity": "report", "label": "Laporan Penerimaan", "actions": ["read", "list", "export"] }
       ]
     },
     {
       "code": "lapak-jambi-app",
       "name": "Lapak Jambi Mobile",
-      "description": "Marketplace UMKM Jambi — aplikasi mobile",
+      "description": "Lapak Jambi versi mobile — menyusul, akan digabung ke lapak-jambi-web (LJ-5.2)",
       "isActive": true,
       "audience": "PUBLIC",
       "settings": { "branding": { "shortName": "Lapak Jambi", "primaryColor": "#EA580C" } },
       "permissions": [
-        { "module": "Mitra", "entity": "merchant", "label": "Merchant", "actions": ["read", "list", "update"] },
-        { "module": "Katalog", "entity": "product", "label": "Produk", "actions": ["content"] },
-        { "module": "Transaksi", "entity": "order", "label": "Pesanan", "actions": ["read", "list", "update"] }
+        { "module": "Katalog", "entity": "product", "label": "Produk & Layanan", "actions": ["read", "list"] },
+        { "module": "Transaksi", "entity": "order", "label": "Pesanan", "actions": ["read", "list"] }
       ]
     },
     {
