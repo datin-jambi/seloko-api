@@ -13,7 +13,8 @@ Repositori ini adalah **SELOKO API** — Centralized Core API & Multi-App Engine
 ## 1. Prinsip Arsitektur Utama
 - **Multi-Tenancy (`X-App-Code`):** Wajib di seluruh rute `/api/*`. Pegawai (`INTERNAL`) login hanya lewat gateway `seloko`. Warga (`PUBLIC`) login langsung di aplikasi publik masing-masing.
 - **Dynamic RBAC & Redis Cache:** Pemeriksaan izin per user di-cache di Redis (`perms:user:{userId}:app:{appCode}`, TTL 5 menit) dan otomatis di-invalidate saat ada mutasi role/permission.
-- **Centralized Storage (ImageKit):** Upload multipart melalui `/api/storage/upload` dengan path folder otomatis `/{appCode}/{module}/{subFolder}` dan auto-generated hash filename `{prefix}_{YYYYMMDD}_{HHmmss}_{hash8}{ext}`.
+- **Dokumentasi API Wajib Ikut Berubah:** Setiap rute baru, atau perubahan path/query/body/response/guard pada rute lama, WAJIB memperbarui `docs/api/<app>/<modul>.md`, menambah entri di `docs/api/CHANGELOG.md`, dan menyesuaikan jumlah endpoint di `docs/api/README.md` + `docs/api/<app>/README.md` — dalam perubahan yang SAMA. Endpoint tanpa dokumentasi dianggap fitur belum selesai. Format & aturan lengkap: `docs/api/README.md` §Aturan Wajib.
+- **Centralized Storage (ImageKit): Upload multipart melalui `/api/storage/upload` dengan path folder otomatis `/{appCode}/{module}/{subFolder}` dan auto-generated hash filename `{prefix}_{YYYYMMDD}_{HHmmss}_{hash8}{ext}`.
 - **Konvensi 4-Layer Modular Monolith:**
   - `*.schema.ts` (Zod DTO & validation)
   - `*.service.ts` (Business logic murni & Prisma query, filter `deletedAt: null`)

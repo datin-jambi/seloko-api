@@ -1,0 +1,130 @@
+# 📡 Dokumentasi API — SELOKO API
+
+Dokumentasi kontrak API yang **tinggal di repo**, satu berkas per modul, dikelompokkan per aplikasi.
+Sumber kebenaran tetap Zod schema di `src/**/*.schema.ts`; berkas di sini adalah cermin yang harus
+diperbarui pada perubahan yang sama (lihat [aturan](#aturan-wajib)).
+
+- **Base URL:** `http://localhost:3000/api` (dev) · `API_BASE_URL` di smoke runner
+- **Header wajib:** `X-App-Code: <kode aplikasi>` — kecuali `/api/health`
+- **Autentikasi:** `Authorization: Bearer <accessToken>`
+- **Format respons:** `{ success, message, data, meta? }` — lihat [00-konvensi.md](./00-konvensi.md)
+
+---
+
+## Struktur
+
+```text
+docs/api/
+├── README.md                  # indeks ini
+├── 00-konvensi.md             # format respons, error, header, paginasi, sanitasi
+├── CHANGELOG.md               # riwayat perubahan kontrak API
+├── core/                      # aplikasi "seloko" (konsol & identitas)
+│   ├── README.md              # ikhtisar modul Core
+│   ├── auth.md
+│   ├── users.md
+│   ├── applications.md
+│   ├── permissions.md
+│   ├── roles.md
+│   ├── menus.md
+│   ├── organizations.md
+│   └── storage.md
+└── bapenda/                   # aplikasi "bapenda-profile"
+    ├── README.md              # ikhtisar modul Bapenda
+    ├── uptds.md
+    ├── banners.md
+    ├── news.md
+    └── pages.md
+```
+
+Aplikasi baru (mis. `lapak/`) mendapat folder sendiri dengan pola yang sama: satu `README.md`
+ikhtisar + satu berkas per modul.
+
+---
+
+## Indeks Endpoint
+
+### Core — aplikasi `seloko`
+
+| Modul | Berkas | Endpoint | Akses |
+|---|---|:---:|---|
+| Auth | [core/auth.md](./core/auth.md) | 5 | publik + bearer |
+| Users | [core/users.md](./core/users.md) | 9 | `user:*`, `user-app-role:*` |
+| Applications | [core/applications.md](./core/applications.md) | 8 | publik + `application:*` |
+| Permissions | [core/permissions.md](./core/permissions.md) | 7 | `permission:*` |
+| Roles | [core/roles.md](./core/roles.md) | 8 | `role:*` |
+| Menus | [core/menus.md](./core/menus.md) | 8 | `application:*` |
+| Organizations | [core/organizations.md](./core/organizations.md) | 8 | publik + `organization:*` |
+| Storage | [core/storage.md](./core/storage.md) | 3 | `authenticate` |
+
+**Total Core: 56 endpoint.**
+
+### Bapenda — aplikasi `bapenda-profile`
+
+| Modul | Berkas | Endpoint | Akses |
+|---|---|:---:|---|
+| UPTD Samsat | [bapenda/uptds.md](./bapenda/uptds.md) | 9 | publik + `uptd:*` |
+| Banners | [bapenda/banners.md](./bapenda/banners.md) | 8 | publik + `banner:*` |
+| News & Kategori | [bapenda/news.md](./bapenda/news.md) | 14 | publik + `news:*`, `news-category:*` |
+| Halaman Profil | [bapenda/pages.md](./bapenda/pages.md) | 8 | publik + `page:*` |
+
+**Total Bapenda: 39 endpoint.**
+
+**Total keseluruhan: 95 endpoint.**
+
+---
+
+## Aturan Wajib
+
+Berlaku untuk developer dan AI Agent. Bagian ini yang membuat dokumentasi tidak basi.
+
+1. **Berkas dokumentasi diperbarui pada perubahan yang SAMA** dengan kodenya — tidak ditunda,
+   tidak "nanti sekalian". PR yang mengubah rute/parameter/body/respons tanpa memperbarui
+   `docs/api/` dianggap belum selesai.
+2. **Endpoint baru** → tambahkan baris di tabel berkas modulnya **dan** perbarui jumlah endpoint
+   di `README.md` modul + tabel indeks ini.
+3. **Endpoint berubah** (path, query, body, bentuk respons, guard/izin) → perbarui tabel endpoint,
+   contoh request/response, dan catat di [`CHANGELOG.md`](./CHANGELOG.md).
+4. **Endpoint dihapus** → jangan hapus barisnya begitu saja; pindahkan ke bagian *Deprecated* di
+   berkas modul dengan tanggal dan penggantinya, lalu catat di `CHANGELOG.md`.
+5. **Modul baru** → buat `docs/api/<app>/<modul>.md` mengikuti format baku, daftarkan di
+   `docs/api/<app>/README.md` dan indeks di atas.
+6. **Aplikasi baru** → buat folder `docs/api/<app>/` + `README.md` ikhtisar.
+7. **Kontrak mengikuti kode.** Bila dokumen dan Zod schema berbeda, yang benar adalah schema —
+   perbaiki dokumennya, atau perbaiki keduanya bila schema-nya yang salah.
+8. **Jangan menyalin isi respons secara manual dari ingatan.** Ambil dari `*.schema.ts` atau
+   panggil endpoint sungguhan, supaya bentuknya nyata.
+
+### Format baku satu berkas modul
+
+```markdown
+# <Nama Modul>
+
+- **Aplikasi:** `<kode aplikasi>`
+- **Prefix:** `/api/<prefix>`
+- **Sumber kode:** `src/modules/<...>/<modul>.routes.ts`
+- **Jumlah endpoint:** N
+
+## Ringkasan Endpoint
+| No | Method | Path | Guard / Akses | Deskripsi |
+
+## Detail Endpoint
+### <METHOD> <path>
+- **Akses:**
+- **Query / Body / Params:**
+- **Contoh request:**
+- **Contoh response:** (200/201)
+- **Error yang mungkin:**
+
+## Catatan Perilaku
+```
+
+---
+
+## Perbedaan dengan Apidog
+
+Dokumentasi Apidog (`seloko.apidog.io`) adalah **salinan untuk dibaca manusia & dicoba langsung**.
+Berkas di folder ini yang menjadi **acuan utama di repo** karena ikut di-review bersama kodenya.
+
+Setelah memperbarui `docs/api/`, sinkronkan ke Apidog dengan menyalin bagian yang berubah.
+Perbedaan yang diketahui saat ini: Apidog belum memuat modul **Organizations**, **Pages**, dan
+`GET /users/:id/roles`, serta belum mencantumkan `organizationIds` pada Assign Role.

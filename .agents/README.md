@@ -22,6 +22,8 @@ Direktori ini dirancang untuk mengubah AI Agent (maupun developer baru) menjadi 
 │   ├── README.md                   # Aturan pipeline
 │   └── lapak-jambi.md              # Pipeline Lapak Jambi (LJ-x.y)
 │
+└── ../docs/api/                    # Dokumentasi kontrak API (per aplikasi + per modul, + CHANGELOG)
+│
 ├── rules/                          # Guidelines & pembatas teknis (selalu aktif / terikat konteks)
 │   ├── seloko-api-general.md       # Arsitektur modular monolith, multi-tenancy X-App-Code, ImageKit lifecycle
 │   ├── coding-standards.md         # Format Zod DTO, exactOptionalPropertyTypes, respon standar, error handling

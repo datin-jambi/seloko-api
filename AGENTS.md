@@ -49,6 +49,13 @@ Sebelum melakukan tugas pengkodean, perbaikan, atau penambahan modul pada reposi
 
 ---
 
+## 📡 Dokumentasi API (`docs/api/`)
+Dokumentasi kontrak API tinggal di repo, dikelompokkan **per aplikasi → per modul** (mengikuti pola Apidog): `core/` (auth, users, applications, permissions, roles, menus, organizations, storage) dan `bapenda/` (uptds, banners, news, pages), plus `00-konvensi.md` & `CHANGELOG.md`.
+
+**Wajib:** rute baru atau perubahan kontrak → perbarui `docs/api/<app>/<modul>.md` + entri `CHANGELOG.md` + jumlah endpoint di kedua `README.md`, **pada perubahan yang sama**. Format baku: [`docs/api/README.md`](file:///docs/api/README.md).
+
+---
+
 ## 🚀 Perintah Standar Pengembangan
 - `npm run dev` — Menjalankan development server Fastify.
 - `npm run typecheck` — Memverifikasi seluruh kode TypeScript (wajib 0 error).
