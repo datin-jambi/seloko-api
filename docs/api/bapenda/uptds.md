@@ -1,81 +1,230 @@
 # UPTD Samsat
 
-- **Aplikasi:** `bapenda-profile`
-- **Prefix:** `/api/bapenda/uptds`
+- **Aplikasi:** `bapenda-profile` · **Prefix:** `/api/bapenda/uptds` · **Jumlah endpoint:** 9
 - **Sumber kode:** `src/modules/bapenda/uptds/uptds.routes.ts`
-- **Jumlah endpoint:** 9
 
-Direktori kantor UPTD Samsat se-Provinsi Jambi, ditampilkan sebagai daftar dan peta publik.
+Direktori kantor UPTD Samsat se-Provinsi Jambi: daftar publik dan peta.
 
 ## Ringkasan Endpoint
 
-| No | Method | Path | Akses | Deskripsi |
+| No | Method | Path | Guard | Deskripsi |
 |:--:|---|---|---|---|
-| 1 | `GET` | `/public` | publik | Daftar UPTD aktif untuk direktori publik. |
-| 2 | `GET` | `/public/:code` | publik | Detail UPTD berdasarkan kode (mis. `UPTD-001`). |
-| 3 | `GET` | `/` | `uptd:list` | Daftar CMS: paginasi, cari, filter kota/aktif/peta. |
-| 4 | `GET` | `/:id` | `uptd:read` | Detail UPTD. |
-| 5 | `POST` | `/` | `uptd:create` | Tambah UPTD. |
-| 6 | `PUT` | `/:id` | `uptd:update` | Perbarui UPTD. |
-| 7 | `PATCH` | `/:id/active` | `uptd:update` | Aktif/nonaktif. |
-| 8 | `PATCH` | `/:id/map` | `uptd:update` | Toggle tampil/tidak di peta publik. |
-| 9 | `DELETE` | `/:id` | `uptd:delete` | Soft-delete. |
+| 1 | `GET` | `/public` | publik | Daftar UPTD aktif |
+| 2 | `GET` | `/public/:code` | publik | Detail via kode (`UPTD-001`) |
+| 3 | `GET` | `/` | `uptd:list` | Daftar CMS berpaginasi + filter |
+| 4 | `GET` | `/:id` | `uptd:read` | Detail |
+| 5 | `POST` | `/` | `uptd:create` | Tambah |
+| 6 | `PUT` | `/:id` | `uptd:update` | Perbarui |
+| 7 | `PATCH` | `/:id/active` | `uptd:update` | Aktif/nonaktif |
+| 8 | `PATCH` | `/:id/map` | `uptd:update` | Tampil/tidak di peta publik |
+| 9 | `DELETE` | `/:id` | `uptd:delete` | Soft-delete |
 
-## Detail Endpoint
+## Bentuk Objek
 
-### GET /bapenda/uptds/public
-- **Query:** `search?` (nama/kode/alamat), `city?`.
-- **Response 200:** hanya `isActive: true`:
-  ```json
-  {
-    "statusCode": 200, "code": "SUCCESS", "message": "...",
-    "data": [{
-      "id": "...", "code": "UPTD-001", "name": "UPTD Samsat Kota Jambi",
-      "description": null, "address": "...", "phone": "...", "email": null,
-      "headName": "...", "province": "Jambi", "city": "Kota Jambi",
-      "district": null, "subDistrict": null, "postalCode": null,
-      "latitude": -1.61, "longitude": 103.61, "googleMapsUrl": null,
-      "isActive": true, "showOnPublicMap": true,
-      "createdAt": "...", "updatedAt": "..."
-    }]
-  }
-  ```
+| Field | Tipe | Keterangan |
+|---|---|---|
+| `id` | string | UUID v7 |
+| `code` | string | Unik, mis. `UPTD-001` |
+| `name` | string | — |
+| `description`, `address`, `phone`, `email`, `headName` | string \| null | — |
+| `province` | string \| null | Bawaan `"Jambi"` saat dibuat |
+| `city`, `district`, `subDistrict`, `postalCode` | string \| null | Wilayah administrasi |
+| `latitude` | number \| null | −90…90 |
+| `longitude` | number \| null | −180…180 |
+| `googleMapsUrl` | string \| null | URL |
+| `isActive` | boolean | — |
+| `showOnPublicMap` | boolean | — |
+| `createdAt`, `updatedAt` | string | ISO 8601 |
 
-### GET /bapenda/uptds/public/:code
-- **Response 200:** satu objek UPTD. **Error:** `404`.
+---
 
-### GET /bapenda/uptds
-- **Query:** `page`, `limit` (1–100), `search?`, `city?`, `isActive?`, `showOnPublicMap?`,
-  `sortBy` (`name`/`code`/`city`/`createdAt`), `sortOrder` (`asc`/`desc`).
-- **Response 200:** `data[]` + `meta` paginasi.
+## 1. GET /api/bapenda/uptds/public
 
-### GET /bapenda/uptds/:id
-- **Response 200:** satu objek. **Error:** `404`.
+**Akses:** publik.
 
-### POST /bapenda/uptds
-- **Body:** `code` (2–50, `^[a-z0-9_-]+$`), `name` (3–150), `description?`, `address?`,
-  `phone?`, `email?`, `headName?`, `province?` (bawaan `Jambi`), `city?`, `district?`,
-  `subDistrict?`, `postalCode?`, `latitude?`, `longitude?`, `googleMapsUrl?`,
-  `isActive?`, `showOnPublicMap?`.
-- **Response 201:** objek UPTD. **Error:** `409` kode sudah dipakai.
+### Query Parameter
 
-### PUT /bapenda/uptds/:id
-- **Body:** subset field `POST` (kecuali `code`). Minimal satu.
-- **Response 200:** objek UPTD.
+| Nama | Wajib | Tipe | Aturan | Keterangan |
+|---|:--:|---|---|---|
+| `search` | — | string | ≤100 karakter | Cari di `name`, `code`, `address`, `headName` |
+| `city` | — | string | ≤100 karakter | Filter kota (contains, case-insensitive) |
 
-### PATCH /bapenda/uptds/:id/active
-- **Body:** `{ "isActive": boolean }` → `{ statusCode, code, message, data }`
+Hanya `isActive: true` dan belum dihapus. Tanpa paginasi.
 
-### PATCH /bapenda/uptds/:id/map
-- **Body:** `{ "showOnPublicMap": boolean }`
-- **Catatan:** hanya UPTD dengan `showOnPublicMap: true` yang dirender di peta portal.
+### Response 200
 
-### DELETE /bapenda/uptds/:id
-- **Perilaku:** soft-delete → `{ statusCode, code, message, data }`
-- **Error:** `404`.
+```json
+{
+  "statusCode": 200, "code": "SUCCESS", "message": "Daftar UPTD berhasil diambil",
+  "data": [{
+    "id": "...", "code": "UPTD-001", "name": "UPTD Samsat Kota Jambi",
+    "description": null, "address": "Jl. ...", "phone": "0741-...", "email": null,
+    "headName": "...", "province": "Jambi", "city": "Kota Jambi",
+    "district": null, "subDistrict": null, "postalCode": null,
+    "latitude": -1.61, "longitude": 103.61, "googleMapsUrl": null,
+    "isActive": true, "showOnPublicMap": true,
+    "createdAt": "...", "updatedAt": "..."
+  }]
+}
+```
+
+---
+
+## 2. GET /api/bapenda/uptds/public/:code
+
+**Akses:** publik.
+
+### Path Parameter
+
+| Nama | Wajib | Tipe | Aturan |
+|---|:--:|---|---|
+| `code` | ✓ | string | 2–50 |
+
+**Response 200:** satu objek. **Error:** `404` kode tidak ada atau nonaktif.
+
+---
+
+## 3. GET /api/bapenda/uptds
+
+**Akses:** `authenticate` + `uptd:list` (aplikasi `bapenda-profile`).
+
+### Query Parameter
+
+| Nama | Wajib | Tipe | Aturan | Default | Keterangan |
+|---|:--:|---|---|---|---|
+| `page` | — | integer | ≥ 1 | `1` | — |
+| `limit` | — | integer | 1–100 | `20` | — |
+| `search` | — | string | ≤100 karakter | — | `name`, `code`, `headName`, `address` |
+| `city` | — | string | ≤100 karakter | — | Filter kota |
+| `isActive` | — | string | `"true"` \| `"false"` | — | Filter status |
+| `showOnPublicMap` | — | string | `"true"` \| `"false"` | — | Filter tampil di peta |
+| `sortBy` | — | enum | `name` \| `code` \| `city` \| `createdAt` | `name` | — |
+| `sortOrder` | — | enum | `asc` \| `desc` | `asc` | — |
+
+**Response 200:** `data[]` + `meta` (`totalItems`, `totalPages`, `hasNextPage`, `hasPreviousPage`).
+
+---
+
+## 4. GET /api/bapenda/uptds/:id
+
+**Akses:** `authenticate` + `uptd:read`.
+
+### Path Parameter
+
+| Nama | Wajib | Tipe | Aturan |
+|---|:--:|---|---|
+| `id` | ✓ | uuid | — |
+
+**Response 200:** satu objek. **Error:** `404`.
+
+---
+
+## 5. POST /api/bapenda/uptds
+
+**Akses:** `authenticate` + `uptd:create`.
+
+### Request Body
+
+| Field | Wajib | Tipe | Aturan | Default | Nullable |
+|---|:--:|---|---|---|:--:|
+| `code` | ✓ | string | 2–50, `^[a-z0-9_-]+$` (case-insensitive), unik | — | — |
+| `name` | ✓ | string | 3–150 | — | — |
+| `description` | — | string | — | — | — |
+| `address` | — | string | — | — | — |
+| `phone` | — | string | ≤30 | — | — |
+| `email` | — | string | email valid, ≤100 | — | — |
+| `headName` | — | string | ≤150 | — | — |
+| `province` | — | string | ≤50 | `"Jambi"` | — |
+| `city` | — | string | ≤100 | — | — |
+| `district` | — | string | ≤100 | — | — |
+| `subDistrict` | — | string | ≤100 | — | — |
+| `postalCode` | — | string | ≤10 | — | — |
+| `latitude` | — | number | −90…90 | — | ✓ |
+| `longitude` | — | number | −180…180 | — | ✓ |
+| `googleMapsUrl` | — | string | URL valid | — | ✓ |
+| `isActive` | — | boolean | — | `true` | — |
+| `showOnPublicMap` | — | boolean | — | `false` | — |
+
+```json
+{
+  "code": "UPTD-012",
+  "name": "UPTD Samsat Muara Bulian",
+  "address": "Jl. ...",
+  "city": "Batanghari",
+  "latitude": -1.72, "longitude": 103.26,
+  "isActive": true, "showOnPublicMap": true
+}
+```
+
+**Response 201:** objek UPTD. **Error:** `409` kode sudah dipakai.
+
+---
+
+## 6. PUT /api/bapenda/uptds/:id
+
+**Akses:** `authenticate` + `uptd:update`.
+
+### Path Parameter
+
+| Nama | Wajib | Tipe |
+|---|:--:|---|
+| `id` | ✓ | uuid |
+
+### Request Body
+
+`CreateUptdBodySchema.partial()` — semua field `POST` menjadi opsional, **termasuk `code`**.
+
+**Response 200:** objek UPTD.
+
+---
+
+## 7. PATCH /api/bapenda/uptds/:id/active
+
+**Akses:** `authenticate` + `uptd:update`.
+
+### Request Body
+
+| Field | Wajib | Tipe |
+|---|:--:|---|
+| `isActive` | ✓ | boolean |
+
+**Response 200:** `{ statusCode, code, message, data: objek }`
+
+---
+
+## 8. PATCH /api/bapenda/uptds/:id/map
+
+**Akses:** `authenticate` + `uptd:update`.
+
+### Request Body
+
+| Field | Wajib | Tipe | Keterangan |
+|---|:--:|---|---|
+| `showOnPublicMap` | ✓ | boolean | Hanya `true` yang dirender di peta portal |
+
+**Response 200:** `{ statusCode, code, message, data: objek }`
+
+---
+
+## 9. DELETE /api/bapenda/uptds/:id
+
+**Akses:** `authenticate` + `uptd:delete`.
+
+### Path Parameter
+
+| Nama | Wajib | Tipe |
+|---|:--:|---|
+| `id` | ✓ | uuid |
+
+**Perilaku:** soft-delete.
+
+**Response 200:** `{ statusCode, code, message, data: { id, deleted: true } }`
+**Error:** `404`.
+
+---
 
 ## Catatan Perilaku
-- Seed awal: 11 kantor Samsat (`prisma/seeds/bapenda/uptds.json`).
-- `latitude`/`longitude` disimpan sebagai float; tidak ada validasi rentang koordinat.
-- Status peta dan status aktif sengaja dipisah: kantor bisa tetap tampil di daftar tanpa muncul
-  di peta.
+
+- Seed: 11 kantor Samsat (`prisma/seeds/bapenda/uptds.json`).
+- Status aktif dan status peta dipisah: kantor bisa tetap muncul di daftar tanpa tampil di peta.
+- Urutan rute: `/public` dan `/public/:code` didaftarkan **sebelum** `/:id`.

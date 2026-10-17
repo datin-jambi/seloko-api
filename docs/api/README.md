@@ -17,7 +17,8 @@ diperbarui pada perubahan yang sama (lihat [aturan](#aturan-wajib)).
 docs/api/
 ├── README.md                  # indeks ini
 ├── 00-konvensi.md             # format respons, error, header, paginasi, sanitasi
-├── CHANGELOG.md               # riwayat perubahan kontrak API
+- `CHANGELOG.md`               # riwayat perubahan kontrak API
+├── check.ts                   # pemeriksa otomatis: dokumen ⇄ kode (ikut `npm test`)
 ├── core/                      # aplikasi "seloko" (konsol & identitas)
 │   ├── README.md              # ikhtisar modul Core
 │   ├── auth.md
@@ -99,26 +100,65 @@ Berlaku untuk developer dan AI Agent. Bagian ini yang membuat dokumentasi tidak 
 ```markdown
 # <Nama Modul>
 
-- **Aplikasi:** `<kode aplikasi>`
-- **Prefix:** `/api/<prefix>`
+- **Aplikasi:** `<kode>` · **Prefix:** `/api/<prefix>` · **Jumlah endpoint:** N
 - **Sumber kode:** `src/modules/<...>/<modul>.routes.ts`
-- **Jumlah endpoint:** N
 
 ## Ringkasan Endpoint
-| No | Method | Path | Guard / Akses | Deskripsi |
+| No | Method | Path | Guard | Deskripsi |
 
-## Detail Endpoint
-### <METHOD> <path>
-- **Akses:**
-- **Query / Body / Params:**
-- **Contoh request:**
-- **Contoh response:** (200/201)
-- **Error yang mungkin:**
+---
 
+## <n>. <METHOD> /api/<path>
+
+**Akses:** `authenticate` + `<permission>` (aplikasi `<kode>`)
+
+### Path Parameter            ← hanya bila ada :param
+| Nama | Wajib | Tipe | Aturan |
+
+### Query Parameter           ← hanya bila ada query
+| Nama | Wajib | Tipe | Aturan | Default | Keterangan |
+
+### Request Body              ← hanya bila ada body
+| Field | Wajib | Tipe | Aturan | Default | Nullable | Keterangan |
+
+### Contoh Request
+### Response <kode>
+<daftar field + contoh JSON nyata>
+
+**Error:** `<kode>` <alasan>
+
+---
 ## Catatan Perilaku
 ```
 
+**Aturan penulisan tabel parameter:**
+- Kolom **Wajib** memakai `✓` (wajib) atau `—` (opsional). Jangan pakai kata "yes/no".
+- **Aturan** = batas yang benar-benar ditegakkan Zod (panjang, regex, enum), bukan saran.
+- **Default** diisi nilai sebenarnya bila schema punya `.default()`; `—` bila tidak ada.
+- **Nullable** hanya muncul di tabel body: `✓` bila `null` boleh dikirim eksplisit.
+- Setiap endpoint **wajib** punya contoh request dan contoh response yang nyata
+  (diambil dari schema atau hasil panggilan sungguhan) — bukan `properties: {}`.
+- Daftar **Error** menyebut kode status + pemicunya, bukan hanya "bisa gagal".
+```
+
 ---
+
+## Pemeriksa Otomatis
+
+`docs/api/check.ts` dijalankan oleh `npm test` dan memastikan:
+
+1. Angka **Jumlah endpoint** di setiap berkas modul sama dengan jumlah rute nyata di
+   `<modul>.routes.ts`.
+2. Setiap `METHOD` + `path` yang ada di kode muncul di tabel ringkasan dokumen.
+3. Totalnya cocok dengan `Total keseluruhan: N endpoint` di indeks ini.
+4. Setiap berkas modul tertaut dari `docs/api/<app>/README.md`.
+
+Kalau Anda menambah rute lalu lupa memperbarui dokumen, `npm test` **gagal** dengan pesan yang
+menyebut modul dan rute mana. Jalankan manual kapan saja:
+
+```bash
+npx tsx docs/api/check.ts
+```
 
 ## Perbedaan dengan Apidog
 
