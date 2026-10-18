@@ -528,15 +528,16 @@ export async function deleteProduct(id: string, scope: string[] | null) {
 
 // ─── Publik ───────────────────────────────────────────────────────────────────
 /**
- * Tarif yang terlihat publik. Catatan: tarif yang dibuat bersama produk baru
- * ber-status DRAFT — sampai LJ-2 (persetujuan tarif terpisah), DRAFT ikut
- * ditampilkan agar katalog tidak kosong; PRD 04 §C baru penuh saat alur
- * tarif dinonaktifkan-draft itu berjalan.
+ * Tarif yang terlihat publik (PRD 04 §C, penuh sejak LJ-1.3): hanya
+ * APPROVED/PUBLISHED yang `effectiveFrom` sudah tercapai. Tarif DRAFT tidak
+ * pernah bocor ke portal; produk yang belum punya tarif terapprove
+ * menyajikan `rates: []` dan `startingPrice: 0`.
  */
 const PUBLIC_RATE_FILTER = {
   deletedAt: null,
   isActive: true,
-  status: { in: ["DRAFT", "APPROVED", "PUBLISHED"] as ContentStatus[] },
+  status: { in: ["APPROVED", "PUBLISHED"] as ContentStatus[] },
+  effectiveFrom: { lte: new Date() },
 } as const;
 
 export async function getPublicProducts(query: PublicListProductsQuery) {

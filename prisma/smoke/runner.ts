@@ -20,6 +20,7 @@
  *   npm run db:smoke -- register     → Hanya uji registrasi akun warga (PUBLIC)
  *   npm run db:smoke -- lapak-categories → Hanya uji kategori layanan Lapak (LJ-1.1)
  *   npm run db:smoke -- lapak-products  → Hanya uji produk katalog Lapak (LJ-1.2)
+ *   npm run db:smoke -- lapak-rates     → Hanya uji alur persetujuan tarif (LJ-1.3)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -1276,6 +1277,163 @@ async function runLapakProductsSuite() {
   assert("Kategori bebas setelah produknya dihapus", delCatAfter.status === 200, delCatAfter.status);
 }
 
+// ─── Test Suite: Lapak — Alur Persetujuan Tarif (LJ-1.3) ──────────────────────
+async function runLapakRatesSuite() {
+  console.log("\n\x1b[36m▶ [Suite 15: Lapak - Alur Persetujuan Tarif]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  assert("Superadmin login", Boolean(saToken));
+
+  // Idempoten: bersihkan artefak sebelumnya — termasuk produk uji suite lain
+  // yang mungkin soft-delete menggantung (listRates mengecualikan produk
+  // terhapus, jadi baris yatim itu tak terlihat di CMS).
+  await prisma.lapakProductRate.deleteMany({ where: { product: { slug: { in: ["produk-tarif-uji", "aula-uji-suite-bpsdm", "produk-bpsdm-kedua", "tanpa-atribut-uji"] } } } });
+  await prisma.lapakProduct.deleteMany({ where: { slug: { in: ["produk-tarif-uji", "aula-uji-suite-bpsdm", "produk-bpsdm-kedua", "tanpa-atribut-uji", "produk-opd-lain", "produk-penjaga-uji"] } } });
+  await prisma.lapakCategory.deleteMany({ where: { name: { in: ["Kategori Tarif Uji", "Kategori Penjaga Uji", "Sewa Test Suite"] } } });
+
+  // Persiapan: produk DRAFT + kategori khusus uji.
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const gedung = (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+
+  const cat = await request("/lapak/categories", {
+    method: "POST", token: saToken || undefined,
+    body: { name: "Kategori Tarif Uji", defaultPricingUnit: "SESSION", defaultAvailabilityType: "SLOT", defaultFulfillmentType: "TICKET_QR" },
+  });
+  assert("Kategori uji dibuat", cat.status === 201, cat.status);
+
+  const created = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: cat.data?.data?.id,
+      name: "Produk Tarif Uji", description: "Produk untuk menguji alur persetujuan tarif.",
+      rates: [{ name: "Tarif Awal", unit: "SESSION", price: 500_000 }],
+    },
+  });
+  assert("Produk uji dibuat (DRAFT)", created.status === 201, created.status);
+  const productId = created.data?.data?.id;
+  const draftRateId = created.data?.data?.rates?.[0]?.id;
+  assert("Tarif awal ikut lahir DRAFT (produk DRAFT)", created.data?.data?.rates?.[0]?.status === "DRAFT", created.data?.data?.rates?.[0]?.status);
+
+  // ── 1. Publik TIDAK melihat tarif DRAFT.
+  await request(`/lapak/products/${productId}/status/publish`, { method: "PATCH", token: saToken || undefined });
+  const pubBefore = await request("/lapak/products/public/produk-tarif-uji", { appCode: "lapak-jambi-web" });
+  assert("Produk terbit tapi tarif DRAFT tak terlihat", pubDetailSafe(pubBefore) === 0, pubDetailSafe(pubBefore));
+
+  // ── 2. Alur tarif: submit → approve → muncul di publik.
+  const submit = await request(`/lapak/rates/${draftRateId}/status/submit`, { method: "PATCH", token: saToken || undefined });
+  assert("submit → PENDING_REVIEW", submit.status === 200 && submit.data?.data?.status === "PENDING_REVIEW", submit.status, submit.data?.message);
+
+  // PRD 04 §C: admin-opd MEMEGANG product:approve untuk OPD-nya. Yang dicek
+  // di sini adalah LINGKUP: tarif produk BPSDM tidak boleh disetujui admin
+  // OPD lain (disbudpar) walau permission-nya sama.
+  const disbudparToken = await login("admin.multiopd", DEFAULT_PASSWORD, "seloko");
+  void disbudparToken; // admin.multiopd memegang BPSDM — pakai akun OPD lain:
+  const otherOpdToken = await login("petugas.samsat", DEFAULT_PASSWORD, "seloko");
+  const crossApprove = await request(`/lapak/rates/${draftRateId}/status/approve`, {
+    method: "PATCH", token: otherOpdToken || undefined,
+  });
+  assert("petugas (tanpa product:approve) ditolak 403", crossApprove.status === 403, crossApprove.status, 403);
+
+  // Admin OPD pemilik (admin.bpsdm) BOLEH menyetujui tarif OPD-nya.
+  const ownerApprove = await request(`/lapak/rates/${draftRateId}/status/approve`, {
+    method: "PATCH", token: (await login("admin.bpsdm", DEFAULT_PASSWORD, "seloko")) || undefined,
+  });
+  assert("admin-opd BPSDM menyetujui tarif BPSDM (200)", ownerApprove.status === 200, ownerApprove.status, ownerApprove.data?.message);
+
+  // Tarif sudah APPROVED oleh admin-opd di atas — coba approve lagi harus 400.
+  const doubleApprove = await request(`/lapak/rates/${draftRateId}/status/approve`, { method: "PATCH", token: saToken || undefined });
+  assert("approve kedua ditolak 400 (transisi tak sah)", doubleApprove.status === 400, doubleApprove.status);
+
+  const pubAfter = await request("/lapak/products/public/produk-tarif-uji", { appCode: "lapak-jambi-web" });
+  assert("Tarif APPROVED tampil di publik", pubDetailSafe(pubAfter) === 1, pubDetailSafe(pubAfter));
+
+  // ── 3. Revisi tarif ter-approve: produk TETAP terbit, tarif baru PENDING_REVIEW.
+  const revise = await request(`/lapak/rates/${draftRateId}/revise`, {
+    method: "POST", token: saToken || undefined,
+    body: { price: 750_000 },
+  });
+  assert("revise membuat baris baru PENDING_REVIEW", revise.status === 200 && revise.data?.data?.status === "PENDING_REVIEW", revise.status, revise.data?.message);
+  const revisedRateId = revise.data?.data?.id;
+
+  const prodAfterRevise = await request(`/lapak/products/${productId}`, { token: saToken || undefined });
+  assert("Produk TETAP PUBLISHED setelah revisi tarif", prodAfterRevise.data?.data?.status === "PUBLISHED", prodAfterRevise.data?.data?.status);
+
+  const pubDuring = await request("/lapak/products/public/produk-tarif-uji", { appCode: "lapak-jambi-web" });
+  assert("Selama revisi, publik masih melihat harga LAMA", pubDetailSafe(pubDuring) === 1 && pubDuring.data?.data?.rates?.[0]?.price === 500_000, pubDuring.data?.data?.rates?.[0]?.price);
+
+  const rejectNoNote = await request(`/lapak/rates/${revisedRateId}/status/reject`, { method: "PATCH", token: saToken || undefined });
+  assert("reject tanpa note ditolak 400", rejectNoNote.status === 400, rejectNoNote.status, 400);
+
+  const reject = await request(`/lapak/rates/${revisedRateId}/status/reject`, {
+    method: "PATCH", token: saToken || undefined, body: { note: "Harga meleset dari Perda" },
+  });
+  assert("reject dengan note → REJECTED", reject.status === 200 && reject.data?.data?.status === "REJECTED", reject.status);
+
+  // Edit tarif REJECTED boleh, lalu submit ulang.
+  const editRejected = await request(`/lapak/rates/${revisedRateId}`, {
+    method: "PUT", token: saToken || undefined, body: { price: 700_000 },
+  });
+  assert("Edit tarif REJECTED boleh", editRejected.status === 200 && editRejected.data?.data?.price === 700_000, editRejected.status);
+
+  const resubmit = await request(`/lapak/rates/${revisedRateId}/status/submit`, { method: "PATCH", token: saToken || undefined });
+  const reapprove = await request(`/lapak/rates/${revisedRateId}/status/approve`, { method: "PATCH", token: saToken || undefined });
+  assert("submit ulang → approve → APPROVED", resubmit.status === 200 && reapprove.status === 200 && reapprove.data?.data?.status === "APPROVED", reapprove.status, reapprove.data?.message);
+
+  const pubFinal = await request("/lapak/products/public/produk-tarif-uji", { appCode: "lapak-jambi-web" });
+  const pubPrices = (pubFinal.data?.data?.rates ?? []).map((r: any) => r.price);
+  // Revisi disetujui: tarif lama dinonaktifkan otomatis oleh revise → hanya 700rb tersisa.
+  assert("Hanya tarif revisi (700rb) yang tersisa setelah revise disetujui",
+    pubDetailSafe(pubFinal) === 1 && pubPrices.includes(700_000) && !pubPrices.includes(500_000),
+    pubPrices);
+
+  // ── 4. Edit tarif APPROVED ditolak; revise endpoint untuk perubahan.
+  const editApproved = await request(`/lapak/rates/${draftRateId}`, {
+    method: "PUT", token: saToken || undefined, body: { price: 1 },
+  });
+  assert("Edit tarif APPROVED ditolak 409", editApproved.status === 409, editApproved.status, 409);
+
+  // ── 5. effectiveFrom di masa depan belum tampil di publik.
+  const future = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+  const futRate = await request(`/lapak/rates/product/${productId}`, {
+    method: "POST", token: saToken || undefined,
+    body: { name: "Tarif Masa Depan", unit: "SESSION", price: 900_000, effectiveFrom: future },
+  });
+  assert("Tarif dengan effectiveFrom masa depan lahir PENDING_REVIEW (produk terbit)", futRate.status === 201 && futRate.data?.data?.status === "PENDING_REVIEW", futRate.status);
+  const futApproved = await request(`/lapak/rates/${futRate.data?.data?.id}/status/approve`, { method: "PATCH", token: saToken || undefined });
+  assert("approve tarif masa depan", futApproved.status === 200, futApproved.status);
+  const pubFuture = await request("/lapak/products/public/produk-tarif-uji", { appCode: "lapak-jambi-web" });
+  const futurePrices = (pubFuture.data?.data?.rates ?? []).map((r: any) => r.price);
+  // 700k tampil; 900k (effectiveFrom +30 hari) TIDAK.
+  assert("effectiveFrom masa depan tersembunyi dari publik",
+    pubDetailSafe(pubFuture) === 1 && futurePrices.includes(700_000) && !futurePrices.includes(900_000),
+    futurePrices, "900rb harus tak terlihat");
+
+  // ── 6. Deactivate & delete guard.
+  const ratesList = await request(`/lapak/rates?productId=${productId}`, { token: saToken || undefined });
+  const activeRates = (ratesList.data?.data ?? []).filter((r: any) => r.isActive && ["APPROVED", "PUBLISHED"].includes(r.status));
+  assert("Hanya 1 tarif aktif ter-approve (revisi menggantikan lama)", activeRates.length === 1, activeRates.length);
+
+  // draftRateId = tarif lama 500k yang dinonaktifkan oleh revise → boleh dihapus.
+  const delInactive = await request(`/lapak/rates/${draftRateId}`, { method: "DELETE", token: saToken || undefined });
+  assert("Hapus tarif nonaktif boleh", delInactive.status === 200, delInactive.status, delInactive.data?.message);
+
+  // revisedRateId = 700k aktif ter-approve → ditolak.
+  const delActive = await request(`/lapak/rates/${revisedRateId}`, { method: "DELETE", token: saToken || undefined });
+  assert("Hapus tarif aktif ter-approve ditolak 409", delActive.status === 409, delActive.status, 409);
+
+  // ── 7. Bersih-bersih.
+  await request(`/lapak/products/${productId}/status/unpublish`, { method: "PATCH", token: saToken || undefined });
+  await prisma.lapakProductRate.deleteMany({ where: { productId } });
+  await prisma.lapakProduct.deleteMany({ where: { id: productId } });
+  await prisma.lapakCategory.deleteMany({ where: { id: cat.data?.data?.id } });
+}
+
+/** Jumlah tarif terlihat di respons detail publik (aman bila 404). */
+function pubDetailSafe(res: { status: number; data?: any }): number {
+  return res.status === 200 ? (res.data?.data?.rates ?? []).length : 0;
+}
+
 // ─── Main Orchestrator ────────────────────────────────────────────────────────
 async function main() {
   const args = process.argv.slice(2);
@@ -1346,6 +1504,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-products") {
       await runLapakProductsSuite();
+    }
+    if (!targetModule || targetModule === "lapak-rates") {
+      await runLapakRatesSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
