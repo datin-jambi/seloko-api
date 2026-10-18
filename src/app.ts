@@ -265,6 +265,9 @@ export async function buildApp(): Promise<FastifyInstance> {
       const { lapakCategoriesRoutes } = await import("~/modules/lapak/categories/categories.routes.js");
       await api.register(lapakCategoriesRoutes, { prefix: "/lapak/categories" });
 
+      const { lapakProductsRoutes } = await import("~/modules/lapak/products/products.routes.js");
+      await api.register(lapakProductsRoutes, { prefix: "/lapak/products" });
+
       // Lapak modules
       // await api.register(merchantsRoutes, { prefix: "/merchants" });
       // await api.register(productsRoutes, { prefix: "/products" });

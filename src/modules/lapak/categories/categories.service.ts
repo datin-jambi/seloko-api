@@ -278,9 +278,16 @@ export async function deleteCategory(id: string) {
   });
   if (!existing) throw new NotFoundError("Kategori", id);
 
-  // TODO(LJ-1.2): tolak bila masih dipakai produk
-  // (`prisma.lapakProduct.count({ where: { categoryId: id } })` > 0 → 409).
-  // Model LapakProduct baru lahir di LJ-1.2, jadi penjaga itu ditambah di sana.
+  // Kategori yang masih dipakai produk tidak boleh hilang — produk akan
+  // kehilangan kategorinya dan URL publiknya mati.
+  const productCount = await prisma.lapakProduct.count({
+    where: { categoryId: id, deletedAt: null },
+  });
+  if (productCount > 0) {
+    throw new ConflictError(
+      `Kategori masih dipakai ${productCount} produk — pindahkan atau hapus produknya dahulu`,
+    );
+  }
 
   await prisma.lapakCategory.update({
     where: { id },

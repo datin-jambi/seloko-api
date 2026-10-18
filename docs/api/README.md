@@ -37,7 +37,8 @@ docs/api/
 │   └── pages.md
 └── lapak/                     # aplikasi "lapak-jambi-web"
     ├── README.md              # ikhtisar modul Lapak + peta fase
-    └── categories.md
+    ├── categories.md
+    └── products.md
 ```
 
 Aplikasi baru mendapat folder sendiri dengan pola yang sama: satu `README.md`
@@ -78,10 +79,11 @@ ikhtisar + satu berkas per modul.
 | Modul | Berkas | Endpoint | Akses |
 |---|---|:---:|---|
 | Kategori Layanan | [lapak/categories.md](./lapak/categories.md) | 9 | publik + `category:*` |
+| Produk / Aset | [lapak/products.md](./lapak/products.md) | 8 | publik + `product:*` |
 
-**Total Lapak: 9 endpoint.**
+**Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 105 endpoint.**
+**Total keseluruhan: 113 endpoint.**
 
 ---
 

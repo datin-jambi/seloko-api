@@ -8,9 +8,6 @@ CREATE TABLE "lapak_categories" (
     "icon" VARCHAR(50),
     "sort_order" INTEGER NOT NULL DEFAULT 0,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
-    "default_pricing_unit" VARCHAR(20),
-    "default_availability_type" VARCHAR(20),
-    "default_fulfillment_type" VARCHAR(20),
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ NOT NULL,
     "deleted_at" TIMESTAMPTZ,
@@ -26,4 +23,3 @@ CREATE UNIQUE INDEX "uq_lapak_categories_app_slug" ON "lapak_categories"("app_id
 
 -- AddForeignKey
 ALTER TABLE "lapak_categories" ADD CONSTRAINT "lapak_categories_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "applications"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-

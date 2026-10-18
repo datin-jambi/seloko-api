@@ -64,6 +64,7 @@ model Application {
   faqCategories     FaqCategory[]
   faqs              Faq[]
   lapakCategories   LapakCategory[]
+  lapakProducts     LapakProduct[]
 
   @@map("applications")
 }
@@ -300,6 +301,7 @@ model Organization {
   parent            Organization?             @relation("OrganizationTree", fields: [parentId], references: [id], onDelete: SetNull)
   children          Organization[]            @relation("OrganizationTree")
   userAppRoleScopes UserAppRoleOrganization[]
+  lapakProducts     LapakProduct[]
 
   @@index([parentId])
   @@index([type, isActive])
@@ -710,9 +712,172 @@ model LapakCategory {
   updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt               DateTime? @map("deleted_at") @db.Timestamptz() // Soft delete
 
-  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application   Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  lapakProducts LapakProduct[]
 
   @@unique([applicationId, slug], map: "uq_lapak_categories_app_slug")
   @@index([applicationId, isActive], map: "idx_lapak_categories_app_active")
   @@map("lapak_categories")
+}
+
+// ─── Lapak: Produk / Aset (katalog, dikelola OPD) ─────────────────────────────
+/// Satu model untuk seluruh jenis aset (PRD 04 §3, keputusan "satu model
+/// Produk"): gedung, kamar, lahan, tiket rekreasi, kios, alat, jasa lab,
+/// hasil usaha. Jenisnya dibedakan kategori + tiga atribut bawaan yang
+/// diwarisi dari kategori saat produk dibuat.
+///
+/// Kepemilikan: WAJIB satu `organizationId` (OPD pemilik) — penjagaan akses
+/// per OPD lewat `user_app_role_organizations`, bukan di sini.
+///
+/// Status memakai enum `ContentStatus` yang sama dengan artikel, demikian
+/// pula mesin transisinya (submit/approve/reject/publish/unpublish).
+model LapakProduct {
+  id                  String        @id @default(uuid(7)) @db.VarChar(36)
+  applicationId       String        @map("app_id") @db.VarChar(36)
+  organizationId      String        @map("organization_id") @db.VarChar(36)
+  categoryId          String        @map("category_id") @db.VarChar(36)
+  /// Objek retribusi Perda — opsional dulu, wajib saat SKRD dikerjakan (LJ-2).
+  retributionObjectId String?       @map("retribution_object_id") @db.VarChar(36)
+  name                String        @db.VarChar(150)
+  slug                String        @db.VarChar(180)
+  /// Ringkasan untuk kartu katalog & SEO (bisa null; diparaf dari deskripsi).
+  excerpt             String?       @db.VarChar(1000)
+  description         String        @db.Text
+  address             String?       @db.VarChar(255)
+  latitude            Decimal?      @db.Decimal(9, 6)
+  longitude           Decimal?      @db.Decimal(9, 6)
+  /// Kapasitas orang (gedung/kamar/...)
+  capacity            Int?
+  /// Luas m² (lahan/gedung)
+  areaM2              Int?          @map("area_m2")
+  pricingUnit         String        @db.VarChar(20)
+  availabilityType    String        @map("availability_type") @db.VarChar(20)
+  fulfillmentType     String        @map("fulfillment_type") @db.VarChar(20)
+  status              ContentStatus @default(DRAFT)
+  publishedAt         DateTime?     @map("published_at") @db.Timestamptz()
+  /// Slider gambar memakai URL utama sebagai sampul.
+  coverUrl            String?       @map("cover_url")
+  coverFileId         String?       @map("cover_file_id") @db.VarChar(100)
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt           DateTime?     @map("deleted_at") @db.Timestamptz()
+
+  application  Application               @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  organization Organization              @relation(fields: [organizationId], references: [id])
+  category     LapakCategory             @relation(fields: [categoryId], references: [id])
+  rates        LapakProductRate[]
+  addons       LapakProductAddon[]
+  requirements LapakProductRequirement[]
+  images       LapakProductImage[]
+  facilities   LapakProductFacility[]
+
+  @@unique([applicationId, slug], map: "uq_lapak_products_app_slug")
+  @@index([applicationId, status], map: "idx_lapak_products_app_status")
+  @@index([organizationId, status], map: "idx_lapak_products_org_status")
+  @@index([categoryId], map: "idx_lapak_products_category")
+  @@map("lapak_products")
+}
+
+/// Tarif per sesi/satuan. Punya status sendiri (PRD 04 §C): mengubah tarif
+/// produk TERBIT tidak menurunkan produk — buat baris baru ber-status
+/// DRAFT/PENDING_REVIEW, publik hanya melihat APPROVED/PUBLISHED aktif,
+/// pesanan menyimpan snapshot harga.
+model LapakProductRate {
+  id            String        @id @default(uuid(7)) @db.VarChar(36)
+  productId     String        @map("product_id") @db.VarChar(36)
+  name          String        @db.VarChar(100)
+  /// Satuan tarif baris ini — boleh beda dari satuan produk (mis. paket).
+  unit          String        @db.VarChar(20)
+  price         Decimal       @db.Decimal(14, 2)
+  minQty        Int           @default(1) @map("min_qty")
+  maxQty        Int?          @map("max_qty")
+  /// Batas jam untuk sesi (Siang/Malam) — null untuk satuan hari/bulan.
+  startTime     String?       @map("start_time") @db.VarChar(5)
+  endTime       String?       @map("end_time") @db.VarChar(5)
+  status        ContentStatus @default(DRAFT)
+  /// Mulai berlaku — publik memakai baris APPROVED dengan effectiveFrom terbaru.
+  effectiveFrom DateTime      @default(now()) @map("effective_from") @db.Timestamptz()
+  isActive      Boolean       @default(true) @map("is_active")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt     DateTime?     @map("deleted_at") @db.Timestamptz()
+
+  product LapakProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, status], map: "idx_lapak_product_rates_product_status")
+  @@map("lapak_product_rates")
+}
+
+/// Layanan tambahan (proyektor, katering, sound system).
+model LapakProductAddon {
+  id        String    @id @default(uuid(7)) @db.VarChar(36)
+  productId String    @map("product_id") @db.VarChar(36)
+  name      String    @db.VarChar(100)
+  unit      String    @db.VarChar(20)
+  price     Decimal   @db.Decimal(14, 2)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz()
+
+  product LapakProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId], map: "idx_lapak_product_addons_product")
+  @@map("lapak_product_addons")
+}
+
+/// Persyaratan pemesanan: dokumen yang diunggah atau isian warga.
+model LapakProductRequirement {
+  id         String    @id @default(uuid(7)) @db.VarChar(36)
+  productId  String    @map("product_id") @db.VarChar(36)
+  label      String    @db.VarChar(150)
+  /// FILE | TEXT | NUMBER | DATE | SELECT — VARCHAR longgar, kontrak ketat di Zod.
+  fieldType  String    @map("field_type") @db.VarChar(20)
+  /// Pilihan untuk SELECT: JSON array string.
+  options    Json?
+  isRequired Boolean   @default(true) @map("is_required")
+  sortOrder  Int       @default(0) @map("sort_order")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz()
+
+  product LapakProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId], map: "idx_lapak_product_reqs_product")
+  @@map("lapak_product_requirements")
+}
+
+/// Gambar produk (ImageKit two-step seperti Banner).
+model LapakProductImage {
+  id        String    @id @default(uuid(7)) @db.VarChar(36)
+  productId String    @map("product_id") @db.VarChar(36)
+  url       String    @db.VarChar(500)
+  fileId    String?   @map("file_id") @db.VarChar(100)
+  altText   String?   @map("alt_text") @db.VarChar(150)
+  isPrimary Boolean   @default(false) @map("is_primary")
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz()
+
+  product LapakProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId], map: "idx_lapak_product_images_product")
+  @@map("lapak_product_images")
+}
+
+/// Fasilitas yang tersedia (wifi, parkir, AC, ...).
+model LapakProductFacility {
+  id        String    @id @default(uuid(7)) @db.VarChar(36)
+  productId String    @map("product_id") @db.VarChar(36)
+  name      String    @db.VarChar(100)
+  icon      String?   @db.VarChar(50)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz()
+
+  product LapakProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId], map: "idx_lapak_product_facilities_product")
+  @@map("lapak_product_facilities")
 }

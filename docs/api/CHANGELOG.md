@@ -7,6 +7,26 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-20 — Modul Produk Katalog Lapak (LJ-1.2)
+
+**Ditambah** — prefix `/api/lapak/products` (8 endpoint)
+- Publik: `GET /public` (filter kategori/OPD/harga + paginasi), `GET /public/:slug`.
+- CMS (`product:*`): list (tersaring lingkup OPD otomatis), detail, create + anak-anak,
+  update (replace-set anak), `PATCH /:id/status/:action`, soft-delete.
+- DB: 6 tabel — `lapak_products`, `lapak_product_rates`, `lapak_product_addons`,
+  `lapak_product_requirements`, `lapak_product_images`, `lapak_product_facilities`
+  (migrasi `20261020090000_add_lapak_products`).
+
+**Keputusan kontrak**
+- Tiga atribut produk (`pricingUnit/availabilityType/fulfillmentType`) **diwarisi nilai bawaan
+  kategori** bila tidak dikirim; `null` eksplisit diperlakukan sama dengan tidak dikirim.
+- Produk hanya boleh diedit pada `DRAFT`/`REJECTED`; hapus ditolak `409` saat masih `PUBLISHED`.
+- `DELETE /lapak/categories/:id` kini ditolak `409` bila masih ada produk aktif yang memakainya.
+- Tarif publik sementara menyertakan status `DRAFT` — pengetatan `APPROVED` dilakukan di LJ-2
+  bersama alur persetujuan tarif terpisah (PRD 04 §C).
+
+---
+
 ## 2026-10-19 — Modul Kategori Layanan Lapak (LJ-1.1, Fase 1 dimulai)
 
 **Ditambah** — aplikasi `lapak-jambi-web`, prefix `/api/lapak/categories` (9 endpoint)

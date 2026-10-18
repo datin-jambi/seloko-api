@@ -18,14 +18,15 @@ penjualan hasil usaha (PRD 04). Data dikelola **per OPD**, disajikan ke publik *
 | Modul | Berkas | Endpoint | Prefix |
 |---|---|:--:|---|
 | Kategori Layanan | [categories.md](./categories.md) | 9 | `/api/lapak/categories` |
+| Produk / Aset | [products.md](./products.md) | 8 | `/api/lapak/products` |
 
-**Total: 9 endpoint.**
+**Total: 17 endpoint.**
 
 ## Peta Fase (PRD 04 §9)
 
 | Fase | Isi | Status |
 |---|---|---|
-| 1 | Kategori ✅ · Produk + tarif/addon/persyaratan/media · alur persetujuan · API publik | ⏳ berjalan |
+| 1 | Kategori ✅ · Produk ✅ (tarif/addon/persyaratan/media/fasilitas, alur persetujuan, API publik) · ketersediaan/availability | ⏳ berjalan |
 | 2 | Pesanan: quote, checkout SKRD, pembayaran, tiket QR, check-in | ⏳ |
 | 3 | Monitoring PAD, laporan, transparansi publik | ⏳ |
 | 4 | Konten OPD (berita/artikel/galeri/banner berlingkup OPD) | ⏳ |

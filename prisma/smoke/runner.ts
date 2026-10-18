@@ -19,6 +19,7 @@
  *   npm run db:smoke -- lapak-rbac   → Hanya uji RBAC & lingkup OPD Lapak Jambi
  *   npm run db:smoke -- register     → Hanya uji registrasi akun warga (PUBLIC)
  *   npm run db:smoke -- lapak-categories → Hanya uji kategori layanan Lapak (LJ-1.1)
+ *   npm run db:smoke -- lapak-products  → Hanya uji produk katalog Lapak (LJ-1.2)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -1090,6 +1091,191 @@ async function runLapakCategoriesSuite() {
   assert("Kembali 8 kategori aktif", (finalPub.data?.data ?? []).length === 8, (finalPub.data?.data ?? []).length);
 }
 
+// ─── Test Suite: Lapak — Produk Katalog (LJ-1.2) ──────────────────────────────
+async function runLapakProductsSuite() {
+  console.log("\n\x1b[36m▶ [Suite 14: Lapak - Produk Katalog]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  assert("Superadmin login", Boolean(saToken));
+
+  // Idempoten: bersihkan artefak run sebelumnya (produk ber-status apa pun,
+  // kategori uji). Hard-delete agar slug bebas dipakai ulang.
+  const SLUGS = ["aula-uji-suite-bpsdm", "produk-opd-lain", "produk-bpsdm-kedua", "produk-penjaga-uji", "tanpa-atribut-uji"];
+  await prisma.lapakProduct.deleteMany({ where: { OR: [{ slug: { in: SLUGS } }, { name: { in: ["Produk OPD Lain", "Produk BPSDM kedua", "Produk Penjaga Uji", "Tanpa Atribut Uji"] } }] } });
+  await prisma.lapakCategory.deleteMany({ where: { name: { in: ["Kategori Penjaga Uji", "Sewa Test Suite"] } } });
+
+  // Kategori & OPD acuan.
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const gedung = (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  assert("Kategori Sewa Gedung ada", Boolean(gedung));
+
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+  const disbudpar = (orgs.data?.data ?? []).find((o: any) => o.code === "DISBUDPAR");
+  assert("OPD BPSDM & DISBUDPAR ada", Boolean(bpsdm && disbudpar));
+
+  // ── 1. Create oleh superadmin dengan nilai bawaan kategori (tanpa 3 atribut).
+  const created = await request("/lapak/products", {
+    method: "POST",
+    token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id,
+      categoryId: gedung.id,
+      name: "Aula Uji Suite BPSDM",
+      description: "Aula untuk pengujian smoke test dengan kapasitas 300 orang.",
+      address: "Jl. Test 123, Jambi",
+      capacity: 300,
+      rates: [
+        { name: "Paket Uji", unit: "DAY", price: 7_000_000, minQty: 1 },
+        { name: "Sesi Uji Siang", unit: "SESSION", price: 1_000_000, minQty: 1, startTime: "08:00", endTime: "17:00" },
+      ],
+      addons: [{ name: "Proyektor Uji", unit: "DAY", price: 250_000 }],
+      requirements: [{ label: "Surat permohonan", fieldType: "FILE", isRequired: true }],
+      facilities: [{ name: "Wifi" }, { name: "Parkir" }],
+      images: [{ url: "https://example.com/aula.jpg", isPrimary: true }],
+    },
+  });
+  assert("Create 201", created.status === 201, created.status, created.data?.message);
+  const productId = created.data?.data?.id;
+  assert("pricingUnit diwarisi kategori (SESSION)", created.data?.data?.pricingUnit === "SESSION", created.data?.data?.pricingUnit);
+  assert("availabilityType diwarisi (SLOT)", created.data?.data?.availabilityType === "SLOT");
+  assert("fulfillmentType diwarisi (TICKET_QR)", created.data?.data?.fulfillmentType === "TICKET_QR");
+  assert("Slug otomatis", created.data?.data?.slug === "aula-uji-suite-bpsdm", created.data?.data?.slug);
+  assert("2 tarif tersimpan", (created.data?.data?.rates ?? []).length === 2, (created.data?.data?.rates ?? []).length);
+  assert("Addon, persyaratan, fasilitas, gambar tersimpan",
+    (created.data?.data?.addons ?? []).length === 1 &&
+    (created.data?.data?.requirements ?? []).length === 1 &&
+    (created.data?.data?.facilities ?? []).length === 2 &&
+    (created.data?.data?.images ?? []).length === 1);
+  assert("Status awal DRAFT", created.data?.data?.status === "DRAFT");
+
+  // ── 2. Validasi.
+  const badOrg = await request("/lapak/products", {
+    method: "POST",
+    token: saToken || undefined,
+    body: { organizationId: "00000000-0000-7000-8000-000000000000", categoryId: gedung.id, name: "X", description: "Minimal sepuluh karakter" },
+  });
+  assert("OPD tak dikenal ditolak", badOrg.status === 404 || badOrg.status === 400, badOrg.status);
+
+  const noAttr = await request("/lapak/products", {
+    method: "POST",
+    token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id,
+      categoryId: (await request("/lapak/categories/public", { appCode: "lapak-jambi-web" })).data?.data?.[0]?.id,
+      name: "Tanpa Atribut Uji",
+      description: "Deskripsi minimal sepuluh karakter.",
+      pricingUnit: null, availabilityType: null, fulfillmentType: null,
+    },
+  });
+  // Kategori pertama (Sewa Gedung) punya bawaan lengkap, jadi ini harus 201.
+  assert("Atribut eksplisit null fallback ke kategori", noAttr.status === 201, noAttr.status, noAttr.data?.message);
+  await request(`/lapak/products/${noAttr.data?.data?.id}`, { method: "DELETE", token: saToken || undefined });
+
+  // ── 3. Alur persetujuan.
+  const badTransition = await request(`/lapak/products/${productId}/status/publish`, {
+    method: "PATCH", token: saToken || undefined,
+  });
+  assert("publish dari DRAFT sah (superadmin)", badTransition.status === 200, badTransition.status, badTransition.data?.message);
+
+  const pubList = await request("/lapak/products/public?search=Aula Uji Suite", { appCode: "lapak-jambi-web" });
+  assert("Produk terbit tampil di publik", (pubList.data?.data ?? []).some((p: any) => p.slug === "aula-uji-suite-bpsdm"), pubList.data?.data?.length);
+  assert("Kartu publik punya startingPrice", typeof pubList.data?.data?.[0]?.startingPrice === "number");
+
+  const pubDetail = await request("/lapak/products/public/aula-uji-suite-bpsdm", { appCode: "lapak-jambi-web" });
+  assert("Detail publik 200", pubDetail.status === 200, pubDetail.status);
+  assert("Publik melihat tarif aktif saja (2)", (pubDetail.data?.data?.rates ?? []).length === 2);
+  assert("Publik TIDAK melihat status tarif", !("status" in (pubDetail.data?.data?.rates?.[0] ?? {})));
+
+  const unpublish = await request(`/lapak/products/${productId}/status/unpublish`, {
+    method: "PATCH", token: saToken || undefined,
+  });
+  assert("unpublish → DRAFT + publishedAt null", unpublish.status === 200 && unpublish.data?.data?.status === "DRAFT" && unpublish.data?.data?.publishedAt === null, unpublish.status);
+
+  // ── 4. Lingkup OPD: admin-opd BPSDM.
+  const opdToken = await login("admin.bpsdm", DEFAULT_PASSWORD, "seloko");
+  assert("admin.bpsdm login", Boolean(opdToken));
+
+  const opdList = await request("/lapak/products?limit=100", { token: opdToken || undefined });
+  assert("admin-opd hanya melihat produk BPSDM", (opdList.data?.data ?? []).every((p: any) => p.organization.code === "BPSDM"), opdList.data?.data?.length);
+
+  const otherOrg = await request("/lapak/products", {
+    method: "POST",
+    token: opdToken || undefined,
+    body: { organizationId: disbudpar.id, categoryId: gedung.id, name: "Produk OPD Lain", description: "Harus ditolak karena di luar lingkup." },
+  });
+  assert("admin-opd BPSDM tidak bisa membuat produk Disbudpar (403)", otherOrg.status === 403, otherOrg.status, 403);
+
+  const detailOther = await request("/lapak/products", {
+    method: "POST", token: opdToken || undefined,
+    body: { organizationId: bpsdm.id, categoryId: gedung.id, name: "Produk BPSDM kedua", description: "Produk kedua untuk uji akses silang OPD." },
+  });
+  assert("admin-opd bisa membuat produk BPSDM", detailOther.status === 201, detailOther.status, detailOther.data?.message);
+  const otherProductId = detailOther.data?.data?.id;
+
+  // Bapenda (superadmin) tetap bisa akses produk OPD mana pun.
+  const saSee = await request(`/lapak/products/${otherProductId}`, { token: saToken || undefined });
+  assert("Bapenda melihat produk OPD", saSee.status === 200, saSee.status);
+
+  // ── 5. Update + sync anak (replace-set).
+  const updated = await request(`/lapak/products/${productId}`, {
+    method: "PUT",
+    token: saToken || undefined,
+    body: {
+      capacity: 350,
+      rates: [
+        { name: "Paket Uji", unit: "DAY", price: 7_500_000, minQty: 1 },
+        { name: "Sesi Uji Malam", unit: "SESSION", price: 1_200_000, minQty: 1, startTime: "17:00", endTime: "23:00" },
+      ],
+      facilities: [{ name: "Wifi" }, { name: "Parkir" }, { name: "AC" }],
+    },
+  });
+  assert("Update 200", updated.status === 200, updated.status, updated.data?.message);
+  assert("capacity 350", updated.data?.data?.capacity === 350);
+  assert("Anak sinkron: 2 tarif baru (nama beda)", (updated.data?.data?.rates ?? []).length === 2, (updated.data?.data?.rates ?? []).length);
+  assert("Fasilitas bertambah 3", (updated.data?.data?.facilities ?? []).length === 3);
+
+  // Edit produk non-DRAFT ditolak.
+  await request(`/lapak/products/${productId}/status/publish`, { method: "PATCH", token: saToken || undefined });
+  const editPublished = await request(`/lapak/products/${productId}`, {
+    method: "PUT", token: saToken || undefined, body: { capacity: 999 },
+  });
+  assert("Edit produk PUBLISHED ditolak 403", editPublished.status === 403, editPublished.status, 403);
+
+  // ── 6. Delete: produk terbit ditolak, draft boleh.
+  const delPublished = await request(`/lapak/products/${productId}`, { method: "DELETE", token: saToken || undefined });
+  assert("Hapus produk terbit ditolak 409", delPublished.status === 409, delPublished.status, 409);
+
+  await request(`/lapak/products/${productId}/status/unpublish`, { method: "PATCH", token: saToken || undefined });
+  const delDraft = await request(`/lapak/products/${productId}`, { method: "DELETE", token: saToken || undefined });
+  assert("Hapus draft 200", delDraft.status === 200, delDraft.status);
+
+  const delOther = await request(`/lapak/products/${otherProductId}`, { method: "DELETE", token: saToken || undefined });
+  assert("Hapus produk kedua 200 (bersih-bersih)", delOther.status === 200, delOther.status);
+
+  // ── 7. Penjaga kategori: kategori yang pernah dipakai produk masih boleh dihapus
+  // karena produknya sudah dihapus; buat kategori + produk, coba hapus kategori → 409.
+  const cat = await request("/lapak/categories", {
+    method: "POST", token: saToken || undefined, body: { name: "Kategori Penjaga Uji" },
+  });
+  assert("Kategori penjaga dibuat", cat.status === 201, cat.status, cat.data?.message);
+  // Kategori tanpa bawaan: isi tiga atribut secara eksplisit (produk gagal 400 tanpa ini).
+  const prod = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: cat.data?.data?.id,
+      name: "Produk Penjaga Uji", description: "Menjaga kategori agar tak terhapus.",
+      pricingUnit: "DAY", availabilityType: "SLOT", fulfillmentType: "TICKET_QR",
+    },
+  });
+  assert("Produk penjaga dibuat", prod.status === 201, prod.status, prod.data?.message);
+  const delCat = await request(`/lapak/categories/${cat.data?.data?.id}`, { method: "DELETE", token: saToken || undefined });
+  assert("Hapus kategori terpakai ditolak 409", delCat.status === 409, delCat.status, 409);
+  // Setelah produk dihapus, kategori boleh dihapus (produk soft-delete tidak menghalangi).
+  await request(`/lapak/products/${prod.data?.data?.id}`, { method: "DELETE", token: saToken || undefined });
+  const delCatAfter = await request(`/lapak/categories/${cat.data?.data?.id}`, { method: "DELETE", token: saToken || undefined });
+  assert("Kategori bebas setelah produknya dihapus", delCatAfter.status === 200, delCatAfter.status);
+}
+
 // ─── Main Orchestrator ────────────────────────────────────────────────────────
 async function main() {
   const args = process.argv.slice(2);
@@ -1157,6 +1343,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-categories") {
       await runLapakCategoriesSuite();
+    }
+    if (!targetModule || targetModule === "lapak-products") {
+      await runLapakProductsSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
