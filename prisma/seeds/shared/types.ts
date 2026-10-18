@@ -60,6 +60,34 @@ export interface RolesFile {
   roles: RoleDef[];
 }
 
+// ─── lapak/categories.json ────────────────────────────────────────────────────
+/** Atribut bawaan yang diwarisi produk baru pada kategori ini (LJ-1.2). */
+export type PricingUnit =
+  | "SESSION" | "HOUR" | "DAY" | "NIGHT" | "MONTH" | "YEAR"
+  | "PERSON" | "UNIT" | "M2" | "TEST" | "TRIP";
+
+export type AvailabilityType = "SLOT" | "DATE_RANGE" | "CONTRACT" | "STOCK" | "SCHEDULE";
+export type FulfillmentType = "TICKET_QR" | "BOOKING" | "CONTRACT" | "SCHEDULE" | "RESULT" | "DOCUMENT_SKRD";
+
+export interface LapakCategoryDef {
+  name: string;
+  /** Stabil di URL publik; unik per aplikasi. */
+  slug: string;
+  description?: string;
+  /** Nama ikon lucide untuk kartu kategori. */
+  icon?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+  defaultPricingUnit?: PricingUnit;
+  defaultAvailabilityType?: AvailabilityType;
+  defaultFulfillmentType?: FulfillmentType;
+}
+
+export interface LapakCategoriesFile {
+  $comment?: string;
+  categories: LapakCategoryDef[];
+}
+
 // ─── users.json ───────────────────────────────────────────────────────────────
 export interface RoleAssignmentDef {
   app: string;

@@ -35,6 +35,9 @@ const APP_MODULES: Record<string, Record<string, string>> = {
     news: "src/modules/bapenda/news/news.routes.ts",
     pages: "src/modules/bapenda/pages/pages.routes.ts",
   },
+  lapak: {
+    categories: "src/modules/lapak/categories/categories.routes.ts",
+  },
 };
 
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");

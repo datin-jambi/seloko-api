@@ -63,6 +63,7 @@ model Application {
   regulations       Regulation[]
   faqCategories     FaqCategory[]
   faqs              Faq[]
+  lapakCategories   LapakCategory[]
 
   @@map("applications")
 }
@@ -678,4 +679,40 @@ model VehicleTaxCheckLog {
   @@index([userId], map: "idx_vehicle_tax_user_id")
   @@index([createdAt], map: "idx_vehicle_tax_created_at")
   @@map("vehicle_tax_check_logs")
+}
+
+// ─── Lapak: Kategori Layanan (master, dikelola Bapenda) ───────────────────────
+/// Delapan kategori layanan aset daerah (PRD 04 §3). Dikelola Bapenda lewat
+/// CMS seloko; OPD hanya MEMILIH kategori ini saat membuat produk — tidak
+/// pernah membuat sendiri. Satu model Produk nanti mewarisi nilai bawaan
+/// atribut tarif/ketersediaan/pemenuhan dari kategorinya.
+///
+/// Unik per aplikasi (applicationId + slug): bila kelak aplikasi lain memakai
+/// modul katalog ini, kategorinya tetap terpisah.
+model LapakCategory {
+  id                      String    @id @default(uuid(7)) @db.VarChar(36)
+  applicationId           String    @map("app_id") @db.VarChar(36)
+  name                    String    @db.VarChar(100)
+  /// Stabil di URL publik: /lapak/kategori/<slug> dan filter produk.
+  slug                    String    @db.VarChar(120)
+  description             String?   @db.VarChar(500)
+  /// Nama ikon (lucide) untuk kartu kategori di portal.
+  icon                    String?   @db.VarChar(50)
+  sortOrder               Int       @default(0) @map("sort_order")
+  isActive                Boolean   @default(true) @map("is_active")
+  /// Nilai bawaan yang diwarisi produk baru pada kategori ini (PRD 04 §3,
+  /// keputusan "satu model Produk"). Opsional: Bapenda boleh membiarkan kosong
+  /// agar OPD wajib memilih sendiri saat membuat produk.
+  defaultPricingUnit      String?   @map("default_pricing_unit") @db.VarChar(20)
+  defaultAvailabilityType String?   @map("default_availability_type") @db.VarChar(20)
+  defaultFulfillmentType  String?   @map("default_fulfillment_type") @db.VarChar(20)
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt               DateTime? @map("deleted_at") @db.Timestamptz() // Soft delete
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, slug], map: "uq_lapak_categories_app_slug")
+  @@index([applicationId, isActive], map: "idx_lapak_categories_app_active")
+  @@map("lapak_categories")
 }

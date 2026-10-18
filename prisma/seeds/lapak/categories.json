@@ -1,0 +1,85 @@
+{
+  "$comment": "8 kategori layanan aset daerah — PRD 04 §3. Urutan & nama sesuai infografis proposal. defaultPricingUnit/availability/fulfillment menjadi nilai bawaan produk di kategori itu (dipakai LJ-1.2).",
+  "categories": [
+    {
+      "name": "Sewa Gedung / Ruangan",
+      "slug": "sewa-gedung-ruangan",
+      "description": "Aula, auditorium, ruang rapat, dan ruang serbaguna milik OPD.",
+      "icon": "building-2",
+      "sortOrder": 1,
+      "defaultPricingUnit": "SESSION",
+      "defaultAvailabilityType": "SLOT",
+      "defaultFulfillmentType": "TICKET_QR"
+    },
+    {
+      "name": "Penginapan / Asrama / Rumah Dinas",
+      "slug": "penginapan-asrama-rumah-dinas",
+      "description": "Asrama, mess, dan rumah dinas per malam per kamar.",
+      "icon": "bed-double",
+      "sortOrder": 2,
+      "defaultPricingUnit": "NIGHT",
+      "defaultAvailabilityType": "DATE_RANGE",
+      "defaultFulfillmentType": "BOOKING"
+    },
+    {
+      "name": "Sewa Tanah / Lahan",
+      "slug": "sewa-tanah-lahan",
+      "description": "Lahan usaha dan area parkir, dihitung per m² per bulan/tahun.",
+      "icon": "landmark",
+      "sortOrder": 3,
+      "defaultPricingUnit": "MONTH",
+      "defaultAvailabilityType": "CONTRACT",
+      "defaultFulfillmentType": "CONTRACT"
+    },
+    {
+      "name": "Rekreasi & Olahraga",
+      "slug": "rekreasi-olahraga",
+      "description": "Kolam renang, GOR, dan stadion per orang atau slot jam.",
+      "icon": "dumbbell",
+      "sortOrder": 4,
+      "defaultPricingUnit": "PERSON",
+      "defaultAvailabilityType": "SLOT",
+      "defaultFulfillmentType": "TICKET_QR"
+    },
+    {
+      "name": "Sewa Kios / Kantin / Usaha",
+      "slug": "sewa-kios-kantin-usaha",
+      "description": "Kios dan kantin di fasilitas daerah, per bulan atau tahun.",
+      "icon": "store",
+      "sortOrder": 5,
+      "defaultPricingUnit": "MONTH",
+      "defaultAvailabilityType": "CONTRACT",
+      "defaultFulfillmentType": "CONTRACT"
+    },
+    {
+      "name": "Sewa Alat & Laboratorium",
+      "slug": "sewa-alat-laboratorium",
+      "description": "Alat berat dan alat laboratorium per unit dan durasi.",
+      "icon": "wrench",
+      "sortOrder": 6,
+      "defaultPricingUnit": "HOUR",
+      "defaultAvailabilityType": "STOCK",
+      "defaultFulfillmentType": "SCHEDULE"
+    },
+    {
+      "name": "Layanan Laboratorium / Kesehatan",
+      "slug": "layanan-laboratorium-kesehatan",
+      "description": "Uji lab dan kalibrasi per jenis pemeriksaan.",
+      "icon": "flask-conical",
+      "sortOrder": 7,
+      "defaultPricingUnit": "TEST",
+      "defaultAvailabilityType": "SCHEDULE",
+      "defaultFulfillmentType": "RESULT"
+    },
+    {
+      "name": "Penjualan Hasil Usaha Daerah",
+      "slug": "penjualan-hasil-usaha-daerah",
+      "description": "Bibit, ikan, dan ternak — harga dikali kuantitas.",
+      "icon": "sprout",
+      "sortOrder": 8,
+      "defaultPricingUnit": "UNIT",
+      "defaultAvailabilityType": "STOCK",
+      "defaultFulfillmentType": "DOCUMENT_SKRD"
+    }
+  ]
+}

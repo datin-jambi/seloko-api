@@ -7,6 +7,25 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-19 — Modul Kategori Layanan Lapak (LJ-1.1, Fase 1 dimulai)
+
+**Ditambah** — aplikasi `lapak-jambi-web`, prefix `/api/lapak/categories` (9 endpoint)
+- Publik: `GET /public`, `GET /public/:slug`.
+- CMS (`category:*`, hanya Bapenda): list, detail, create, `PATCH /reorder`, update,
+  `PATCH /:id/active`, soft-delete.
+- DB: tabel `lapak_categories` + 3 kolom nilai bawaan produk
+  (`default_pricing_unit`, `default_availability_type`, `default_fulfillment_type`) — migrasi
+  `20261019090000_add_lapak_categories` dan `20261019093000_add_lapak_category_defaults`.
+- Seed: 8 kategori sesuai PRD 04 §3.
+
+**Keputusan kontrak**
+- `slug` unik per aplikasi; bentrok **ditolak** (bukan akhiran `-2`) — URL publik tidak berubah
+  diam-diam. Slug milik kategori terhapus boleh dihidupkan kembali lewat create.
+- Objek publik hanya 5 field (`id`, `name`, `slug`, `description`, `icon`).
+- `default*` nullable: `null` = OPD memilih sendiri saat membuat produk (LJ-1.2).
+
+---
+
 ## 2026-10-18 — Registrasi akun warga + kolom NIK
 
 **Ditambah**

@@ -24,7 +24,9 @@ import { seedBapendaUptds } from "./seeds/bapenda/uptds.seeder.js";
 import { seedBanners } from "./seeds/bapenda/banners.seeder.js";
 import { seedNews } from "./seeds/bapenda/news.seeder.js";
 import { seedPages } from "./seeds/bapenda/pages.seeder.js";
+import { seedLapakCategories } from "./seeds/lapak/categories.seeder.js";
 import type {
+  LapakCategoriesFile,
   ApplicationsFile,
   MenusFile,
   RolesFile,
@@ -98,7 +100,7 @@ async function main(): Promise<void> {
 
   if (process.argv.includes("--reset")) await resetTables();
 
-  const [appsFile, rolesFile, usersFile, menusFile, uptdsFile, bannersFile, newsFile, pagesFile, orgsFile] =
+  const [appsFile, rolesFile, usersFile, menusFile, uptdsFile, bannersFile, newsFile, pagesFile, orgsFile, lapakCategoriesFile] =
     await Promise.all([
       loadJson<ApplicationsFile>("core/applications.json"),
       loadJson<RolesFile>("core/roles.json"),
@@ -109,6 +111,7 @@ async function main(): Promise<void> {
       loadJson<NewsFile>("bapenda/news.json"),
       loadJson<PagesFile>("bapenda/pages.json"),
       loadJson<OrganizationsFile>("core/organizations.json"),
+      loadJson<LapakCategoriesFile>("lapak/categories.json"),
     ]);
 
   // Urutan WAJIB: menu dan user menautkan diri ke permission/role yang dibuat
@@ -147,6 +150,9 @@ async function main(): Promise<void> {
 
   console.log("");
   await seedPages(pagesFile.pages);
+
+  console.log("");
+  await seedLapakCategories(lapakCategoriesFile.categories);
 
   await printSummary();
 

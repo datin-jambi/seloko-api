@@ -29,15 +29,18 @@ docs/api/
 │   ├── menus.md
 │   ├── organizations.md
 │   └── storage.md
-└── bapenda/                   # aplikasi "bapenda-profile"
-    ├── README.md              # ikhtisar modul Bapenda
-    ├── uptds.md
-    ├── banners.md
-    ├── news.md
-    └── pages.md
+├── bapenda/                   # aplikasi "bapenda-profile"
+│   ├── README.md              # ikhtisar modul Bapenda
+│   ├── uptds.md
+│   ├── banners.md
+│   ├── news.md
+│   └── pages.md
+└── lapak/                     # aplikasi "lapak-jambi-web"
+    ├── README.md              # ikhtisar modul Lapak + peta fase
+    └── categories.md
 ```
 
-Aplikasi baru (mis. `lapak/`) mendapat folder sendiri dengan pola yang sama: satu `README.md`
+Aplikasi baru mendapat folder sendiri dengan pola yang sama: satu `README.md`
 ikhtisar + satu berkas per modul.
 
 ---
@@ -70,7 +73,15 @@ ikhtisar + satu berkas per modul.
 
 **Total Bapenda: 39 endpoint.**
 
-**Total keseluruhan: 96 endpoint.**
+### Lapak Jambi — aplikasi `lapak-jambi-web`
+
+| Modul | Berkas | Endpoint | Akses |
+|---|---|:---:|---|
+| Kategori Layanan | [lapak/categories.md](./lapak/categories.md) | 9 | publik + `category:*` |
+
+**Total Lapak: 9 endpoint.**
+
+**Total keseluruhan: 105 endpoint.**
 
 ---
 
