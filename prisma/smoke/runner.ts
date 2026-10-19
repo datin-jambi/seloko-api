@@ -23,6 +23,7 @@
  *   npm run db:smoke -- lapak-rates     → Hanya uji alur persetujuan tarif (LJ-1.3)
  *   npm run db:smoke -- lapak-catalog   → Hanya uji katalog publik OPD (LJ-1.6)
  *   npm run db:smoke -- lapak-availability → Hanya uji jam operasional & tanggal tutup (LJ-2.1)
+ *   npm run db:smoke -- lapak-reservations → Hanya uji reservasi & anti double-booking (LJ-2.2)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -1727,6 +1728,144 @@ async function runLapakAvailabilitySuite() {
   void slug;
 }
 
+// ─── Test Suite: Lapak — Reservasi & Anti Double-Booking (LJ-2.2) ─────────────
+async function runLapakReservationsSuite() {
+  console.log("\n\x1b[36m▶ [Suite 18: Lapak - Reservasi & Anti Double-Booking]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  assert("Superadmin login", Boolean(saToken));
+
+  await cleanupDebugArtefacts();
+
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const gedung = (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+
+  const created = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: gedung.id,
+      name: "Reservasi Uji Produk", description: "Produk uji reservasi slot dan anti double-booking.",
+      capacity: 1,
+      rates: [{ name: "Per Jam", unit: "HOUR", price: 100_000 }],
+    },
+  });
+  assert("Produk reservasi dibuat", created.status === 201, created.status, created.data?.message);
+  const productId = created.data?.data?.id;
+  const slug = created.data?.data?.slug;
+
+  // Jam operasional: SEMUA hari 00:00–23:59 agar uji tidak bergantung hari.
+  const allDays = [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, openTime: "00:00", closeTime: "23:59" }));
+  await request(`/lapak/availability/product/${productId}/hours`, {
+    method: "PUT", token: saToken || undefined, body: { hours: allDays },
+  });
+  await request(`/lapak/products/${productId}/status/publish`, { method: "PATCH", token: saToken || undefined });
+
+  // Tanggal uji di masa depan (hari ini + 30..32 hari) agar tak kena "waktu lewat".
+  const day = (offset: number) => {
+    const d = new Date(Date.now() + offset * 86_400_000);
+    return d.toISOString().slice(0, 10);
+  };
+  const d1 = day(30), d2 = day(31);
+
+  // ── 1. Reservasi pertama berhasil (HOLD).
+  const r1 = await request(`/lapak/reservations/product/${productId}`, {
+    method: "POST", body: { startAt: `${d1}T08:00:00+07:00`, endAt: `${d1}T10:00:00+07:00`, qty: 1 },
+  });
+  assert("Reservasi pertama 201", r1.status === 201, r1.status, r1.data?.message);
+  assert("Status awal HOLD", r1.data?.data?.status === "HOLD", r1.data?.data?.status);
+  assert("expiresAt terisi", typeof r1.data?.data?.expiresAt === "string");
+  const r1id = r1.data?.data?.id;
+
+  // ── 2. Bentrok persis → 409 dari exclusion constraint, bukan dari kode.
+  const clash = await request(`/lapak/reservations/product/${productId}`, {
+    method: "POST", body: { startAt: `${d1}T08:00:00+07:00`, endAt: `${d1}T10:00:00+07:00`, qty: 1 },
+  });
+  assert("Bentrok persis ditolak 409", clash.status === 409, clash.status, clash.data?.message);
+
+  // ── 3. Bentrok sebagian → 409.
+  const partial = await request(`/lapak/reservations/product/${productId}`, {
+    method: "POST", body: { startAt: `${d1}T09:00:00+07:00`, endAt: `${d1}T11:00:00+07:00`, qty: 1 },
+  });
+  assert("Bentrok sebagian ditolak 409", partial.status === 409, partial.status);
+
+  // ── 4. Bersambung (batas eksklusif) → BERHASIL.
+  const adjacent = await request(`/lapak/reservations/product/${productId}`, {
+    method: "POST", body: { startAt: `${d1}T10:00:00+07:00`, endAt: `${d1}T12:00:00+07:00`, qty: 1 },
+  });
+  assert("Bersambung 10:00 diterima (batas atas eksklusif)", adjacent.status === 201, adjacent.status, adjacent.data?.message);
+  const adjId = adjacent.data?.data?.id;
+
+  // ── 5. INTI: dua request PARALEL pada slot yang sama → tepat satu menang.
+  const parallelBody = { startAt: `${d2}T08:00:00+07:00`, endAt: `${d2}T09:00:00+07:00`, qty: 1 };
+  const [pa, pb] = await Promise.all([
+    request(`/lapak/reservations/product/${productId}`, { method: "POST", body: parallelBody }),
+    request(`/lapak/reservations/product/${productId}`, { method: "POST", body: parallelBody }),
+  ]);
+  const wins = [pa, pb].filter((r) => r.status === 201).length;
+  const conflicts = [pa, pb].filter((r) => r.status === 409).length;
+  assert("Dua request paralel: tepat 1 berhasil", wins === 1, `201=${wins} 409=${conflicts}`);
+  assert("Dua request paralel: tepat 1 ditolak 409", conflicts === 1, `201=${wins} 409=${conflicts}`);
+
+  // ── 6. Slot terpakai tampil di cek publik.
+  const slots = await request(`/lapak/reservations/product/${productId}/slots?from=${d1}T00:00:00%2B07:00&to=${d1}T23:59:00%2B07:00`, { appCode: "lapak-jambi-web" });
+  assert("Cek slot publik 200", slots.status === 200, slots.status, slots.data?.message);
+  assert("Dua blok terpakai tercatat", (slots.data?.data?.busy ?? []).length >= 2, (slots.data?.data?.busy ?? []).length);
+  assert("Kapasitas dilaporkan", slots.data?.data?.capacity === 1, slots.data?.data?.capacity);
+
+  // ── 7. Release → slot bisa dipesan ulang (partial index mengecualikan RELEASED).
+  const rel = await request(`/lapak/reservations/${r1id}/release`, { method: "POST" });
+  assert("Release 200", rel.status === 200, rel.status, rel.data?.message);
+  assert("Status jadi RELEASED", rel.data?.data?.status === "RELEASED", rel.data?.data?.status);
+
+  const rebook = await request(`/lapak/reservations/product/${productId}`, {
+    method: "POST", body: { startAt: `${d1}T08:00:00+07:00`, endAt: `${d1}T10:00:00+07:00`, qty: 1 },
+  });
+  assert("Slot yang dilepas bisa dipesan ulang", rebook.status === 201, rebook.status, rebook.data?.message);
+
+  // ── 8. Release dua kali → 400 (bukan diam-diam sukses).
+  const rel2 = await request(`/lapak/reservations/${r1id}/release`, { method: "POST" });
+  assert("Release ulang ditolak 400", rel2.status === 400, rel2.status);
+
+  // ── 9. Validasi masukan.
+  const badRange = await request(`/lapak/reservations/product/${productId}`, {
+    method: "POST", body: { startAt: `${d1}T10:00:00+07:00`, endAt: `${d1}T09:00:00+07:00` },
+  });
+  assert("Akhir < awal ditolak 400", badRange.status === 400, badRange.status);
+
+  const past = await request(`/lapak/reservations/product/${productId}`, {
+    method: "POST", body: { startAt: "2020-01-01T08:00:00+07:00", endAt: "2020-01-01T10:00:00+07:00" },
+  });
+  assert("Waktu lampau ditolak 400", past.status === 400, past.status);
+
+  // Di luar jam operasional: produk uji 00:00–23:59, jadi uji dengan produk
+  // berjadwal sempit tidak perlu — cukup pastikan tanggal tutup menolak.
+  const blackout = await request(`/lapak/availability/product/${productId}/blackouts`, {
+    method: "POST", token: saToken || undefined,
+    body: { startDate: d2, endDate: d2, reason: "Uji tutup" },
+  });
+  assert("Tanggal tutup dibuat", blackout.status === 201, blackout.status);
+  const onBlackout = await request(`/lapak/reservations/product/${productId}`, {
+    method: "POST", body: { startAt: `${d2}T15:00:00+07:00`, endAt: `${d2}T16:00:00+07:00`, qty: 1 },
+  });
+  assert("Reservasi pada tanggal tutup ditolak 400", onBlackout.status === 400, onBlackout.status, onBlackout.data?.message);
+
+  // ── 10. Produk DRAFT tidak bisa direservasi (404).
+  await request(`/lapak/products/${productId}/status/unpublish`, { method: "PATCH", token: saToken || undefined });
+  const draftTry = await request(`/lapak/reservations/product/${productId}`, {
+    method: "POST", body: { startAt: `${d1}T20:00:00+07:00`, endAt: `${d1}T21:00:00+07:00` },
+  });
+  assert("Produk DRAFT tak bisa direservasi (404)", draftTry.status === 404, draftTry.status);
+
+  // ── 11. Bersih-bersih.
+  await prisma.$executeRawUnsafe(`DELETE FROM lapak_reservations WHERE product_id = $1`, productId);
+  await prisma.lapakOperatingHour.deleteMany({ where: { productId } });
+  await prisma.lapakBlackoutDate.deleteMany({ where: { productId } });
+  await prisma.lapakProductRate.deleteMany({ where: { productId } });
+  await prisma.lapakProduct.deleteMany({ where: { slug } });
+  void adjId;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -1805,6 +1944,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-availability" || targetModule === "jadwal") {
       await runLapakAvailabilitySuite();
+    }
+    if (!targetModule || targetModule === "lapak-reservations" || targetModule === "reservasi") {
+      await runLapakReservationsSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

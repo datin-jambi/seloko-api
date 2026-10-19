@@ -7,6 +7,31 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-21 — Reservasi Slot & Anti Double-Booking (LJ-2.2)
+
+**Ditambah** — prefix `/api/lapak/reservations` (4 endpoint)
+- Publik: `GET /product/:productId/slots` (blok terpakai + sisa kuota),
+  `POST /product/:productId` (pegang HOLD), `POST /:id/release`.
+- CMS (`product:read`): `GET /product/:productId` (daftar reservasi).
+- DB: tabel `lapak_reservations` + enum `ReservationStatus`, migrasi
+  `20261021140000_add_lapak_reservations`, drift 0.
+
+**Keputusan kontrak — ANTI DOUBLE-BOOKING DI DATABASE**
+- `EXCLUDE USING gist (product_id WITH =, period WITH &&) WHERE (status <> 'RELEASED')`
+  dengan `btree_gist`. Dua reservasi beririsan untuk produk sama **mustahil tersimpan**;
+  PostgreSQL menolak (`23P01`) dan API menerjemahkannya menjadi `409`.
+- Pengecekan "slot kosong?" sebelum INSERT **sengaja tidak dilakukan**: selalu ada jendela
+  race antara `SELECT` dan `INSERT`. Constraint yang menutup jendela itu.
+- Diuji nyata: dua `POST` paralel pada slot identik → tepat satu `201`, satu `409`.
+- `period` bertipe `tstzrange` dengan batas atas **eksklusif** `[)`, sehingga booking
+  `08:00–10:00` dan `10:00–12:00` tidak dianggap bentrok.
+- `RELEASED` tetap tersimpan (riwayat utuh) tapi dikecualikan dari constraint lewat
+  partial index — slot langsung bisa dipesan ulang.
+- Pesan `409` sengaja generik agar tidak membocorkan detail pemesan lain.
+- HOLD punya `expiresAt` (default 15 menit); `releaseExpiredHolds()` tersedia untuk worker.
+
+---
+
 ## 2026-10-21 — Jam Operasional & Tanggal Tutup (LJ-2.1, Fase 2 dimulai)
 
 **Ditambah** — prefix `/api/lapak/availability` (6 endpoint)

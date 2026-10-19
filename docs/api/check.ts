@@ -41,6 +41,7 @@ const APP_MODULES: Record<string, Record<string, string>> = {
     rates: "src/modules/lapak/rates/rates.routes.ts",
     catalog: "src/modules/lapak/catalog/catalog.routes.ts",
     availability: "src/modules/lapak/availability/availability.routes.ts",
+    reservations: "src/modules/lapak/reservations/reservations.routes.ts",
   },
 };
 

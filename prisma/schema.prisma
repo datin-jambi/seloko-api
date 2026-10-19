@@ -772,6 +772,7 @@ model LapakProduct {
   facilities   LapakProductFacility[]
   operatingHours LapakOperatingHour[]
   blackoutDates  LapakBlackoutDate[]
+  reservations   LapakReservation[]
 
   @@unique([applicationId, slug], map: "uq_lapak_products_app_slug")
   @@index([applicationId, status], map: "idx_lapak_products_app_status")
@@ -819,6 +820,54 @@ model LapakBlackoutDate {
 
   @@index([productId, startDate, endDate], map: "idx_lapak_blackout_product_range")
   @@map("lapak_blackout_dates")
+}
+
+/// ReservationStatus — siklus hidup satu blok waktu pada produk (LJ-2.2).
+enum ReservationStatus {
+  /// Blok sementara selama checkout; dibersihkan worker saat `expiresAt` lewat.
+  HOLD
+  /// Sudah dibayar/dikonfirmasi — blok permanen.
+  CONFIRMED
+  /// Dibatalkan/dilepas — waktu kembali tersedia.
+  RELEASED
+}
+
+/// Reservasi rentang waktu produk (PRD 04 §H).
+///
+/// ANTI DOUBLE-BOOKING DI LEVEL DATABASE, bukan kode aplikasi:
+/// exclusion constraint `EXCLUDE USING gist (product_id WITH =, period WITH &&)`
+/// membuat dua reservasi yang beririsan untuk produk yang sama MUSTAHIL
+/// tersimpan — PostgreSQL menolak transaksi kedua, berapa pun banyaknya request
+/// paralel. Kode aplikasi hanya menerjemahkan penolakan itu menjadi 409.
+///
+/// `period` bertipe `tstzrange` (rentang waktu berzona) sehingga batas atas
+/// bisa eksklusif — booking 08:00–10:00 dan 10:00–12:00 tidak dianggap bentrok.
+/// `qty` dipakai produk berkuota (mis. kolam renang per orang) yang berbagi
+/// slot waktu yang sama; untuk produk unit tunggal nilainya 1.
+model LapakReservation {
+  id        String   @id @default(uuid(7)) @db.VarChar(36)
+  productId String   @map("product_id") @db.VarChar(36)
+  /// Rentang waktu blok. Diisi lewat SQL mentah (Prisma belum punya tipe range).
+  /// Tidak dipakai di klien Prisma — baca lewat `startAt`/`endAt` turunan.
+  period    Unsupported("tstzrange") @map("period")
+  /// Salinan batas rentang untuk pembacaan mudah & sortir (dijaga trigger/insert).
+  startAt   DateTime @map("start_at") @db.Timestamptz()
+  endAt     DateTime @map("end_at") @db.Timestamptz()
+  /// Jumlah unit yang diblok (kuota). Unit tunggal = 1.
+  qty       Int      @default(1)
+  status    ReservationStatus @default(HOLD)
+  /// Kapan HOLD kedaluwarsa; worker melepasnya. NULL untuk CONFIRMED.
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz()
+  /// Pemesan (user PUBLIC) — nullable selama keranjang belum terikat akun.
+  userId    String?  @map("user_id") @db.VarChar(36)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  product LapakProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, status], map: "idx_lapak_reservations_product_status")
+  @@index([expiresAt], map: "idx_lapak_reservations_expires")
+  @@map("lapak_reservations")
 }
 
 /// Tarif per sesi/satuan. Punya status sendiri (PRD 04 §C): mengubah tarif
