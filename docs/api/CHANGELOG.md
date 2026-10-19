@@ -7,6 +7,43 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-22 — Tiket QR & Check-in (LJ-2.7)
+
+**Ditambah** — prefix `/api/lapak/tickets` (5 endpoint)
+- `GET /verify/:token` — **publik**, periksa tiket lewat QR **atau** kode pendek (tanpa PII).
+- `GET /order/:orderId`, `GET /:id` (warga).
+- `GET /` (`ticket:read`), `POST /:id/use` (`ticket:approve` — petugas lokasi).
+- DB: `lapak_tickets` + enum `TicketKind`/`TicketStatus`, migrasi
+  `20261022190000_add_lapak_tickets`, drift 0.
+
+**Keputusan kontrak**
+- **Tiket terbit SAAT LUNAS, bukan saat checkout.** Tiket = bukti hak pakai; hak itu baru
+  sah setelah dibayar. Menerbitkan lebih awal berarti warga bisa masuk tanpa membayar.
+  Diuji: sebelum LUNAS `tickets: []`, sesudahnya tiket `AKTIF`.
+- **Sekali pakai, ditegakkan atomik:** `UPDATE ... WHERE status='AKTIF'`, bukan
+  `SELECT`-lalu-`UPDATE`. Syarat di `WHERE` membuat database memutuskan pemenang. Diuji
+  dua scan paralel → tepat 1×`200`, 1×`409`.
+- **Jenis tiket mengikuti `fulfillmentType` produk** (`TICKET_QR`→`TICKET`,
+  `BOOKING`→`BOOKING`, `CONTRACT`→`CONTRACT`, `RESULT`→`RESULT`,
+  `DOCUMENT_SKRD`→`HANDOVER`, `SCHEDULE`→`SCHEDULE`).
+- **Masa berlaku diperiksa saat verifikasi DAN saat `use`.** Status `AKTIF` saja tidak
+  cukup — tiket kemarin tetap `AKTIF` sampai worker berjalan.
+- **Verifikasi publik tanpa PII:** respons hanya memuat data produk + status + `usable` +
+  `reason`; nama pemesan tidak dikirim.
+- **Kode pendek `TKT-XXXXXX`** (alfabet tanpa `I/O/0/1`) untuk dibacakan manual bila QR
+  rusak; token QR 24 byte acak terpisah sehingga menebak kode tidak memberi akses token.
+- **Snapshot** `productName`/`rateName` di tiket — produk berganti nama tidak mengubah
+  tiket yang sudah terbit.
+- **Idempoten:** konfirmasi ulang tidak menggandakan tiket.
+
+**Perbaikan alat (docs.check)**
+- Checker sebelumnya **tidak mendeteksi field yang didahului komentar JSDoc** di dalam
+  `z.object({...})` — karakter terakhir sebelum kunci terbaca `/` (dari `*/`), bukan `{`
+  atau `,`. Kini komentar dinetralkan dengan menjaga offset, sehingga
+  **23 field yang tadinya tak terhitung** ikut terverifikasi (516 → 539).
+
+---
+
 ## 2026-10-22 — Pembayaran Transfer Manual (LJ-2.6)
 
 **Ditambah** — prefix `/api/lapak/payments` (6 endpoint)

@@ -88,10 +88,11 @@ ikhtisar + satu berkas per modul.
 | Quote & Checkout Pesanan | [lapak/orders.md](./lapak/orders.md) | 5 | login + `order:read` |
 | SKRD & Penomoran Gapless | [lapak/skrd.md](./lapak/skrd.md) | 10 | publik (verify) + `order:*` |
 | Pembayaran Transfer Manual | [lapak/payments.md](./lapak/payments.md) | 6 | login + `payment:*` |
+| Tiket QR & Check-in | [lapak/tickets.md](./lapak/tickets.md) | 5 | publik (verify) + `ticket:*` |
 
 **Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 162 endpoint.**
+**Total keseluruhan: 167 endpoint.**
 
 ---
 

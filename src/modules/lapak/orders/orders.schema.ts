@@ -101,6 +101,7 @@ export const OrderItemShape = z.object({
 });
 
 import { OrderPaymentShape } from "../payments/payments.schema.js";
+import { OrderTicketShape } from "../tickets/tickets.schema.js";
 
 /** Ringkasan SKRD yang menempel pada pesanan (null bila belum terbit). */
 export const OrderSkrdShape = z.object({
@@ -131,6 +132,8 @@ export const OrderShape = z.object({
   skrd: OrderSkrdShape.nullable(),
   /** Riwayat pembayaran (LJ-2.6), terbaru lebih dulu. */
   payments: z.array(OrderPaymentShape).default([]),
+  /** Tiket per baris pesanan; terbit saat LUNAS (LJ-2.7). */
+  tickets: z.array(OrderTicketShape).default([]),
 });
 
 /** Detail pesanan menampilkan pemohon TERMASKING — PII tidak pernah utuh. */

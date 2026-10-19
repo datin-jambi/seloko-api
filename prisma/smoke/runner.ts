@@ -28,6 +28,7 @@
  *   npm run db:smoke -- lapak-orders     → Hanya uji quote & checkout pesanan (LJ-2.4)
  *   npm run db:smoke -- lapak-skrd       → Hanya uji SKRD & penomoran gapless (LJ-2.5)
  *   npm run db:smoke -- lapak-payments   → Hanya uji pembayaran transfer manual (LJ-2.6)
+ *   npm run db:smoke -- lapak-tickets    → Hanya uji tiket QR & check-in (LJ-2.7)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -1145,6 +1146,7 @@ async function cleanupDebugArtefacts() {
   // Urutan hapus HARUS dari cucu ke induk: sejak LJ-2.4 produk direferensikan
   // `lapak_order_items` (FK RESTRICT), jadi menghapus produk lebih dulu akan
   // gagal P2003. Pesanan/keranjang/reservasi milik produk uji dibersihkan dulu.
+  await prisma.lapakTicket.deleteMany({ where: { orderItem: { product: testProductWhere } } });
   await prisma.lapakPayment.deleteMany({ where: { order: { items: { some: { product: testProductWhere } } } } });
   await prisma.lapakSkrd.deleteMany({ where: { order: { items: { some: { product: testProductWhere } } } } });
   await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { items: { some: { product: testProductWhere } } } } });
@@ -2682,6 +2684,219 @@ async function runLapakPaymentsSuite() {
   await prisma.lapakProduct.deleteMany({ where: { id: productId } });
 }
 
+// ─── Test Suite: Lapak — Tiket QR & Check-in (LJ-2.7) ────────────────────────
+async function runLapakTicketsSuite() {
+  console.log("\n\x1b[36m▶ [Suite 23: Lapak - Tiket QR & Check-in]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  assert("Superadmin login", Boolean(saToken));
+  assert("Warga login lapak", Boolean(wargaToken));
+  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+
+  await cleanupDebugArtefacts();
+  await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM"] }, year: { gte: 2020 } } });
+
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const rekreasi = (cats.data?.data ?? []).find((c: any) => c.slug === "rekreasi-olahraga")
+    ?? (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+
+  // Produk dengan fulfillmentType TICKET_QR — menentukan kind tiket.
+  const prod = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: rekreasi.id,
+      name: "Tiket Uji Kolam", description: "Produk uji tiket QR kolam renang.",
+      pricingUnit: "PERSON", availabilityType: "SLOT", fulfillmentType: "TICKET_QR",
+      rates: [{ name: "Per Orang", unit: "PERSON", price: 25_000 }],
+    },
+  });
+  const productId = prod.data?.data?.id;
+  const rateId = prod.data?.data?.rates?.[0]?.id;
+  await request(`/lapak/rates/${rateId}/status/submit`, { method: "PATCH", token: saToken || undefined, body: {} });
+  await request(`/lapak/rates/${rateId}/status/approve`, { method: "PATCH", token: saToken || undefined, body: {} });
+  await request(`/lapak/products/${productId}/status/publish`, { method: "PATCH", token: saToken || undefined });
+  await request("/lapak/skrd/settings", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      issuer: "BAPENDA", numberFormat: "{seq6}/SKRD/{issuer}/{romanMonth}/{year}",
+      signerName: "H. Al Haris", signerPosition: "Gubernur Jambi",
+      bankName: "Bank Jambi", bankAccount: "001-02-000123-4", dueDays: 7,
+    },
+  });
+
+  // Pesanan → bukti → konfirmasi LUNAS.
+  const cart = await request("/lapak/carts/opd/BPSDM", W);
+  const cartId = cart.data?.data?.id;
+  await request(`/lapak/carts/${cartId}/items`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { productId, rateId, qty: 3 },
+  });
+  const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { applicant: { name: "Budi Santoso", nik: "1234567890123456", phone: "081234567890" } },
+  });
+  const order = co.data?.data ?? {};
+  assert("Checkout 201", co.status === 201, co.status, co.data?.message);
+
+  // ── 1. Sebelum LUNAS: BELUM ada tiket.
+  assert("Tiket belum terbit sebelum LUNAS", (order.tickets ?? []).length === 0, (order.tickets ?? []).length);
+
+  const paymentId = order.payments?.[0]?.id;
+  await request(`/lapak/payments/${paymentId}/proof`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: {
+      proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti-tiket.jpg",
+      proofFileId: "ik_tiket_1", senderName: "Budi Santoso", senderBank: "Bank Jambi",
+      amount: 75_000, paidAt: new Date().toISOString(),
+    },
+  });
+
+  // ── 2. Setelah LUNAS: tiket terbit dengan kind TICKET.
+  const confirm = await request(`/lapak/payments/${paymentId}/verify`, {
+    method: "POST", token: saToken || undefined, body: {},
+  });
+  assert("Konfirmasi pembayaran 200", confirm.status === 200, confirm.status, confirm.data?.message);
+
+  const afterPaid = await request(`/lapak/orders/${order.id}`, W);
+  const ticketsAfter = afterPaid.data?.data?.tickets ?? [];
+  assert("Tiket terbit setelah LUNAS", ticketsAfter.length === 1, ticketsAfter.length);
+  const ticket = ticketsAfter[0] ?? {};
+  assert("Kind tiket = TICKET (dari TICKET_QR)", ticket.kind === "TICKET", ticket.kind);
+  assert("Status AKTIF", ticket.status === "AKTIF", ticket.status);
+  assert("Kode berformat TKT-", String(ticket.code).startsWith("TKT-"), ticket.code);
+  assert("Snapshot nama produk", ticket.productName === "Tiket Uji Kolam", ticket.productName);
+
+  // ── 3. Warga bisa lihat tiket pesanannya.
+  const myTickets = await request(`/lapak/tickets/order/${order.id}`, W);
+  assert("Daftar tiket pesanan 200", myTickets.status === 200, myTickets.status, myTickets.data?.message);
+  assert("Warga melihat tiketnya", (myTickets.data?.data ?? []).length === 1);
+
+  // ── 4. Verifikasi publik lewat token QR & kode pendek.
+  const ticketRow = await prisma.lapakTicket.findUnique({
+    where: { id: ticket.id }, select: { qrToken: true, code: true },
+  });
+  const verifyQr = await request(`/lapak/tickets/verify/${ticketRow?.qrToken}`, { appCode: "lapak-jambi-web" });
+  assert("Verifikasi QR publik 200", verifyQr.status === 200, verifyQr.status, verifyQr.data?.message);
+  assert("Tiket usable", verifyQr.data?.data?.usable === true, verifyQr.data?.data?.reason);
+  assert("Verifikasi TANPA NIK", !("nik" in (verifyQr.data?.data ?? {})),
+    Object.keys(verifyQr.data?.data ?? {}).join(","));
+
+  const verifyCode = await request(`/lapak/tickets/verify/${ticketRow?.code}`, { appCode: "lapak-jambi-web" });
+  assert("Verifikasi lewat KODE pendek 200", verifyCode.status === 200, verifyCode.status);
+  assert("Kode sama dengan QR", verifyCode.data?.data?.code === ticketRow?.code);
+
+  const badTicket = await request("/lapak/tickets/verify/TKT-PALSU123", { appCode: "lapak-jambi-web" });
+  assert("Tiket palsu 404", badTicket.status === 404, badTicket.status);
+
+  // ── 5. Warga tidak boleh menandai tiket terpakai.
+  const wargaUse = await request(`/lapak/tickets/${ticket.id}/use`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web", body: {},
+  });
+  assert("Warga tidak boleh pakai tiket (401/403)", [401, 403].includes(wargaUse.status), wargaUse.status);
+
+  // ── 6. Petugas menandai tiket terpakai.
+  const use1 = await request(`/lapak/tickets/${ticket.id}/use`, {
+    method: "POST", token: saToken || undefined, body: {},
+  });
+  assert("Pakai tiket 200", use1.status === 200, use1.status, use1.data?.message);
+  assert("Status DIGUNAKAN", use1.data?.data?.status === "DIGUNAKAN", use1.data?.data?.status);
+  assert("usedAt terisi", Boolean(use1.data?.data?.usedAt));
+
+  // ── 7. INTI: sekali pakai — scan kedua DITOLAK.
+  const use2 = await request(`/lapak/tickets/${ticket.id}/use`, {
+    method: "POST", token: saToken || undefined, body: {},
+  });
+  assert("Scan kedua ditolak 409", use2.status === 409, use2.status, use2.data?.message);
+
+  // Verifikasi publik kini menyatakan tidak bisa dipakai.
+  const verifyUsed = await request(`/lapak/tickets/verify/${ticketRow?.qrToken}`, { appCode: "lapak-jambi-web" });
+  assert("Verifikasi: tidak usable", verifyUsed.data?.data?.usable === false);
+  assert("Verifikasi: alasan menyebut sudah dipakai",
+    String(verifyUsed.data?.data?.reason ?? "").toLowerCase().includes("dipakai"),
+    verifyUsed.data?.data?.reason);
+
+  // ── 8. INTI: dua scan PARALEL → hanya satu berhasil.
+  // Buat pesanan kedua untuk diuji konkurensi.
+  await request(`/lapak/carts/${cartId}/items`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { productId, rateId, qty: 1 },
+  });
+  const co2 = await request(`/lapak/orders/cart/${cartId}/checkout`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
+  });
+  const order2 = co2.data?.data ?? {};
+  const pay2 = order2.payments?.[0]?.id;
+  await request(`/lapak/payments/${pay2}/proof`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: {
+      proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti-tiket2.jpg",
+      proofFileId: "ik_tiket_2", senderName: "Budi Santoso", senderBank: "Bank Jambi",
+      amount: 25_000, paidAt: new Date().toISOString(),
+    },
+  });
+  await request(`/lapak/payments/${pay2}/verify`, { method: "POST", token: saToken || undefined, body: {} });
+
+  const order2Detail = await request(`/lapak/orders/${order2.id}`, W);
+  const ticket2 = (order2Detail.data?.data?.tickets ?? [])[0] ?? {};
+  assert("Tiket kedua terbit", Boolean(ticket2.id), ticket2.id);
+
+  const [s1, s2] = await Promise.all([
+    request(`/lapak/tickets/${ticket2.id}/use`, { method: "POST", token: saToken || undefined, body: {} }),
+    request(`/lapak/tickets/${ticket2.id}/use`, { method: "POST", token: saToken || undefined, body: {} }),
+  ]);
+  const okCount = [s1, s2].filter((r) => r.status === 200).length;
+  const conflictCount = [s1, s2].filter((r) => r.status === 409).length;
+  assert("Scan paralel: tepat 1 berhasil", okCount === 1, `${s1.status}/${s2.status}`);
+  assert("Scan paralel: tepat 1 ditolak", conflictCount === 1, `${s1.status}/${s2.status}`);
+
+  // ── 9. Daftar tiket CMS + filter.
+  const cmsList = await request("/lapak/tickets?limit=100", { token: saToken || undefined });
+  assert("Daftar tiket CMS 200", cmsList.status === 200, cmsList.status, cmsList.data?.message);
+  assert("Tiket muncul di CMS", (cmsList.data?.data ?? []).some((t: any) => t.id === ticket.id));
+
+  const usedList = await request("/lapak/tickets?status=DIGUNAKAN&limit=100", { token: saToken || undefined });
+  assert("Filter DIGUNAKAN bekerja",
+    (usedList.data?.data ?? []).every((t: any) => t.status === "DIGUNAKAN"),
+    (usedList.data?.data ?? []).length);
+
+  const kindList = await request("/lapak/tickets?kind=TICKET&limit=100", { token: saToken || undefined });
+  assert("Filter kind TICKET bekerja",
+    (kindList.data?.data ?? []).every((t: any) => t.kind === "TICKET"),
+    (kindList.data?.data ?? []).length);
+
+  // ── 10. Tiket orang lain tidak bisa diakses (404).
+  const otherToken = await login("admin.bpsdm", DEFAULT_PASSWORD, "seloko");
+  const otherView = await request(`/lapak/tickets/${ticket.id}`, {
+    token: otherToken || undefined, appCode: "seloko",
+  });
+  assert("Tiket orang lain tidak 200", otherView.status !== 200, otherView.status);
+
+  // ── 11. Bersih-bersih.
+  await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSetting.deleteMany({});
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM"] }, year: { gte: 2020 } } });
+  await prisma.lapakProductRate.deleteMany({ where: { productId } });
+  await prisma.lapakProduct.deleteMany({ where: { id: productId } });
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -2775,6 +2990,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-payments" || targetModule === "pembayaran") {
       await runLapakPaymentsSuite();
+    }
+    if (!targetModule || targetModule === "lapak-tickets" || targetModule === "tiket") {
+      await runLapakTicketsSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

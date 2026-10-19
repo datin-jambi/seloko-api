@@ -46,6 +46,7 @@ const APP_MODULES: Record<string, Record<string, string>> = {
     orders: "src/modules/lapak/orders/orders.routes.ts",
     skrd: "src/modules/lapak/skrd/skrd.routes.ts",
     payments: "src/modules/lapak/payments/payments.routes.ts",
+    tickets: "src/modules/lapak/tickets/tickets.routes.ts",
   },
 };
 
@@ -97,8 +98,21 @@ function topLevelKeys(src: string, from: number): string[] {
 const schemaKeys = new Map<string, string[]>();
 const schemaBody = new Map<string, string>();
 
+/**
+ * Netralkan komentar TANPA mengubah panjang teks, sehingga offset tetap valid.
+ * Tanpa ini, kunci yang didahului komentar JSDoc tidak terdeteksi: pemeriksa
+ * melihat karakter terakhir sebelum kunci sebagai `/` (dari `*\/`), bukan `{`
+ * atau `,`, lalu melewatinya.
+ */
+function stripCommentsKeepingOffsets(src: string): string {
+  const blank = (s: string) => s.replace(/[^\n]/g, " ");
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, blank)
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m0, p1: string) => p1 + blank(m0.slice(p1.length)));
+}
+
 for (const file of allSchemaFiles()) {
-  const src = readFileSync(file, "utf8");
+  const src = stripCommentsKeepingOffsets(readFileSync(file, "utf8"));
   for (const m of src.matchAll(/export const (\w+)\s*=\s*/g)) {
     const name = m[1]!;
     const after = m.index! + m[0].length;

@@ -1039,6 +1039,7 @@ model LapakOrderItem {
   product     LapakProduct      @relation(fields: [productId], references: [id])
   rate        LapakProductRate? @relation(fields: [rateId], references: [id])
   reservation LapakReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  ticket      LapakTicket?
 
   @@index([orderId], map: "idx_lapak_order_items_order")
   @@map("lapak_order_items")
@@ -1247,6 +1248,74 @@ model LapakPayment {
   @@index([orderId, status], map: "idx_lapak_payments_order_status")
   @@index([status, expiresAt], map: "idx_lapak_payments_status_expires")
   @@map("lapak_payments")
+}
+
+/// Jenis tiket (PRD 04 §3). Mengikuti `fulfillmentType` produk:
+/// TICKET_QR → TICKET, BOOKING → BOOKING, CONTRACT → CONTRACT,
+/// RESULT → RESULT. HANDOVER = serah terima barang, SCHEDULE = jadwal.
+enum TicketKind {
+  /// Sekali masuk, discan di pintu (kolam renang, GOR).
+  TICKET
+  /// Bukti pemesanan berdurasi (aula, asrama) — check-in lalu check-out.
+  BOOKING
+  /// Kontrak sewa (kendaraan, alat berat).
+  CONTRACT
+  /// Serah terima barang.
+  HANDOVER
+  /// Hasil layanan (hasil laboratorium, sertifikat).
+  RESULT
+  /// Jadwal kunjungan berulang.
+  SCHEDULE
+}
+
+enum TicketStatus {
+  /// Terbit setelah pesanan LUNAS, siap dipakai.
+  AKTIF
+  /// Sudah discan/di-check-in.
+  DIGUNAKAN
+  /// Kedaluwarsa karena masa berlaku lewat.
+  KEDALUWARSA
+  /// Dibatalkan (pesanan dibatalkan/refund).
+  DIBATALKAN
+}
+
+/// Tiket / bukti pemenuhan per BARIS pesanan (PRD 04 §3 & §5).
+///
+/// Terbit **SAAT LUNAS**, bukan saat checkout: tiket adalah bukti hak pakai, dan
+/// hak itu baru sah setelah dibayar. Menerbitkan lebih awal berarti warga bisa
+/// masuk tanpa membayar.
+///
+/// Satu baris pesanan = satu tiket. `qrToken` unik dipakai petugas lokasi untuk
+/// memvalidasi; `code` adalah kode pendek yang bisa dibacakan manual bila QR
+/// rusak.
+model LapakTicket {
+  id            String       @id @default(uuid(7)) @db.VarChar(36)
+  orderItemId   String       @unique @map("order_item_id") @db.VarChar(36)
+  kind          TicketKind
+  /// Kode pendek yang bisa dibacakan manual, mis. "TKT-7K2M9P".
+  code          String       @db.VarChar(40)
+  /// Token QR acak — tidak bisa diturunkan dari kode.
+  qrToken       String       @unique @map("qr_token") @db.VarChar(64)
+  status        TicketStatus @default(AKTIF)
+  /// Masa berlaku: diisi dari rentang pesanan, atau jatuh tempo + tenggang.
+  validFrom     DateTime?    @map("valid_from") @db.Timestamptz()
+  validUntil    DateTime?    @map("valid_until") @db.Timestamptz()
+  /// Kapan benar-benar dipakai & oleh siapa.
+  usedAt        DateTime?    @map("used_at") @db.Timestamptz()
+  checkedInBy   String?      @map("checked_in_by") @db.VarChar(36)
+  /// Snapshot: perubahan produk/pesanan tidak mengubah tiket yang sudah terbit.
+  productName   String       @map("product_name") @db.VarChar(150)
+  rateName      String       @map("rate_name") @db.VarChar(100)
+  organizationId String      @map("organization_id") @db.VarChar(36)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz()
+
+  orderItem LapakOrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  /// Kode unik per aplikasi — dipakai petugas membacakan/mencari tiket.
+  @@unique([organizationId, code], map: "uq_lapak_tickets_org_code")
+  @@index([status, validUntil], map: "idx_lapak_tickets_status_valid")
+  @@map("lapak_tickets")
 }
 
 /// Tarif per sesi/satuan. Punya status sendiri (PRD 04 §C): mengubah tarif

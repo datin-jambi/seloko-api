@@ -361,7 +361,6 @@ export async function checkoutCart(
 // ─── Baca pesanan ─────────────────────────────────────────────────────────────
 const ORDER_INCLUDE = {
   organization: { select: { code: true, name: true } },
-  items: { orderBy: { createdAt: "asc" as const } },
   skrd: {
     select: {
       id: true, number: true, documentType: true, issuer: true,
@@ -375,6 +374,19 @@ const ORDER_INCLUDE = {
       id: true, status: true, method: true, amount: true, proofUrl: true,
       senderName: true, senderBank: true, rejectReason: true,
       paidAt: true, confirmedAt: true, createdAt: true,
+    },
+  },
+  // Tiket menempel pada baris pesanan, bukan langsung ke pesanan.
+  items: {
+    orderBy: { createdAt: "asc" as const },
+    include: {
+      ticket: {
+        select: {
+          id: true, orderItemId: true, kind: true, code: true, status: true,
+          productName: true, rateName: true,
+          validFrom: true, validUntil: true, usedAt: true,
+        },
+      },
     },
   },
 } as const;
@@ -419,6 +431,21 @@ function toBaseDto(row: OrderRow) {
           status: row.skrd.status,
         }
       : null,
+    tickets: row.items
+      .map((i) => i.ticket)
+      .filter((t): t is NonNullable<typeof t> => t !== null)
+      .map((t) => ({
+        id: t.id,
+        orderItemId: t.orderItemId,
+        kind: t.kind,
+        code: t.code,
+        status: t.status,
+        productName: t.productName,
+        rateName: t.rateName,
+        validFrom: t.validFrom?.toISOString() ?? null,
+        validUntil: t.validUntil?.toISOString() ?? null,
+        usedAt: t.usedAt?.toISOString() ?? null,
+      })),
     payments: row.payments.map((p) => ({
       id: p.id,
       status: p.status,

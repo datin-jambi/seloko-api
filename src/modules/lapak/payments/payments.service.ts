@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "~/config/database.js";
 import { NotFoundError, BadRequestError } from "~/common/errors/index.js";
+import { issueTicketsInTx } from "../tickets/tickets.service.js";
 import type {
   SubmitProofBody,
   RejectPaymentBody,
@@ -266,6 +267,13 @@ export async function verifyPayment(
     await tx.lapakSkrd.updateMany({
       where: { orderId: payment.orderId, status: "TERBIT" },
       data: { status: "LUNAS" },
+    });
+
+    // TIKET TERBIT SAAT LUNAS (LJ-2.7). Bukan saat checkout: tiket adalah bukti
+    // hak pakai, dan hak itu baru sah setelah dibayar.
+    await issueTicketsInTx(tx, {
+      orderId: payment.orderId,
+      organizationId: payment.order.organizationId,
     });
   });
 
