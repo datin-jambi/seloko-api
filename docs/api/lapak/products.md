@@ -67,6 +67,29 @@ DRAFT ──publish──► PUBLISHED
 | `images` | array | `{ id,url,fileId,altText,isPrimary,sortOrder }` |
 | `createdAt`, `updatedAt` | string | ISO 8601 |
 
+## Media Produk (LJ-1.5)
+
+Gambar produk disimpan sebagai baris `lapak_product_images` (`url`, `fileId`, `altText`,
+`isPrimary`, `sortOrder`). Berkas fisik diunggah lebih dulu lewat modul core:
+
+`POST /api/storage/upload?module=lapak&subFolder=products` → `{ url, fileId }`, lalu `fileId`
+dan `url` itu dimasukkan ke `images[]` saat create/update produk.
+
+**Aturan `isPrimary` — dinormalisasi server:**
+
+| Kondisi kiriman | Hasil |
+|---|---|
+| 0 gambar | `images: []`, `coverUrl` tetap seperti dikirim |
+| 1+ bertanda `isPrimary: true` | **Hanya satu** yang dipakai — yang `sortOrder` terkecil |
+| Tidak ada yang bertanda | Gambar `sortOrder` terkecil **diangkat otomatis** |
+| `coverUrl` tidak diisi | Diisi otomatis dari URL gambar primer |
+
+Normalisasi bersifat **menurunkan**, bukan menolak: klien yang mengirim semua `true`
+(mis. UI dengan checkbox tercentang semua) tetap mendapat hasil wajar `201`/`200`.
+
+**Fasilitas** (`lapak_product_facilities`: `name`, `icon`) bersifat dekoratif — daftar
+ikon Lucide opsional, tidak memengaruhi harga maupun ketersediaan.
+
 ## Aturan Edit & Hapus
 
 - Hanya `DRAFT` / `REJECTED` yang boleh diedit — produk lain ditolak `403` ("unpublish dahulu").
@@ -161,13 +184,13 @@ Hanya `status: PUBLISHED`. `startingPrice` = tarif aktif termurah.
 | `pricingUnit` | — | enum \| null | — | bawaan kategori | ✓ | `null` = fallback kategori |
 | `availabilityType` | — | enum \| null | — | bawaan kategori | ✓ | idem |
 | `fulfillmentType` | — | enum \| null | — | bawaan kategori | ✓ | idem |
-| `coverUrl` | — | string | URL | — | ✓ | — |
+| `coverUrl` | — | string | URL | otomatis dari gambar primer | ✓ | — |
 | `coverFileId` | — | string | ≤100 | — | ✓ | — |
 | `rates` | — | array | maks 50 | `[]` | — | `id?` ada = (di update) perbarui |
 | `addons` | — | array | maks 50 | `[]` | — | — |
 | `requirements` | — | array | maks 30 | `[]` | — | `options` wajib bila `SELECT`, dan **hanya** boleh pada `SELECT` |
 | `facilities` | — | array | maks 50 | `[]` | — | — |
-| `images` | — | array | maks 20 | `[]` | — | — |
+| `images` | — | array | maks 20 | `[]` | — | `isPrimary` dinormalisasi: tepat satu per produk |
 
 Bila kategori tidak punya bawaan lengkap dan atribut tidak dikirim → `400` dengan pesan eksplisit.
 

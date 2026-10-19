@@ -321,6 +321,26 @@ export async function getProductById(id: string, scope: string[] | null) {
 }
 
 // ─── Mutations (CMS) ──────────────────────────────────────────────────────────
+/**
+ * Normalisasi gambar produk (LJ-1.5).
+ *
+ * `isPrimary` adalah penanda tunggal: kartu katalog memakai gambar primer
+ * sebagai thumbnail, jadi dua baris `isPrimary: true` membuat "gambar utama"
+ * menjadi ambigu. Di sini hanya yang PERTAMA dipakai; sisanya diturunkan
+ * diam-diam alih-alih melempar error — klien yang mengirim semua `true`
+ * (mis. hasil centang "jadikan utama" di UI) tetap mendapat hasil wajar.
+ *
+ * Bila belum ada yang ditandai, gambar pertama (berdasarkan `sortOrder`)
+ * diangkat menjadi primer agar `coverUrl` selalu punya sumber.
+ */
+function normalizePrimary(images: z.infer<typeof ImageInputSchema>[] | undefined) {
+  if (!images?.length) return images;
+  const sorted = [...images].sort((a, b) => a.sortOrder - b.sortOrder);
+  const primaryIdx = sorted.findIndex((i) => i.isPrimary);
+  const chosen = primaryIdx >= 0 ? primaryIdx : 0;
+  return sorted.map((img, idx) => ({ ...img, isPrimary: idx === chosen }));
+}
+
 export async function createProduct(body: CreateProductBody, scope: string[] | null) {
   const applicationId = await getLapakAppId();
 
@@ -345,7 +365,8 @@ export async function createProduct(body: CreateProductBody, scope: string[] | n
     throw new ConflictError(`Slug '${slug}' sudah digunakan produk lain`);
   }
 
-  const { rates, addons, requirements, facilities, images, ...head } = body;
+  const { rates, addons, requirements, facilities, images: rawImages, ...head } = body;
+  const images = normalizePrimary(rawImages);
 
   // Nested create: buang `id` dari payload anak (selalu undefined di sini,
   // tapi biar aman). `any` karena lima tabel berbeda shape — Zod yang menjaga
@@ -368,8 +389,10 @@ export async function createProduct(body: CreateProductBody, scope: string[] | n
       capacity: head.capacity ?? null,
       areaM2: head.areaM2 ?? null,
       ...attrs,
-      coverUrl: head.coverUrl ?? null,
-      coverFileId: head.coverFileId ?? null,
+      // coverUrl mengikuti gambar primer bila tidak diisi eksplisit: kartu
+      // katalog butuh satu sumber thumbnail yang pasti (LJ-1.5).
+      coverUrl: head.coverUrl ?? images?.find((i) => i.isPrimary)?.url ?? null,
+      coverFileId: head.coverFileId ?? images?.find((i) => i.isPrimary)?.fileId ?? null,
       rates: { create: stripId(rates) },
       addons: { create: stripId(addons) },
       requirements: { create: stripId(requirements).map((q) => ({ ...q, options: q.options ?? undefined })) },
@@ -430,7 +453,8 @@ export async function updateProduct(id: string, body: UpdateProductBody, scope: 
     if (conflict) throw new ConflictError(`Slug '${slug}' sudah digunakan produk lain`);
   }
 
-  const { rates, addons, requirements, facilities, images, ...head } = body;
+  const { rates, addons, requirements, facilities, images: rawImages, ...head } = body;
+  const images = normalizePrimary(rawImages);
 
   const row = await prisma.$transaction(async (tx) => {
     const updated = await tx.lapakProduct.update({
@@ -448,7 +472,9 @@ export async function updateProduct(id: string, body: UpdateProductBody, scope: 
         ...(attrs.pricingUnit !== undefined && { pricingUnit: attrs.pricingUnit }),
         ...(attrs.availabilityType !== undefined && { availabilityType: attrs.availabilityType }),
         ...(attrs.fulfillmentType !== undefined && { fulfillmentType: attrs.fulfillmentType }),
-        ...(head.coverUrl !== undefined && { coverUrl: head.coverUrl ?? null }),
+        ...(head.coverUrl !== undefined
+          ? { coverUrl: head.coverUrl ?? null }
+          : images?.length ? { coverUrl: images.find((i) => i.isPrimary)?.url ?? null } : {}),
         ...(head.coverFileId !== undefined && { coverFileId: head.coverFileId ?? null }),
         ...(body.organizationId !== undefined && { organizationId: body.organizationId }),
         ...(body.categoryId !== undefined && { categoryId: body.categoryId }),

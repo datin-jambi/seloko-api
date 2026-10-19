@@ -1180,7 +1180,12 @@ async function runLapakProductsSuite() {
         { label: "Catatan tambahan", fieldType: "TEXT", isRequired: false, sortOrder: 4 },
       ],
       facilities: [{ name: "Wifi" }, { name: "Parkir" }],
-      images: [{ url: "https://example.com/aula.jpg", isPrimary: true }],
+      // 3 gambar, SEMUA isPrimary:true — service wajib memilih satu saja.
+      images: [
+        { url: "https://example.com/aula.jpg", isPrimary: true, sortOrder: 0, altText: "Aula utama" },
+        { url: "https://example.com/aula-2.jpg", isPrimary: true, sortOrder: 1 },
+        { url: "https://example.com/aula-3.jpg", isPrimary: true, sortOrder: 2 },
+      ],
     },
   });
   assert("Create 201", created.status === 201, created.status, created.data?.message);
@@ -1194,7 +1199,12 @@ async function runLapakProductsSuite() {
     (created.data?.data?.addons ?? []).length === 1 &&
     (created.data?.data?.requirements ?? []).length === 5 &&
     (created.data?.data?.facilities ?? []).length === 2 &&
-    (created.data?.data?.images ?? []).length === 1);
+    (created.data?.data?.images ?? []).length === 3);
+  const imgs = created.data?.data?.images ?? [];
+  assert("Tepat 1 gambar primer (3 dikirim true)", imgs.filter((i: any) => i.isPrimary).length === 1,
+    imgs.filter((i: any) => i.isPrimary).length);
+  assert("Gambar primer = sortOrder terkecil", imgs.find((i: any) => i.isPrimary)?.url === "https://example.com/aula.jpg");
+  assert("coverUrl mengikuti gambar primer", created.data?.data?.coverUrl === "https://example.com/aula.jpg", created.data?.data?.coverUrl);
   const reqs = created.data?.data?.requirements ?? [];
   assert("Kelima tipe persyaratan terwakili", ["FILE", "TEXT", "NUMBER", "DATE", "SELECT"].every((t) =>
     reqs.some((r: any) => r.fieldType === t)), reqs.map((r: any) => r.fieldType));
@@ -1223,6 +1233,24 @@ async function runLapakProductsSuite() {
     },
   });
   assert("Opsi pada tipe non-SELECT ditolak 400", optsOnFile.status === 400, optsOnFile.status);
+
+  // LJ-1.5: tanpa satu pun isPrimary, gambar sortOrder terkecil otomatis diangkat.
+  const noPrimary = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: gedung.id,
+      name: "Produk Uji Tanpa Primer", description: "Deskripsi minimal sepuluh karakter.",
+      images: [
+        { url: "https://example.com/b.jpg", sortOrder: 5 },
+        { url: "https://example.com/a.jpg", sortOrder: 1 },
+      ],
+    },
+  });
+  const npImgs = noPrimary.data?.data?.images ?? [];
+  assert("Tanpa isPrimary → satu diangkat otomatis", npImgs.filter((i: any) => i.isPrimary).length === 1,
+    npImgs.filter((i: any) => i.isPrimary).length);
+  assert("Yang diangkat = sortOrder terkecil", npImgs.find((i: any) => i.isPrimary)?.url === "https://example.com/a.jpg");
+  await request(`/lapak/products/${noPrimary.data?.data?.id}`, { method: "DELETE", token: saToken || undefined });
 
   // ── 2. Validasi.
   const badOrg = await request("/lapak/products", {

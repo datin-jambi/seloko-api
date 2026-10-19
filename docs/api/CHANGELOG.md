@@ -7,6 +7,22 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-21 — Media & Fasilitas Produk (LJ-1.5)
+
+**Berubah — PERILAKU KONTRAK**
+- `images[].isPrimary` kini **dinormalisasi server** menjadi tepat satu per produk: bila
+  klien mengirim beberapa `true`, hanya yang `sortOrder` terkecil dipertahankan; bila tak
+  ada yang bertanda, gambar pertama otomatis diangkat. Sebelumnya semua `true` tersimpan
+  apa adanya sehingga "gambar utama" ambigu di katalog publik.
+- `coverUrl`/`coverFileId` **diisi otomatis** dari gambar primer bila tidak dikirim eksplisit.
+
+**Catatan** — tabel `lapak_product_images` & `lapak_product_facilities` sudah ada sejak
+LJ-1.2; unggah berkas memakai modul core `POST /api/storage/upload` (folder per aplikasi),
+bukan endpoint khusus lapak. LJ-1.5 menutup celah integritas `isPrimary` dan konsistensi
+`coverUrl`.
+
+---
+
 ## 2026-10-21 — Persyaratan/Dokumen Produk (LJ-1.4)
 
 **Berubah — VALIDASI KONTRAK**
