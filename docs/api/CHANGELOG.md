@@ -7,6 +7,25 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-21 — Katalog Publik OPD (LJ-1.6)
+
+**Ditambah** — prefix `/api/lapak` (2 endpoint publik, PRD 04 §176)
+- `GET /api/lapak/organizations/:code` — profil OPD + `productCount` (produk terbit).
+- `GET /api/lapak/organizations/:code/products` — katalog produk OPD dengan filter
+  kategori/cari/harga-urut + paginasi.
+
+**Keputusan kontrak**
+- Endpoint hidup di modul lapak, bukan `core/organizations`, karena responsnya menggabungkan
+  data OPD dengan katalog — menaruhnya di core memaksa core mengimpor lapak (coupling terbalik).
+- Kode OPD tak dikenal → **`404`**, bukan katalog kosong: katalog kosong akan menyamarkan
+  salah ketik URL di halaman SEO publik.
+- `productCount` hanya menghitung produk `PUBLISHED` milik aplikasi lapak — bukan seluruh
+  produk OPD di semua aplikasi.
+- Field internal OPD (`id`, `isActive`, `parentId`) tidak pernah dikirim ke publik.
+- Filter `organization` dipaksa ke `:code`; klien tidak bisa melebarkan lingkup via query.
+
+---
+
 ## 2026-10-21 — Media & Fasilitas Produk (LJ-1.5)
 
 **Berubah — PERILAKU KONTRAK**

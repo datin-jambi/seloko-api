@@ -21,6 +21,7 @@
  *   npm run db:smoke -- lapak-categories → Hanya uji kategori layanan Lapak (LJ-1.1)
  *   npm run db:smoke -- lapak-products  → Hanya uji produk katalog Lapak (LJ-1.2)
  *   npm run db:smoke -- lapak-rates     → Hanya uji alur persetujuan tarif (LJ-1.3)
+ *   npm run db:smoke -- lapak-catalog   → Hanya uji katalog publik OPD (LJ-1.6)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -1548,6 +1549,52 @@ function pubDetailSafe(res: { status: number; data?: any }): number {
 }
 
 // ─── Main Orchestrator ────────────────────────────────────────────────────────
+// ─── Test Suite: Lapak — Katalog Publik OPD (LJ-1.6) ──────────────────────────
+async function runLapakCatalogSuite() {
+  console.log("\n\x1b[36m▶ [Suite 16: Lapak - Katalog Publik OPD]\x1b[0m");
+
+  // ── 1. Profil OPD publik: field aman & productCount masuk akal.
+  const profile = await request("/lapak/organizations/BPSDM", { appCode: "lapak-jambi-web" });
+  assert("Profil OPD 200 (tanpa login)", profile.status === 200, profile.status);
+  const p = profile.data?.data ?? {};
+  assert("Profil memuat kode & nama", p.code === "BPSDM" && typeof p.name === "string", p.code);
+  assert("Profil memuat productCount angka", typeof p.productCount === "number", typeof p.productCount);
+  // Field internal tidak boleh bocor ke publik.
+  assert("Field internal tidak bocor", !("id" in p) && !("isActive" in p) && !("parentId" in p),
+    Object.keys(p).join(","));
+
+  // ── 2. Kode OPD tak dikenal → 404, bukan katalog kosong yang menyamarkan typo.
+  const badCode = await request("/lapak/organizations/OPD-TIDAK-ADA", { appCode: "lapak-jambi-web" });
+  assert("OPD tak dikenal ditolak 404", badCode.status === 404, badCode.status);
+
+  // ── 3. Produk OPD: hanya milik OPD itu.
+  const prods = await request("/lapak/organizations/BPSDM/products", { appCode: "lapak-jambi-web" });
+  assert("Produk OPD 200", prods.status === 200, prods.status);
+  const list = prods.data?.data ?? [];
+  assert("Produk OPD menyertakan meta paginasi", typeof prods.data?.meta?.totalItems === "number",
+    prods.data?.meta?.totalItems);
+  assert("Semua produk milik OPD tersebut", list.every((x: any) => x.organization?.code === "BPSDM"),
+    list.map((x: any) => x.organization?.code).join(","));
+  assert("Kartu katalog punya startingPrice", list.every((x: any) => typeof x.startingPrice === "number"));
+
+  // ── 4. Filter & paginasi bekerja di endpoint OPD.
+  const limited = await request("/lapak/organizations/BPSDM/products?limit=1", { appCode: "lapak-jambi-web" });
+  assert("limit dihormati", (limited.data?.data ?? []).length <= 1, (limited.data?.data ?? []).length);
+  assert("meta.limit mengikuti query", limited.data?.meta?.limit === 1, limited.data?.meta?.limit);
+
+  const badSort = await request("/lapak/organizations/BPSDM/products?sortBy=ngawur", { appCode: "lapak-jambi-web" });
+  assert("sortBy tak dikenal ditolak 400", badSort.status === 400, badSort.status);
+
+  // ── 5. productCount konsisten dengan isi katalog OPD.
+  const total = prods.data?.meta?.totalItems ?? 0;
+  assert("productCount = totalItems katalog OPD", p.productCount === total, `${p.productCount} vs ${total}`);
+
+  // ── 6. Katalog tetap jalan meski OPD tanpa produk terbit.
+  const other = await request("/lapak/organizations/DISBUDPAR/products", { appCode: "lapak-jambi-web" });
+  assert("OPD tanpa produk tetap 200", other.status === 200, other.status);
+  assert("Katalog kosong berupa array", Array.isArray(other.data?.data), typeof other.data?.data);
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -1620,6 +1667,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-rates") {
       await runLapakRatesSuite();
+    }
+    if (!targetModule || targetModule === "lapak-catalog" || targetModule === "katalog") {
+      await runLapakCatalogSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

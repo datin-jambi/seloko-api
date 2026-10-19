@@ -271,6 +271,10 @@ export async function buildApp(): Promise<FastifyInstance> {
       const { lapakRatesRoutes } = await import("~/modules/lapak/rates/rates.routes.js");
       await api.register(lapakRatesRoutes, { prefix: "/lapak/rates" });
 
+      // Katalog publik OPD — digabung dengan produk tanpa menyentuh core.
+      const { lapakCatalogRoutes } = await import("~/modules/lapak/catalog/catalog.routes.js");
+      await api.register(lapakCatalogRoutes, { prefix: "/lapak" });
+
       // Lapak modules
       // await api.register(merchantsRoutes, { prefix: "/merchants" });
       // await api.register(productsRoutes, { prefix: "/products" });
