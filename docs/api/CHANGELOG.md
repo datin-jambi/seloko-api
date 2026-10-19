@@ -7,6 +7,34 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-21 — Quote & Checkout → Pesanan (LJ-2.4)
+
+**Ditambah** — prefix `/api/lapak/orders` (5 endpoint)
+- `GET /cart/:cartId/quote` — hitung harga **tanpa menyimpan apa pun**.
+- `POST /cart/:cartId/checkout` — buat pesanan (atomik).
+- `GET /mine`, `GET /:id` — pesanan warga.
+- `GET /` (`order:read`) — daftar pesanan CMS, lingkup OPD.
+- DB: `lapak_orders`, `lapak_order_items`, `lapak_order_status_logs` + enum
+  `OrderStatus` (11 status), migrasi `20261021220000_add_lapak_orders`, drift 0.
+
+**Keputusan kontrak — SNAPSHOT & PII**
+- **Snapshot, bukan referensi hidup:** checkout menyalin nama produk, nama tarif, satuan,
+  dan harga ke baris pesanan. Kenaikan tarif setelahnya **tidak mengubah** pesanan lama —
+  pesanan adalah bukti transaksi pada harga saat itu. Diuji nyata di smoke.
+- **PII tidak pernah keluar utuh:** `applicant` disimpan lengkap untuk SKRD, tetapi setiap
+  respons memakai versi termasking (NIK `1234********3456`, telepon `0812****7890`) —
+  termasuk di daftar CMS.
+- **Atomik:** pesanan + baris + log + konfirmasi reservasi (HOLD → CONFIRMED) dalam satu
+  transaksi. Bila satu reservasi gagal, seluruh checkout dibatalkan.
+- **Kode pesanan `LJK-YYMMDD-XXXXX`** dengan 5 karakter acak (alfabet tanpa `I/O/0/1`).
+  Bukan berurutan: kode dipakai warga melacak pesanan, jadi nomor urut mudah ditebak akan
+  membocorkan volume transaksi.
+- Harga **selalu dihitung ulang di server**; nilai dari klien tidak pernah dipercaya.
+- Uang memakai **integer rupiah** (bukan desimal) untuk menghindari galat pembulatan.
+- Keranjang dikosongkan setelah checkout — isinya sudah menjadi snapshot di pesanan.
+
+---
+
 ## 2026-10-21 — Keranjang per OPD (LJ-2.3)
 
 **Ditambah** — prefix `/api/lapak/carts` (8 endpoint, semua butuh login)

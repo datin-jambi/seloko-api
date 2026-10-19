@@ -66,6 +66,7 @@ model Application {
   lapakCategories   LapakCategory[]
   lapakProducts     LapakProduct[]
   lapakCarts        LapakCart[]
+  lapakOrders       LapakOrder[]
 
   @@map("applications")
 }
@@ -233,6 +234,7 @@ model User {
   faqsUpdated       Faq[]                @relation("FaqUpdatedBy")
   vehicleTaxChecks  VehicleTaxCheckLog[]
   lapakCarts        LapakCart[]
+  lapakOrders       LapakOrder[]
 
   @@unique([accountType, email], map: "uq_users_account_email")
   @@index([deletedAt], map: "idx_users_deleted_at")
@@ -305,6 +307,7 @@ model Organization {
   userAppRoleScopes UserAppRoleOrganization[]
   lapakProducts     LapakProduct[]
   lapakCarts        LapakCart[]
+  lapakOrders       LapakOrder[]
 
   @@index([parentId])
   @@index([type, isActive])
@@ -777,6 +780,7 @@ model LapakProduct {
   blackoutDates  LapakBlackoutDate[]
   reservations   LapakReservation[]
   cartItems      LapakCartItem[]
+  orderItems     LapakOrderItem[]
 
   @@unique([applicationId, slug], map: "uq_lapak_products_app_slug")
   @@index([applicationId, status], map: "idx_lapak_products_app_status")
@@ -869,7 +873,8 @@ model LapakReservation {
 
   product LapakProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  cartItem LapakCartItem?
+  cartItem  LapakCartItem?
+  orderItem LapakOrderItem?
 
   @@index([productId, status], map: "idx_lapak_reservations_product_status")
   @@index([expiresAt], map: "idx_lapak_reservations_expires")
@@ -938,6 +943,120 @@ model LapakCartItem {
   @@map("lapak_cart_items")
 }
 
+/// Status pesanan (PRD 04 §5). Alur lengkap; modul ini baru memakai
+/// DRAFT → MENUNGGU_PEMBAYARAN. Sisanya dipakai SKRD/pembayaran/tiket.
+enum OrderStatus {
+  DRAFT
+  /// Butuh persetujuan OPD sebelum SKRD terbit.
+  MENUNGGU_VERIFIKASI
+  /// SKRD terbit; warga harus membayar sebelum `expiresAt`.
+  MENUNGGU_PEMBAYARAN
+  /// Bukti transfer diunggah, menunggu konfirmasi OPD.
+  MENUNGGU_KONFIRMASI
+  LUNAS
+  /// Tiket/kontrak sedang dipakai.
+  AKTIF
+  SELESAI
+  DITOLAK
+  DIBATALKAN
+  KEDALUWARSA
+  REFUND
+}
+
+/// Satu pesanan = satu OPD (PRD 04 §4.F).
+///
+/// SNAPSHOT ADALAH INTI MODEL INI:
+/// - `applicant` menyimpan data pemohon apa adanya saat checkout (PII) —
+///   wajib dimasking di list & log, lihat security-guidelines.md.
+/// - Tiap baris menyimpan nama/harga/satuan hasil salinan dari tarif saat itu.
+///   Bila Bapenda mengubah tarif besok, pesanan kemarin TIDAK boleh berubah.
+///
+/// `code` unik per aplikasi dan dipakai warga untuk melacak pesanan; dibuat
+/// dari tanggal + urutan acak agar tidak mudah ditebak.
+model LapakOrder {
+  id             String      @id @default(uuid(7)) @db.VarChar(36)
+  code           String      @db.VarChar(40)
+  applicationId  String      @map("app_id") @db.VarChar(36)
+  userId         String      @map("user_id") @db.VarChar(36)
+  organizationId String      @map("organization_id") @db.VarChar(36)
+  status         OrderStatus @default(DRAFT)
+  /// Snapshot data pemohon (nama, NIK, NPWP, instansi, telepon, alamat).
+  /// PII — jangan pernah dikirim utuh ke publik.
+  applicant      Json
+  /// Maksud/tujuan pemakaian.
+  purpose        String?     @db.VarChar(500)
+  /// Subtotal & total dalam rupiah utuh (bukan desimal) — retribusi tidak
+  /// memakai pecahan, dan menyimpan integer menghindari galat pembulatan.
+  subtotal       Int
+  total          Int
+  /// Batas waktu pembayaran; lewat dari ini pesanan kedaluwarsa (worker).
+  expiresAt      DateTime?   @map("expires_at") @db.Timestamptz()
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz()
+
+  application  Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user         User            @relation(fields: [userId], references: [id])
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  items        LapakOrderItem[]
+  statusLogs   LapakOrderStatusLog[]
+
+  /// Kode pesanan unik per aplikasi — dipakai warga untuk melacak.
+  @@unique([applicationId, code], map: "uq_lapak_orders_app_code")
+  @@index([userId, status], map: "idx_lapak_orders_user_status")
+  @@index([organizationId, status], map: "idx_lapak_orders_org_status")
+  @@index([expiresAt], map: "idx_lapak_orders_expires")
+  @@map("lapak_orders")
+}
+
+/// Baris pesanan — SNAPSHOT harga, bukan referensi hidup ke tarif.
+model LapakOrderItem {
+  id            String   @id @default(uuid(7)) @db.VarChar(36)
+  orderId       String   @map("order_id") @db.VarChar(36)
+  productId     String   @map("product_id") @db.VarChar(36)
+  /// Tarif asal; boleh null bila tarifnya kelak dihapus.
+  rateId        String?  @map("rate_id") @db.VarChar(36)
+  /// Reservasi yang dikonfirmasi untuk baris ini.
+  reservationId String?  @unique @map("reservation_id") @db.VarChar(36)
+  /// Salinan nama & satuan saat checkout — produk bisa berganti nama nanti.
+  productName   String   @map("product_name") @db.VarChar(150)
+  rateName      String   @map("rate_name") @db.VarChar(100)
+  unit          String   @db.VarChar(20)
+  /// Harga satuan saat checkout (snapshot).
+  price         Int
+  qty           Int
+  /// Harga × qty, dibekukan agar pembulatan tidak berubah di kemudian hari.
+  lineTotal     Int      @map("line_total")
+  startAt       DateTime? @map("start_at") @db.Timestamptz()
+  endAt         DateTime? @map("end_at") @db.Timestamptz()
+  note          String?  @db.VarChar(500)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  order       LapakOrder        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     LapakProduct      @relation(fields: [productId], references: [id])
+  rate        LapakProductRate? @relation(fields: [rateId], references: [id])
+  reservation LapakReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+
+  @@index([orderId], map: "idx_lapak_order_items_order")
+  @@map("lapak_order_items")
+}
+
+/// Jejak audit perubahan status pesanan — siapa, kapan, dari apa ke apa.
+model LapakOrderStatusLog {
+  id        String      @id @default(uuid(7)) @db.VarChar(36)
+  orderId   String      @map("order_id") @db.VarChar(36)
+  fromStatus OrderStatus? @map("from_status")
+  toStatus  OrderStatus @map("to_status")
+  /// Pelaku; null bila perubahan oleh sistem (worker kedaluwarsa).
+  actorId   String?     @map("actor_id") @db.VarChar(36)
+  note      String?     @db.VarChar(500)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+
+  order LapakOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt], map: "idx_lapak_order_logs_order_time")
+  @@map("lapak_order_status_logs")
+}
+
 /// Tarif per sesi/satuan. Punya status sendiri (PRD 04 §C): mengubah tarif
 /// produk TERBIT tidak menurunkan produk — buat baris baru ber-status
 /// DRAFT/PENDING_REVIEW, publik hanya melihat APPROVED/PUBLISHED aktif,
@@ -963,7 +1082,8 @@ model LapakProductRate {
   deletedAt     DateTime?     @map("deleted_at") @db.Timestamptz()
 
   product   LapakProduct     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  cartItems LapakCartItem[]
+  cartItems  LapakCartItem[]
+  orderItems LapakOrderItem[]
 
   @@index([productId, status], map: "idx_lapak_product_rates_product_status")
   @@map("lapak_product_rates")

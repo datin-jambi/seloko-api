@@ -112,7 +112,7 @@ lalu matikan setelahnya.
 
 0. ✅ **Fondasi core** (`LJ-0.x`) — OPD + lingkup penugasan, API OPD, seed RBAC/menu Lapak, registrasi akun PUBLIC — *selesai (7/7)*.
 1. ✅ **Katalog** (`LJ-1.x`) — kategori, produk + tarif/persyaratan/media/fasilitas, alur persetujuan tarif terpisah, katalog publik + profil OPD, seed dari Perda Jambi No. 5/2024 — *selesai (7/7)*.
-2. 🟡 **Transaksi** (`LJ-2.x`) — ketersediaan & reservasi, keranjang per OPD, checkout, SKRD, transfer manual, tiket QR — *berjalan; `LJ-2.1` (jam operasional), `LJ-2.2` (reservasi + anti double-booking DB), `LJ-2.3` (keranjang per OPD) ✅*.
+2. 🟡 **Transaksi** (`LJ-2.x`) — ketersediaan & reservasi, keranjang per OPD, checkout, SKRD, transfer manual, tiket QR — *berjalan; `LJ-2.1` (jam operasional), `LJ-2.2` (reservasi + anti double-booking DB), `LJ-2.3` (keranjang per OPD), `LJ-2.4` (quote & checkout + snapshot harga/PII) ✅*.
 3. ⏳ **Monitoring PAD** (`LJ-3.x`) — dashboard, transaksi & ekspor, transparansi publik. *(MVP = Fase 0–3)*
 4. ⏳ **Pasca-MVP** (`LJ-4.x`) — konten OPD, ulasan, komentar, wishlist, target OPD.
 5. ⏳ **Lanjutan** (`LJ-5.x`) — VA/QRIS, gabung web+mobile & auth PUBLIC, mobile.
