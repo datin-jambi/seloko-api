@@ -68,6 +68,7 @@ model Application {
   lapakCarts        LapakCart[]
   lapakOrders       LapakOrder[]
   lapakSkrdSettings LapakSkrdSetting[]
+  lapakTargets      LapakTarget[]
 
   @@map("applications")
 }
@@ -310,6 +311,7 @@ model Organization {
   lapakCarts        LapakCart[]
   lapakOrders       LapakOrder[]
   lapakSkrdSettings LapakSkrdSetting[]
+  lapakTargets      LapakTarget[]
 
   @@index([parentId])
   @@index([type, isActive])
@@ -1355,6 +1357,35 @@ model LapakExpiryRun {
 
   @@index([job, startedAt], map: "idx_lapak_expiry_runs_job_time")
   @@map("lapak_expiry_runs")
+}
+
+/// Target penerimaan retribusi per OPD per tahun (LJ-3.1).
+///
+/// Mengikuti model `TargetOPD` pada backend Bapenda sebelumnya
+/// (`opd_id`, `tahun`, `total`, `achieve`) — Bapenda memang sudah bekerja dengan
+/// target vs capaian per OPD per tahun.
+///
+/// Bedanya di sini: `achieve` TIDAK disimpan. Realisasi selalu dihitung dari
+/// transaksi yang benar-benar lunas, sehingga tidak mungkin ada capaian
+/// "karangan" yang tidak cocok dengan data pesanan.
+model LapakTarget {
+  id             String   @id @default(uuid(7)) @db.VarChar(36)
+  applicationId  String   @map("app_id") @db.VarChar(36)
+  organizationId String?  @map("organization_id") @db.VarChar(36)
+  year           Int
+  /// Target rupiah utuh per tahun.
+  amount         Int
+  note           String?  @db.VarChar(255)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  application  Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Satu target per OPD per tahun. NULL = target default (seluruh aplikasi).
+  @@unique([applicationId, organizationId, year], map: "uq_lapak_targets_app_org_year")
+  @@index([year], map: "idx_lapak_targets_year")
+  @@map("lapak_targets")
 }
 
 /// Tarif per sesi/satuan. Punya status sendiri (PRD 04 §C): mengubah tarif

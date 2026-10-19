@@ -30,6 +30,8 @@
  *   npm run db:smoke -- lapak-payments   → Hanya uji pembayaran transfer manual (LJ-2.6)
  *   npm run db:smoke -- lapak-tickets    → Hanya uji tiket QR & check-in (LJ-2.7)
  *   npm run db:smoke -- lapak-expiry     → Hanya uji worker kedaluwarsa (LJ-2.8)
+ *   npm run db:smoke -- lapak-dashboard  → Hanya uji dashboard & target (LJ-3.1)
+ *   npm run db:smoke -- lapak-reports    → Hanya uji daftar transaksi & ekspor CSV (LJ-3.2)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -88,6 +90,7 @@ async function request(path: string, options: RequestOptions = {}) {
   const response = await fetch(`${BASE}${path}`, init);
 
   let data: any = null;
+  let raw = "";
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     try {
@@ -95,9 +98,14 @@ async function request(path: string, options: RequestOptions = {}) {
     } catch {
       data = null;
     }
+  } else {
+    // Respons non-JSON (mis. ekspor CSV) dibaca sebagai teks. Tanpa ini, uji
+    // ekspor selalu menerima `data: null` meski server mengirim berkas benar.
+    raw = await response.text();
+    data = raw;
   }
 
-  return { status: response.status, data };
+  return { status: response.status, data, raw, headers: response.headers };
 }
 
 async function login(identity: string, password = DEFAULT_PASSWORD, appCode = "seloko"): Promise<string | null> {
@@ -1134,6 +1142,8 @@ async function cleanupDebugArtefacts() {
       { slug: { startsWith: "keranjang-uji-" } },
       { slug: { startsWith: "bayar-uji-" } },
       { slug: { startsWith: "kedaluwarsa-uji-" } },
+      { slug: { startsWith: "dashboard-uji-" } },
+      { slug: { startsWith: "laporan-uji-" } },
     ],
   };
 
@@ -3184,6 +3194,517 @@ async function runLapakExpirySuite() {
   await prisma.lapakProduct.deleteMany({ where: { id: productId } });
 }
 
+// ─── Test Suite: Lapak — Dashboard Penerimaan & Target (LJ-3.1) ──────────────
+async function runLapakDashboardSuite() {
+  console.log("\n\x1b[36m▶ [Suite 25: Lapak - Dashboard Penerimaan & Target]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  assert("Superadmin login", Boolean(saToken));
+
+  await cleanupDebugArtefacts();
+  await prisma.lapakTarget.deleteMany({});
+  await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM"] }, year: { gte: 2020 } } });
+
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const gedung = (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+  const disbudpar = (orgs.data?.data ?? []).find((o: any) => o.code === "DISBUDPAR");
+
+  // ── 1. Dashboard kosong: struktur benar, angka nol.
+  const d0 = await request("/lapak/dashboard?period=THIS_YEAR&groupBy=ORG", { token: saToken || undefined });
+  assert("Dashboard 200", d0.status === 200, d0.status, d0.data?.message);
+  assert("groupBy ORG", d0.data?.data?.groupBy === "ORG", d0.data?.data?.groupBy);
+  assert("Ringkasan realisasi 0", d0.data?.data?.summary?.realized === 0, d0.data?.data?.summary?.realized);
+  assert("Pending berbentuk objek", typeof d0.data?.data?.pending?.awaitingPayment === "number");
+  assert("Trend berbentuk array", Array.isArray(d0.data?.data?.trend));
+  assert("Periode berlabel", typeof d0.data?.data?.period?.label === "string", d0.data?.data?.period?.label);
+
+  // ── 2. VALIDASI: period=CUSTOM tanpa from/to → 400.
+  const noRange = await request("/lapak/dashboard?period=CUSTOM", { token: saToken || undefined });
+  assert("CUSTOM tanpa from/to ditolak 400", noRange.status === 400, noRange.status);
+
+  const badRange = await request("/lapak/dashboard?period=CUSTOM&from=2026-12-31&to=2026-01-01", {
+    token: saToken || undefined,
+  });
+  assert("from setelah to ditolak 400", badRange.status === 400, badRange.status);
+
+  // ── 3. Target: simpan default & per OPD.
+  const year = new Date().getFullYear();
+  const tDefault = await request("/lapak/dashboard/targets", {
+    method: "POST", token: saToken || undefined,
+    body: { year, amount: 100_000_000, note: "Target retribusi aplikasi" },
+  });
+  assert("Target default disimpan 200", tDefault.status === 200, tDefault.status, tDefault.data?.message);
+  assert("Target default tanpa OPD", tDefault.data?.data?.organizationCode === null,
+    tDefault.data?.data?.organizationCode);
+
+  const tBpsdm = await request("/lapak/dashboard/targets", {
+    method: "POST", token: saToken || undefined,
+    body: { year, organizationCode: "BPSDM", amount: 50_000_000 },
+  });
+  assert("Target per OPD disimpan", tBpsdm.status === 200, tBpsdm.status, tBpsdm.data?.message);
+  assert("Target per OPD menyebut kode", tBpsdm.data?.data?.organizationCode === "BPSDM");
+  const targetId = tBpsdm.data?.data?.id;
+
+  // Upsert: simpan ulang tahun+OPD sama → memperbarui, bukan menggandakan.
+  const tBpsdm2 = await request("/lapak/dashboard/targets", {
+    method: "POST", token: saToken || undefined,
+    body: { year, organizationCode: "BPSDM", amount: 60_000_000 },
+  });
+  assert("Upsert memperbarui target yang sama", tBpsdm2.data?.data?.id === targetId, tBpsdm2.data?.data?.id);
+  assert("Nominal target diperbarui", tBpsdm2.data?.data?.amount === 60_000_000, tBpsdm2.data?.data?.amount);
+
+  const tList = await request(`/lapak/dashboard/targets?year=${year}`, { token: saToken || undefined });
+  assert("Daftar target 200", tList.status === 200, tList.status);
+  assert("Tepat 2 target (default + BPSDM)", (tList.data?.data ?? []).length === 2,
+    (tList.data?.data ?? []).length);
+
+  // ── 4. Siapkan transaksi LUNAS untuk menguji realisasi.
+  const mkProduct = async (orgId: string, name: string, price: number) => {
+    const r = await request("/lapak/products", {
+      method: "POST", token: saToken || undefined,
+      body: {
+        organizationId: orgId, categoryId: gedung.id,
+        name, description: `Produk uji dashboard ${name}.`,
+        rates: [{ name: "Harian", unit: "DAY", price }],
+      },
+    });
+    const id = r.data?.data?.id;
+    const rateId = r.data?.data?.rates?.[0]?.id;
+    await request(`/lapak/rates/${rateId}/status/submit`, { method: "PATCH", token: saToken || undefined, body: {} });
+    await request(`/lapak/rates/${rateId}/status/approve`, { method: "PATCH", token: saToken || undefined, body: {} });
+    await request(`/lapak/products/${id}/status/publish`, { method: "PATCH", token: saToken || undefined });
+    return { id, rateId };
+  };
+
+  await request("/lapak/skrd/settings", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      issuer: "BAPENDA", numberFormat: "{seq6}/SKRD/{issuer}/{romanMonth}/{year}",
+      signerName: "H. Al Haris", signerPosition: "Gubernur Jambi", dueDays: 7,
+    },
+  });
+
+  const pA = await mkProduct(bpsdm.id, "Dashboard Uji BPSDM", 5_000_000);
+  const pB = await mkProduct(disbudpar.id, "Dashboard Uji DISBUDPAR", 3_000_000);
+  assert("Dua produk dashboard siap", Boolean(pA.id && pB.id));
+
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+
+  const checkoutPaid = async (orgCode: string, productId: string, rateId: string) => {
+    const cart = await request(`/lapak/carts/opd/${orgCode}`, W);
+    const cartId = cart.data?.data?.id;
+    await request(`/lapak/carts/${cartId}/items`, {
+      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      body: { productId, rateId, qty: 1 },
+    });
+    const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
+      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
+    });
+    return co.data?.data ?? {};
+  };
+
+  // Pesanan 1: BPSDM, dibayar → LUNAS (5 juta).
+  const orderA = await checkoutPaid("BPSDM", pA.id, pA.rateId);
+  await request(`/lapak/payments/${orderA.payments?.[0]?.id}/proof`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: {
+      proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/dash1.jpg",
+      proofFileId: "ik_dash_1", senderName: "Budi Santoso", senderBank: "Bank Jambi",
+      amount: 5_000_000, paidAt: new Date().toISOString(),
+    },
+  });
+  const payA = await request(`/lapak/payments/${orderA.payments?.[0]?.id}/verify`, {
+    method: "POST", token: saToken || undefined, body: {},
+  });
+  assert("Pesanan A LUNAS", payA.status === 200, payA.status, payA.data?.message);
+
+  // Pesanan 2: DISBUDPAR, dibayar → LUNAS (3 juta).
+  const orderB = await checkoutPaid("DISBUDPAR", pB.id, pB.rateId);
+  await request(`/lapak/payments/${orderB.payments?.[0]?.id}/proof`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: {
+      proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/dash2.jpg",
+      proofFileId: "ik_dash_2", senderName: "Budi Santoso", senderBank: "Bank Jambi",
+      amount: 3_000_000, paidAt: new Date().toISOString(),
+    },
+  });
+  await request(`/lapak/payments/${orderB.payments?.[0]?.id}/verify`, {
+    method: "POST", token: saToken || undefined, body: {},
+  });
+
+  // Pesanan 3: BPSDM, TIDAK dibayar → harus masuk pending, bukan realisasi.
+  const orderC = await checkoutPaid("BPSDM", pA.id, pA.rateId);
+  assert("Pesanan C belum dibayar", Boolean(orderC.id));
+
+  // ── 5. Realisasi per OPD: hanya pesanan LUNAS.
+  const dOrg = await request("/lapak/dashboard?period=THIS_YEAR&groupBy=ORG", { token: saToken || undefined });
+  const rows = dOrg.data?.data?.rows ?? [];
+  const rowBpsdm = rows.find((r: any) => r.key === "BPSDM");
+  const rowDisbudpar = rows.find((r: any) => r.key === "DISBUDPAR");
+
+  assert("Baris BPSDM ada", Boolean(rowBpsdm), JSON.stringify(rows.map((r: any) => r.key)));
+  assert("Realisasi BPSDM hanya 5 juta (pesanan belum bayar tidak masuk)",
+    rowBpsdm?.realized === 5_000_000, rowBpsdm?.realized);
+  assert("Target BPSDM terbaca 60 juta", rowBpsdm?.target === 60_000_000, rowBpsdm?.target);
+  // 5jt / 60jt = 8.33%
+  assert("Persentase dihitung", rowBpsdm?.percentage === 8.33, rowBpsdm?.percentage);
+  assert("Realisasi DISBUDPAR 3 juta", rowDisbudpar?.realized === 3_000_000, rowDisbudpar?.realized);
+  assert("DISBUDPAR tanpa target → persentase null", rowDisbudpar?.percentage === null,
+    rowDisbudpar?.percentage);
+
+  assert("Total realisasi 8 juta", dOrg.data?.data?.summary?.realized === 8_000_000,
+    dOrg.data?.data?.summary?.realized);
+
+  // ── 6. Pending: pesanan belum bayar terpisah dari realisasi.
+  assert("Pending awaitingPayment >= 5 juta",
+    dOrg.data?.data?.pending?.awaitingPayment >= 5_000_000,
+    dOrg.data?.data?.pending?.awaitingPayment);
+  assert("Pending punya jumlah pesanan",
+    dOrg.data?.data?.pending?.count?.awaitingPayment >= 1,
+    dOrg.data?.data?.pending?.count?.awaitingPayment);
+
+  // ── 7. Filter per OPD.
+  const dBpsdm = await request("/lapak/dashboard?period=THIS_YEAR&groupBy=ORG&organization=BPSDM", {
+    token: saToken || undefined,
+  });
+  assert("Filter OPD 200", dBpsdm.status === 200, dBpsdm.status);
+  assert("Filter OPD hanya 1 baris", (dBpsdm.data?.data?.rows ?? []).length === 1,
+    (dBpsdm.data?.data?.rows ?? []).length);
+  assert("Filter OPD realisasi 5 juta", dBpsdm.data?.data?.summary?.realized === 5_000_000,
+    dBpsdm.data?.data?.summary?.realized);
+
+  // ── 8. Group by CATEGORY.
+  const dCat = await request("/lapak/dashboard?period=THIS_YEAR&groupBy=CATEGORY", {
+    token: saToken || undefined,
+  });
+  assert("groupBy CATEGORY 200", dCat.status === 200, dCat.status, dCat.data?.message);
+  assert("Kategori punya baris", (dCat.data?.data?.rows ?? []).length >= 1,
+    (dCat.data?.data?.rows ?? []).length);
+  const catTotal = (dCat.data?.data?.rows ?? []).reduce((n: number, r: any) => n + r.realized, 0);
+  assert("Sum kategori = total realisasi", catTotal === 8_000_000, catTotal);
+
+  // ── 9. Group by MONTH.
+  const dMonth = await request("/lapak/dashboard?period=THIS_YEAR&groupBy=MONTH", {
+    token: saToken || undefined,
+  });
+  assert("groupBy MONTH 200", dMonth.status === 200, dMonth.status);
+  assert("Bulan punya baris", (dMonth.data?.data?.rows ?? []).length >= 1);
+  assert("Format bulan YYYY-MM",
+    /^\d{4}-\d{2}$/.test(dMonth.data?.data?.rows?.[0]?.key ?? ""), dMonth.data?.data?.rows?.[0]?.key);
+
+  // ── 10. Trend terisi.
+  assert("Trend berisi titik", (dOrg.data?.data?.trend ?? []).length >= 1,
+    (dOrg.data?.data?.trend ?? []).length);
+
+  // ── 11. Query SQL mentah TIDAK membocorkan OPD lain saat admin OPD.
+  // (diuji lewat akun admin BPSDM — harus hanya melihat OPD-nya)
+  const adminOpd = await login("admin.bpsdm", DEFAULT_PASSWORD, "seloko");
+  if (adminOpd) {
+    const dScoped = await request("/lapak/dashboard?period=THIS_YEAR&groupBy=ORG", {
+      token: adminOpd, appCode: "seloko",
+    });
+    if (dScoped.status === 200) {
+      const keys = (dScoped.data?.data?.rows ?? []).map((r: any) => r.key);
+      assert("Admin OPD tidak melihat DISBUDPAR", !keys.includes("DISBUDPAR"), JSON.stringify(keys));
+    }
+  }
+
+  // ── 12. Warga tidak boleh mengakses dashboard.
+  const wargaDash = await request("/lapak/dashboard", W);
+  assert("Warga ditolak 403", wargaDash.status === 403, wargaDash.status);
+
+  // ── 13. Hapus target.
+  const delTarget = await request(`/lapak/dashboard/targets/${targetId}`, {
+    method: "DELETE", token: saToken || undefined,
+  });
+  assert("Hapus target 200", delTarget.status === 200, delTarget.status);
+  assert("Hapus mengembalikan deleted", delTarget.data?.data?.deleted === true);
+
+  // ── 14. Bersih-bersih.
+  await prisma.lapakTarget.deleteMany({});
+  await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSetting.deleteMany({});
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM", "DISBUDPAR"] }, year: { gte: 2020 } } });
+  for (const pid of [pA.id, pB.id].filter(Boolean)) {
+    await prisma.lapakProductRate.deleteMany({ where: { productId: pid } });
+    await prisma.lapakProduct.deleteMany({ where: { id: pid } });
+  }
+}
+
+// ─── Test Suite: Lapak — Daftar Transaksi & Ekspor CSV (LJ-3.2) ──────────────
+async function runLapakReportsSuite() {
+  console.log("\n\x1b[36m▶ [Suite 26: Lapak - Daftar Transaksi & Ekspor CSV]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  assert("Superadmin login", Boolean(saToken));
+  assert("Warga login lapak", Boolean(wargaToken));
+
+  await cleanupDebugArtefacts();
+  await prisma.lapakTarget.deleteMany({});
+  await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM", "DISBUDPAR"] }, year: { gte: 2020 } } });
+
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const gedung = (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+  const disbudpar = (orgs.data?.data ?? []).find((o: any) => o.code === "DISBUDPAR");
+
+  const mkProduct = async (orgId: string, name: string, price: number) => {
+    const r = await request("/lapak/products", {
+      method: "POST", token: saToken || undefined,
+      body: {
+        organizationId: orgId, categoryId: gedung.id,
+        name, description: `Produk uji laporan ${name}.`,
+        rates: [{ name: "Harian", unit: "DAY", price }],
+      },
+    });
+    const id = r.data?.data?.id;
+    const rateId = r.data?.data?.rates?.[0]?.id;
+    await request(`/lapak/rates/${rateId}/status/submit`, { method: "PATCH", token: saToken || undefined, body: {} });
+    await request(`/lapak/rates/${rateId}/status/approve`, { method: "PATCH", token: saToken || undefined, body: {} });
+    await request(`/lapak/products/${id}/status/publish`, { method: "PATCH", token: saToken || undefined });
+    return { id, rateId };
+  };
+
+  await request("/lapak/skrd/settings", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      issuer: "BAPENDA", numberFormat: "{seq6}/SKRD/{issuer}/{romanMonth}/{year}",
+      signerName: "H. Al Haris", signerPosition: "Gubernur Jambi", dueDays: 7,
+    },
+  });
+
+  const pA = await mkProduct(bpsdm.id, "Laporan Uji BPSDM", 2_000_000);
+  const pB = await mkProduct(disbudpar.id, "Laporan Uji DISBUDPAR", 4_000_000);
+  assert("Dua produk laporan siap", Boolean(pA.id && pB.id));
+
+  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+  const checkout = async (orgCode: string, productId: string, rateId: string, applicant: any) => {
+    const cart = await request(`/lapak/carts/opd/${orgCode}`, W);
+    const cartId = cart.data?.data?.id;
+    await request(`/lapak/carts/${cartId}/items`, {
+      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      body: { productId, rateId, qty: 1 },
+    });
+    const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
+      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      body: { applicant },
+    });
+    return co.data?.data ?? {};
+  };
+  const payOrder = async (order: any, amount: number, fileId: string) => {
+    const payId = order.payments?.[0]?.id;
+    await request(`/lapak/payments/${payId}/proof`, {
+      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      body: {
+        proofUrl: `https://ik.imagekit.io/seloko/lapak/payments/${fileId}.jpg`,
+        proofFileId: fileId, senderName: "Budi Santoso", senderBank: "Bank Jambi",
+        amount, paidAt: new Date().toISOString(),
+      },
+    });
+    return request(`/lapak/payments/${payId}/verify`, {
+      method: "POST", token: saToken || undefined, body: {},
+    });
+  };
+
+  // Pesanan A: BPSDM, LUNAS.
+  const orderA = await checkout("BPSDM", pA.id, pA.rateId, {
+    name: "Budi Santoso", nik: "1234567890123456", phone: "081234567890",
+    institution: "PT Contoh",
+  });
+  await payOrder(orderA, 2_000_000, "ik_lap_1");
+
+  // Pesanan B: DISBUDPAR, LUNAS — dengan MAKSUD berisi formula CSV injection.
+  const orderB = await checkout("DISBUDPAR", pB.id, pB.rateId, {
+    name: "Siti Aminah", phone: "081298765432",
+  });
+  await payOrder(orderB, 4_000_000, "ik_lap_2");
+
+  // Suntikkan maksud berbahaya langsung ke DB (mensimulasikan input warga).
+  await prisma.lapakOrder.update({
+    where: { id: orderB.id },
+    data: { purpose: '=HYPERLINK("http://jahat.example","klik saya")' },
+  });
+
+  // Pesanan C: BPSDM, belum dibayar.
+  const orderC = await checkout("BPSDM", pA.id, pA.rateId, { name: "Andi Wijaya", phone: "081200001111" });
+  assert("Tiga pesanan dibuat", Boolean(orderA.id && orderB.id && orderC.id));
+
+  // ── 1. Daftar transaksi.
+  const list = await request("/lapak/reports/transactions?limit=100", { token: saToken || undefined });
+  assert("Daftar transaksi 200", list.status === 200, list.status, list.data?.message);
+  const rows = list.data?.data ?? [];
+  assert("Ketiga pesanan muncul", rows.length >= 3, rows.length);
+  assert("Ada ringkasan total", typeof list.data?.summary?.totalAmount === "number",
+    list.data?.summary?.totalAmount);
+  assert("Ringkasan per status terisi", (list.data?.summary?.byStatus ?? []).length >= 1,
+    (list.data?.summary?.byStatus ?? []).length);
+
+  const rowA = rows.find((r: any) => r.orderId === orderA.id);
+  assert("Baris A memuat kode pesanan", typeof rowA?.code === "string" && rowA.code.startsWith("LJK-"), rowA?.code);
+  assert("Baris A memuat nomor SKRD", typeof rowA?.skrdNumber === "string", rowA?.skrdNumber);
+  assert("Baris A status LUNAS", rowA?.status === "LUNAS", rowA?.status);
+  assert("Baris A paymentStatus LUNAS", rowA?.paymentStatus === "LUNAS", rowA?.paymentStatus);
+  assert("Baris A punya tiket terbit", rowA?.tickets?.total >= 1, rowA?.tickets?.total);
+
+  // ── 2. INTI: PII DIMASKING di daftar.
+  assert("Nama pemohon dimasking di daftar", rowA?.applicantName !== "Budi Santoso", rowA?.applicantName);
+  assert("Nama termasking berpola bintang", String(rowA?.applicantName ?? "").includes("*"), rowA?.applicantName);
+  assert("Daftar TIDAK memuat NIK", !JSON.stringify(rowA ?? {}).includes("1234567890123456"));
+
+  // ── 3. Filter status.
+  const lunasOnly = await request("/lapak/reports/transactions?status=LUNAS&limit=100", {
+    token: saToken || undefined,
+  });
+  assert("Filter LUNAS 200", lunasOnly.status === 200, lunasOnly.status);
+  assert("Filter LUNAS hanya LUNAS",
+    (lunasOnly.data?.data ?? []).every((r: any) => r.status === "LUNAS"),
+    (lunasOnly.data?.data ?? []).length);
+
+  // ── 4. Filter OPD.
+  const bpsdmOnly = await request("/lapak/reports/transactions?organization=BPSDM&limit=100", {
+    token: saToken || undefined,
+  });
+  assert("Filter OPD 200", bpsdmOnly.status === 200, bpsdmOnly.status);
+  assert("Filter OPD hanya BPSDM",
+    (bpsdmOnly.data?.data ?? []).every((r: any) => r.organizationCode === "BPSDM"),
+    (bpsdmOnly.data?.data ?? []).length);
+
+  // ── 5. Filter tanggal.
+  const today = new Date().toISOString().slice(0, 10);
+  const todayOnly = await request(`/lapak/reports/transactions?from=${today}&to=${today}&limit=100`, {
+    token: saToken || undefined,
+  });
+  assert("Filter tanggal hari ini 200", todayOnly.status === 200, todayOnly.status);
+  assert("Filter tanggal menemukan transaksi", (todayOnly.data?.data ?? []).length >= 3,
+    (todayOnly.data?.data ?? []).length);
+
+  const badRange = await request("/lapak/reports/transactions?from=2026-12-31&to=2026-01-01", {
+    token: saToken || undefined,
+  });
+  assert("Rentang terbalik ditolak 400", badRange.status === 400, badRange.status);
+
+  // ── 6. Pencarian kode.
+  const search = await request(`/lapak/reports/transactions?q=${rowA?.code}&limit=100`, {
+    token: saToken || undefined,
+  });
+  assert("Cari kode 200", search.status === 200, search.status);
+  assert("Cari kode menemukan pesanan", (search.data?.data ?? []).some((r: any) => r.orderId === orderA.id));
+
+  // ── 7. INTI: EKSPOR CSV.
+  const exp = await request("/lapak/reports/transactions/export", { token: saToken || undefined });
+  assert("Ekspor 200", exp.status === 200, exp.status);
+  const csv = typeof exp.data === "string" ? exp.data : String(exp.data ?? "");
+  assert("CSV punya header", csv.includes("Kode Pesanan") && csv.includes("Nomor SKRD"), csv.slice(0, 80));
+  assert("CSV memuat pesanan A", csv.includes(String(rowA?.code)));
+  // BOM tidak bisa diperiksa dari string hasil `fetch().text()` karena decoder
+  // membuangnya. Yang bisa dipastikan: header CSV tetap terbaca sebagai teks
+  // (BOM tidak merusak baris pertama) dan charset respons benar.
+  assert("Baris pertama CSV adalah header", csv.startsWith("Kode Pesanan"), csv.slice(0, 40));
+  assert("Content-Type CSV dengan charset utf-8",
+    String(exp.headers?.get("content-type") ?? "").toLowerCase().includes("charset=utf-8"),
+    exp.headers?.get("content-type"));
+  assert("Content-Disposition attachment",
+    String(exp.headers?.get("content-disposition") ?? "").toLowerCase().includes("attachment"),
+    exp.headers?.get("content-disposition"));
+
+  // ── 8. INTI: CSV INJECTION DIBLOKIR.
+  // Maksud pesanan B diawali '=' → harus dinetralkan dengan prefiks kutip.
+  assert("Formula =HYPERLINK dinetralkan", !csv.includes("\n=HYPERLINK"), "masih ada baris diawali =");
+  assert("Nilai berbahaya diberi prefiks kutip", csv.includes("'=HYPERLINK"), 
+    csv.split("\r\n").find((l) => l.includes("HYPERLINK"))?.slice(0, 60));
+
+  // ── 9. INTI: PII di CSV tetap dimasking.
+  assert("CSV TIDAK memuat NIK", !csv.includes("1234567890123456"), "NIK bocor di CSV");
+  assert("CSV TIDAK memuat nama utuh Budi Santoso", !csv.includes("Budi Santoso"), "nama bocor di CSV");
+
+  // ── 10. Ekspor menghormati filter.
+  const expBpsdm = await request("/lapak/reports/transactions/export?organization=BPSDM", {
+    token: saToken || undefined,
+  });
+  const csvBpsdm = typeof expBpsdm.data === "string" ? expBpsdm.data : String(expBpsdm.data ?? "");
+  assert("Ekspor terfilter 200", expBpsdm.status === 200, expBpsdm.status);
+  assert("Ekspor terfilter tidak memuat pesanan DISBUDPAR", !csvBpsdm.includes(String(
+    rows.find((r: any) => r.orderId === orderB.id)?.code ?? "TIDAK-ADA")));
+
+  // ── 11. Izin: warga tidak boleh membaca maupun mengekspor.
+  const wargaList = await request("/lapak/reports/transactions", W);
+  assert("Warga ditolak daftar 403", wargaList.status === 403, wargaList.status);
+  const wargaExport = await request("/lapak/reports/transactions/export", W);
+  assert("Warga ditolak ekspor 403", wargaExport.status === 403, wargaExport.status);
+
+  // ── 12. Lingkup OPD: admin OPD tidak melihat OPD lain.
+  const adminOpd = await login("admin.bpsdm", DEFAULT_PASSWORD, "seloko");
+  if (adminOpd) {
+    const scoped = await request("/lapak/reports/transactions?limit=100", {
+      token: adminOpd, appCode: "seloko",
+    });
+    if (scoped.status === 200) {
+      const codes = (scoped.data?.data ?? []).map((r: any) => r.organizationCode);
+      assert("Admin OPD tidak melihat DISBUDPAR", !codes.includes("DISBUDPAR"), JSON.stringify(codes));
+
+      const crossOrg = await request("/lapak/reports/transactions?organization=DISBUDPAR", {
+        token: adminOpd, appCode: "seloko",
+      });
+      assert("Admin OPD ditolak filter OPD lain (404)", crossOrg.status === 404, crossOrg.status);
+    }
+  }
+
+  // ── 13. Paginasi & sort.
+  const paged = await request("/lapak/reports/transactions?limit=1&page=1", { token: saToken || undefined });
+  assert("Paginasi limit 1", (paged.data?.data ?? []).length === 1, (paged.data?.data ?? []).length);
+  assert("Meta totalItems benar", paged.data?.meta?.totalItems >= 3, paged.data?.meta?.totalItems);
+
+  const highest = await request("/lapak/reports/transactions?sort=HIGHEST&limit=100", {
+    token: saToken || undefined,
+  });
+  const amounts = (highest.data?.data ?? []).map((r: any) => r.amount);
+  assert("Sort HIGHEST menurun", amounts.every((v: number, i: number) => i === 0 || amounts[i - 1] >= v),
+    JSON.stringify(amounts));
+
+  // ── 14. Bersih-bersih.
+  await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSetting.deleteMany({});
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM", "DISBUDPAR"] }, year: { gte: 2020 } } });
+  for (const pid of [pA.id, pB.id].filter(Boolean)) {
+    await prisma.lapakProductRate.deleteMany({ where: { productId: pid } });
+    await prisma.lapakProduct.deleteMany({ where: { id: pid } });
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -3283,6 +3804,12 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-expiry" || targetModule === "kedaluwarsa") {
       await runLapakExpirySuite();
+    }
+    if (!targetModule || targetModule === "lapak-dashboard" || targetModule === "dashboard") {
+      await runLapakDashboardSuite();
+    }
+    if (!targetModule || targetModule === "lapak-reports" || targetModule === "laporan") {
+      await runLapakReportsSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

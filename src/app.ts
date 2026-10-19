@@ -307,6 +307,14 @@ export async function buildApp(): Promise<FastifyInstance> {
       const { lapakExpiryRoutes } = await import("~/modules/lapak/expiry/expiry.routes.js");
       await api.register(lapakExpiryRoutes, { prefix: "/lapak/expiry" });
 
+      // Dashboard & pelaporan PAD (Fase 3).
+      const { lapakDashboardRoutes } = await import("~/modules/lapak/dashboard/dashboard.routes.js");
+      await api.register(lapakDashboardRoutes, { prefix: "/lapak/dashboard" });
+
+      // Daftar transaksi lintas OPD + ekspor (Fase 3).
+      const { lapakReportsRoutes } = await import("~/modules/lapak/reports/reports.routes.js");
+      await api.register(lapakReportsRoutes, { prefix: "/lapak/reports" });
+
       // Lapak modules
       // await api.register(merchantsRoutes, { prefix: "/merchants" });
       // await api.register(productsRoutes, { prefix: "/products" });

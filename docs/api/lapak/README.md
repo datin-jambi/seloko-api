@@ -29,8 +29,10 @@ penjualan hasil usaha (PRD 04). Data dikelola **per OPD**, disajikan ke publik *
 | Pembayaran Transfer Manual | [payments.md](./payments.md) | 6 | `/api/lapak/payments` |
 | Tiket QR & Check-in | [tickets.md](./tickets.md) | 5 | `/api/lapak/tickets` |
 | Worker Kedaluwarsa | [expiry.md](./expiry.md) | 5 | `/api/lapak/expiry` |
+| Dashboard & Target PAD | [dashboard.md](./dashboard.md) | 4 | `/api/lapak/dashboard` |
+| Daftar Transaksi & Ekspor | [reports.md](./reports.md) | 2 | `/api/lapak/reports` |
 
-**Total: 76 endpoint.**
+**Total: 82 endpoint.**
 
 ## Peta Fase (PRD 04 §9)
 

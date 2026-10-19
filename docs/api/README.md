@@ -90,10 +90,12 @@ ikhtisar + satu berkas per modul.
 | Pembayaran Transfer Manual | [lapak/payments.md](./lapak/payments.md) | 6 | login + `payment:*` |
 | Tiket QR & Check-in | [lapak/tickets.md](./lapak/tickets.md) | 5 | publik (verify) + `ticket:*` |
 | Worker Kedaluwarsa | [lapak/expiry.md](./lapak/expiry.md) | 5 | `order:read` / `order:update` |
+| Dashboard & Target PAD | [lapak/dashboard.md](./lapak/dashboard.md) | 4 | `report:read` / `report:update` |
+| Daftar Transaksi & Ekspor | [lapak/reports.md](./lapak/reports.md) | 2 | `report:read` / `report:export` |
 
 **Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 172 endpoint.**
+**Total keseluruhan: 178 endpoint.**
 
 ---
 

@@ -48,6 +48,8 @@ const APP_MODULES: Record<string, Record<string, string>> = {
     payments: "src/modules/lapak/payments/payments.routes.ts",
     tickets: "src/modules/lapak/tickets/tickets.routes.ts",
     expiry: "src/modules/lapak/expiry/expiry.routes.ts",
+    dashboard: "src/modules/lapak/dashboard/dashboard.routes.ts",
+    reports: "src/modules/lapak/reports/reports.routes.ts",
   },
 };
 

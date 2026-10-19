@@ -7,6 +7,69 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-23 — Daftar Transaksi & Ekspor CSV (LJ-3.2)
+
+**Ditambah** — prefix `/api/lapak/reports` (2 endpoint)
+- `GET /transactions` (`report:read`) — daftar transaksi lintas OPD + ringkasan
+  total & komposisi per status.
+- `GET /transactions/export` (`report:export`) — unduh CSV.
+- Tanpa migrasi (memakai tabel yang sudah ada).
+
+**Keputusan kontrak**
+- **Ekspor dipisah izinnya** dari membaca (`report:export` ≠ `report:read`): melihat
+  satu halaman di layar berbeda risikonya dengan mengunduh seluruh riwayat transaksi
+  ke berkas yang bisa berpindah tangan.
+- **Format CSV, bukan XLSX:** bisa diverifikasi pemeriksa tanpa aplikasi khusus,
+  tidak menambah dependensi (tetap 23), dan dibuka Excel/LibreOffice.
+- **CSV Injection diblokir:** sel yang diawali `=`, `+`, `-`, `@`, TAB, atau CR diberi
+  prefiks `'` agar Excel memperlakukannya sebagai teks. Nama pemohon & maksud pemakaian
+  diisi warga — jalur nyata menanam `=HYPERLINK(...)` yang berjalan di komputer pegawai.
+  Diuji nyata.
+- **PII tetap dimasking di CSV** — nama pemohon (`Bu********o`), NIK tidak diekspor.
+  Ekspor lintas OPD bukan alasan menyebar identitas warga; berkas bisa disalin ke mana saja.
+- **Pencarian hanya pada kode pesanan**, bukan nama pemohon — mencari berdasar identitas
+  membuka jalur menemukan warga lintas OPD dengan menebak nama, persis yang dicegah masking.
+- **`summary` mencakup seluruh hasil filter**, bukan hanya halaman yang tampil.
+- **BOM UTF-8** di awal CSV (Excel Windows tanpa BOM menampilkan nama OPD sebagai mojibake)
+  + `Content-Disposition: attachment` (tanpa itu browser menampilkan CSV di tab).
+
+**Perbaikan alat smoke**
+- Helper `request()` kini membaca respons **non-JSON sebagai teks** (sebelumnya hanya
+  JSON, sehingga uji ekspor selalu menerima `data: null`).
+
+---
+
+## 2026-10-23 — Dashboard Penerimaan & Target PAD (LJ-3.1)
+
+**Ditambah** — prefix `/api/lapak/dashboard` (4 endpoint)
+- `GET /` — ringkasan **target vs realisasi** + `pending` + tren, dikelompokkan
+  per OPD / kategori / bulan.
+- `GET|POST /targets`, `DELETE /targets/:id` — target penerimaan per OPD per tahun.
+- DB: `lapak_targets`, migrasi `20261023140000_add_lapak_targets`, drift 0.
+
+**Dasar perancangan (riset)**
+- Format mengikuti laporan resmi **SIKD/DJPK Kemenkeu**: `Akun | Anggaran/Pagu | Realisasi | %`.
+- Konteks Provinsi Jambi 2024 (data SIKD): **Retribusi Daerah Rp14,31 M dari PAD
+  Rp2.089,31 M (~0,68%) dengan capaian 83,72%** — terendah di antara komponen PAD
+  (pajak 99,20%). Dashboard ini alat pengawasan pada komponen dengan capaian terlemah.
+- Target per OPD per tahun mengikuti model `TargetOPD` backend Bapenda sebelumnya.
+
+**Keputusan kontrak**
+- **Realisasi HANYA dari pesanan `LUNAS`.** Pesanan menunggu bayar tidak dihitung —
+  diuji nyata (pesanan Rp5 jt belum dibayar tidak menambah realisasi).
+- **`pending` dipisah dari realisasi:** `awaitingPayment`, `awaitingConfirmation`,
+  `expired`. `awaitingConfirmation` adalah angka paling kritis — uang bisa sudah masuk
+  rekening tetapi belum diakui.
+- **Target disimpan, capaian dihitung.** `TargetOPD.achieve` pada backend lama tidak
+  diadopsi: capaian manual bisa menyimpang dari data pesanan tanpa terdeteksi.
+- **`percentage` bernilai `null` (bukan 0)** saat target belum ditetapkan — 0%
+  menyiratkan "tidak ada penerimaan", padahal artinya "belum ada pagu".
+- **Zona waktu Asia/Jakarta** untuk batas hari/bulan dan pengelompokan bulan; memakai
+  UTC akan menggeser transaksi malam (23:30 WIB) ke hari/bulan yang salah.
+- Lingkup OPD dipaksa **di server**; OPD di luar lingkup → `404` (bukan `403`).
+
+---
+
 ## 2026-10-23 — Worker Kedaluwarsa (LJ-2.8) — **Fase 2 SELESAI**
 
 **Ditambah** — prefix `/api/lapak/expiry` (5 endpoint) + proses terjadwal
