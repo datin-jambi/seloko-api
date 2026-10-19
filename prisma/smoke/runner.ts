@@ -22,6 +22,7 @@
  *   npm run db:smoke -- lapak-products  → Hanya uji produk katalog Lapak (LJ-1.2)
  *   npm run db:smoke -- lapak-rates     → Hanya uji alur persetujuan tarif (LJ-1.3)
  *   npm run db:smoke -- lapak-catalog   → Hanya uji katalog publik OPD (LJ-1.6)
+ *   npm run db:smoke -- lapak-availability → Hanya uji jam operasional & tanggal tutup (LJ-2.1)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -1595,6 +1596,137 @@ async function runLapakCatalogSuite() {
   assert("Katalog kosong berupa array", Array.isArray(other.data?.data), typeof other.data?.data);
 }
 
+// ─── Test Suite: Lapak — Jam Operasional & Tanggal Tutup (LJ-2.1) ─────────────
+async function runLapakAvailabilitySuite() {
+  console.log("\n\x1b[36m▶ [Suite 17: Lapak - Jam Operasional & Tanggal Tutup]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  assert("Superadmin login", Boolean(saToken));
+
+  await cleanupDebugArtefacts();
+
+  // Persiapan: produk PUBLISHED milik BPSDM pada kategori seed.
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const gedung = (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+
+  const created = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: gedung.id,
+      name: "Jadwal Uji Produk", description: "Produk uji jam operasional dan tanggal tutup.",
+      rates: [{ name: "Harian", unit: "DAY", price: 500_000 }],
+    },
+  });
+  assert("Produk jadwal dibuat", created.status === 201, created.status, created.data?.message);
+  const productId = created.data?.data?.id;
+  const slug = created.data?.data?.slug;
+
+  // ── 1. Awalnya tidak ada jadwal → cek ketersediaan menolak produk DRAFT.
+  const draftAvail = await request(`/lapak/availability/product/${productId}/availability?from=2026-11-01&to=2026-11-03`, { appCode: "lapak-jambi-web" });
+  assert("Produk DRAFT tak bisa dicek publik (404)", draftAvail.status === 404, draftAvail.status);
+
+  // ── 2. Set jam operasional: Senin–Jumat 08:00–16:00 (replace-set).
+  const hours = [1, 2, 3, 4, 5].map((weekday) => ({ weekday, openTime: "08:00", closeTime: "16:00" }));
+  const setHours = await request(`/lapak/availability/product/${productId}/hours`, {
+    method: "PUT", token: saToken || undefined, body: { hours },
+  });
+  assert("Simpan jam operasional 200", setHours.status === 200, setHours.status, setHours.data?.message);
+  assert("5 hari kerja tersimpan", (setHours.data?.data ?? []).length === 5, (setHours.data?.data ?? []).length);
+
+  // ── 3. Duplikat hari ditolak SEBELUM menyentuh DB.
+  const dup = await request(`/lapak/availability/product/${productId}/hours`, {
+    method: "PUT", token: saToken || undefined,
+    body: { hours: [{ weekday: 1, openTime: "08:00", closeTime: "12:00" }, { weekday: 1, openTime: "13:00", closeTime: "17:00" }] },
+  });
+  assert("Hari duplikat ditolak 400", dup.status === 400, dup.status);
+  const afterDup = await request(`/lapak/availability/product/${productId}/hours`, { token: saToken || undefined });
+  assert("Jadwal lama tetap utuh setelah penolakan", (afterDup.data?.data ?? []).length === 5, (afterDup.data?.data ?? []).length);
+
+  // ── 4. Format jam salah ditolak.
+  const badTime = await request(`/lapak/availability/product/${productId}/hours`, {
+    method: "PUT", token: saToken || undefined,
+    body: { hours: [{ weekday: 1, openTime: "25:00", closeTime: "16:00" }] },
+  });
+  assert("Jam tidak valid ditolak 400", badTime.status === 400, badTime.status);
+
+  // ── 5. Terbitkan lalu cek ketersediaan publik.
+  await request(`/lapak/products/${productId}/status/publish`, { method: "PATCH", token: saToken || undefined });
+  const pubAvail = await request(`/lapak/availability/product/${productId}/availability?from=2026-11-02&to=2026-11-08`, { appCode: "lapak-jambi-web" });
+  assert("Cek ketersediaan publik 200", pubAvail.status === 200, pubAvail.status, pubAvail.data?.message);
+  const days = pubAvail.data?.data?.days ?? [];
+  assert("Satu baris per tanggal (7 hari)", days.length === 7, days.length);
+  // 2026-11-02 = Senin. Senin–Jumat buka, Sabtu–Minggu tutup.
+  assert("Senin buka", days.find((d: any) => d.date === "2026-11-02")?.isOpen === true);
+  assert("Minggu tutup", days.find((d: any) => d.date === "2026-11-08")?.isOpen === false);
+  assert("Hari tutup menyertakan alasan", typeof days.find((d: any) => d.date === "2026-11-08")?.reason === "string");
+  assert("Jam buka ikut disajikan", days.find((d: any) => d.date === "2026-11-02")?.openTime === "08:00");
+
+  // ── 6. Rentang terlalu panjang ditolak.
+  const tooLong = await request(`/lapak/availability/product/${productId}/availability?from=2026-11-01&to=2027-06-01`, { appCode: "lapak-jambi-web" });
+  assert("Rentang > 92 hari ditolak 400", tooLong.status === 400, tooLong.status);
+
+  // ── 7. Tanggal tutup menang atas jam operasional.
+  const blackout = await request(`/lapak/availability/product/${productId}/blackouts`, {
+    method: "POST", token: saToken || undefined,
+    body: { startDate: "2026-11-03", endDate: "2026-11-04", reason: "Renovasi atap" },
+  });
+  assert("Tambah tanggal tutup 201", blackout.status === 201, blackout.status, blackout.data?.message);
+  const blackoutId = blackout.data?.data?.id;
+
+  const withBlackout = await request(`/lapak/availability/product/${productId}/availability?from=2026-11-02&to=2026-11-05`, { appCode: "lapak-jambi-web" });
+  const bDays = withBlackout.data?.data?.days ?? [];
+  assert("Tanggal blackout jadi tutup", bDays.find((d: any) => d.date === "2026-11-03")?.isOpen === false);
+  assert("Alasan blackout tampil", bDays.find((d: any) => d.date === "2026-11-03")?.reason === "Renovasi atap");
+  assert("Hari di luar blackout tetap buka", bDays.find((d: any) => d.date === "2026-11-02")?.isOpen === true);
+
+  // ── 8. Validasi tanggal tutup.
+  const badRange = await request(`/lapak/availability/product/${productId}/blackouts`, {
+    method: "POST", token: saToken || undefined,
+    body: { startDate: "2026-11-10", endDate: "2026-11-05" },
+  });
+  assert("Tanggal selesai < mulai ditolak 400", badRange.status === 400, badRange.status);
+
+  const badFormat = await request(`/lapak/availability/product/${productId}/blackouts`, {
+    method: "POST", token: saToken || undefined,
+    body: { startDate: "10-11-2026", endDate: "11-11-2026" },
+  });
+  assert("Format tanggal salah ditolak 400", badFormat.status === 400, badFormat.status);
+
+  // ── 9. Daftar & hapus tanggal tutup.
+  const listB = await request(`/lapak/availability/product/${productId}/blackouts`, { token: saToken || undefined });
+  assert("Daftar tanggal tutup 200", listB.status === 200 && (listB.data?.data ?? []).length === 1);
+
+  const delB = await request(`/lapak/availability/product/${productId}/blackouts/${blackoutId}`, {
+    method: "DELETE", token: saToken || undefined,
+  });
+  assert("Hapus tanggal tutup 200", delB.status === 200, delB.status);
+  assert("Hapus mengembalikan deleted:true", delB.data?.data?.deleted === true);
+
+  const afterDel = await request(`/lapak/availability/product/${productId}/availability?from=2026-11-03&to=2026-11-03`, { appCode: "lapak-jambi-web" });
+  assert("Setelah dihapus, tanggal buka kembali", afterDel.data?.data?.days?.[0]?.isOpen === true,
+    afterDel.data?.data?.days?.[0]?.isOpen);
+
+  // ── 10. Lingkup OPD: admin OPD lain tidak boleh menyentuh jadwal BPSDM.
+  // Bisa 403 (guard izin menolak lebih dulu) atau 404 (lolos guard tapi di
+  // luar lingkup) — keduanya benar; yang penting TIDAK 200 dan data tak bocor.
+  const otherToken = await login("petugas.samsat", DEFAULT_PASSWORD, "seloko");
+  const crossRead = await request(`/lapak/availability/product/${productId}/hours`, { token: otherToken || undefined });
+  assert("OPD lain ditolak (403/404, bukan 200)", crossRead.status === 403 || crossRead.status === 404, crossRead.status);
+
+  // ── 11. Produk tak dikenal.
+  const ghost = await request(`/lapak/availability/product/00000000-0000-7000-8000-000000000000/availability?from=2026-11-01&to=2026-11-02`, { appCode: "lapak-jambi-web" });
+  assert("Produk tak dikenal 404", ghost.status === 404, ghost.status);
+
+  // Bersih-bersih.
+  await request(`/lapak/products/${productId}/status/unpublish`, { method: "PATCH", token: saToken || undefined });
+  await prisma.lapakOperatingHour.deleteMany({ where: { productId } });
+  await prisma.lapakBlackoutDate.deleteMany({ where: { productId } });
+  await prisma.lapakProductRate.deleteMany({ where: { productId } });
+  await prisma.lapakProduct.deleteMany({ where: { slug } });
+  void slug;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -1670,6 +1802,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-catalog" || targetModule === "katalog") {
       await runLapakCatalogSuite();
+    }
+    if (!targetModule || targetModule === "lapak-availability" || targetModule === "jadwal") {
+      await runLapakAvailabilitySuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

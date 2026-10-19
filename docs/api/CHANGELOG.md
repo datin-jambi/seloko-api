@@ -7,6 +7,29 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-21 — Jam Operasional & Tanggal Tutup (LJ-2.1, Fase 2 dimulai)
+
+**Ditambah** — prefix `/api/lapak/availability` (6 endpoint)
+- Publik: `GET /product/:productId/availability?from&to` — ketersediaan harian, hanya
+  produk PUBLISHED, maksimal rentang 92 hari.
+- CMS (`product:read|update`): `GET|PUT /product/:productId/hours`,
+  `GET|POST /product/:productId/blackouts`, `DELETE /product/:productId/blackouts/:id`.
+- DB: tabel `lapak_operating_hours` (unik per produk+weekday) dan `lapak_blackout_dates`
+  (rentang inklusif) — migrasi `20261021090000_add_lapak_availability`, drift 0.
+
+**Keputusan kontrak**
+- **Hari tanpa baris = tutup.** Tidak ada kolom `isOpen`, sehingga mustahil ada keadaan
+  "baris ada tapi ditandai tutup".
+- `PUT /hours` bersifat **replace-set** (bukan tambah-per-hari): jam buka adalah keputusan
+  atas satu minggu; duplikat hari ditolak `400` sebelum menyentuh DB.
+- `closeTime` < `openTime` sah = **lintas tengah malam** (mis. 20:00–02:00).
+- **Blackout menang** atas jam operasional — maintenance membatalkan jadwal.
+- Cek ketersediaan mengembalikan **satu baris per tanggal** (termasuk yang tutup) agar
+  frontend bisa merender kalender penuh tanpa menebak hari yang hilang.
+- Hapus tanggal tutup = **hard delete** (jadwal bukan data transaksi).
+
+---
+
 ## 2026-10-21 — Seed Produk & Tarif dari Perda (LJ-1.7)
 
 **Ditambah** — data seed, bukan kontrak API

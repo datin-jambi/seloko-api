@@ -82,10 +82,11 @@ ikhtisar + satu berkas per modul.
 | Produk / Aset | [lapak/products.md](./lapak/products.md) | 8 | publik + `product:*` |
 | Tarif Produk | [lapak/rates.md](./lapak/rates.md) | 8 | `product:*` (lingkup OPD) |
 | Katalog Publik OPD | [lapak/catalog.md](./lapak/catalog.md) | 2 | publik |
+| Jam Operasional & Tanggal Tutup | [lapak/availability.md](./lapak/availability.md) | 6 | publik + `product:*` |
 
 **Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 123 endpoint.**
+**Total keseluruhan: 129 endpoint.**
 
 ---
 

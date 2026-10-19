@@ -770,12 +770,55 @@ model LapakProduct {
   requirements LapakProductRequirement[]
   images       LapakProductImage[]
   facilities   LapakProductFacility[]
+  operatingHours LapakOperatingHour[]
+  blackoutDates  LapakBlackoutDate[]
 
   @@unique([applicationId, slug], map: "uq_lapak_products_app_slug")
   @@index([applicationId, status], map: "idx_lapak_products_app_status")
   @@index([organizationId, status], map: "idx_lapak_products_org_status")
   @@index([categoryId], map: "idx_lapak_products_category")
   @@map("lapak_products")
+}
+
+/// Jam operasional per hari (LJ-2.1). Satu baris per hari yang BUKA.
+/// Hari tanpa baris = tutup, sehingga tidak perlu kolom `isOpen` yang bisa
+/// bertentangan dengan keberadaan barisnya. `closeTime` boleh lebih kecil dari
+/// `openTime` untuk jam lintas tengah malam (mis. 20:00–02:00).
+model LapakOperatingHour {
+  id        String   @id @default(uuid(7)) @db.VarChar(36)
+  productId String   @map("product_id") @db.VarChar(36)
+  /// 0 = Minggu … 6 = Sabtu (selaras `Date.getDay()`).
+  weekday   Int      @db.SmallInt
+  /// Format HH:MM (24 jam) — VARCHAR agar tidak terikat timezone database.
+  openTime  String   @map("open_time") @db.VarChar(5)
+  closeTime String   @map("close_time") @db.VarChar(5)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  product LapakProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// Satu baris per hari per produk — mencegah jadwal ganda yang ambigu.
+  @@unique([productId, weekday], map: "uq_lapak_op_hours_product_weekday")
+  @@map("lapak_operating_hours")
+}
+
+/// Tanggal tutup / maintenance (LJ-2.1). Rentang tanggal, bukan satu hari,
+/// karena maintenance sering berlangsung beberapa hari berturut-turut.
+model LapakBlackoutDate {
+  id        String   @id @default(uuid(7)) @db.VarChar(36)
+  productId String   @map("product_id") @db.VarChar(36)
+  /// Tanggal mulai (inklusif), disimpan sebagai DATE murni tanpa jam.
+  startDate DateTime @map("start_date") @db.Date
+  /// Tanggal selesai (inklusif). Sama dengan startDate = tutup satu hari.
+  endDate   DateTime @map("end_date") @db.Date
+  reason    String?  @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  product LapakProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, startDate, endDate], map: "idx_lapak_blackout_product_range")
+  @@map("lapak_blackout_dates")
 }
 
 /// Tarif per sesi/satuan. Punya status sendiri (PRD 04 §C): mengubah tarif

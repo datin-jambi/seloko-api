@@ -50,18 +50,44 @@ Sebelum melakukan tugas pengkodean, perbaikan, atau penambahan modul pada reposi
 ---
 
 ## 📡 Dokumentasi API (`docs/api/`)
-Dokumentasi kontrak API tinggal di repo, dikelompokkan **per aplikasi → per modul** (mengikuti pola Apidog): `core/` (auth, users, applications, permissions, roles, menus, organizations, storage) dan `bapenda/` (uptds, banners, news, pages), plus `00-konvensi.md` & `CHANGELOG.md`.
+Dokumentasi kontrak API tinggal di repo, dikelompokkan **per aplikasi → per modul** (mengikuti pola Apidog): `core/` (auth, users, applications, permissions, roles, menus, organizations, storage), `bapenda/` (uptds, banners, news, pages), dan `lapak/` (categories, products, rates, catalog, availability), plus `00-konvensi.md` & `CHANGELOG.md`.
 
 **Wajib:** rute baru atau perubahan kontrak → perbarui `docs/api/<app>/<modul>.md` + entri `CHANGELOG.md` + jumlah endpoint di kedua `README.md`, **pada perubahan yang sama**. Format baku: [`docs/api/README.md`](file:///docs/api/README.md).
+
+> Dijaga otomatis oleh `docs/api/check.ts` (ikut `npm test`): memverifikasi klaim jumlah
+> endpoint = jumlah rute di kode, setiap rute muncul di dokumen, setiap field request
+> terdokumentasi, dan total indeks cocok. Bila checker menolak, **perbaiki dokumennya**,
+> bukan checker-nya.
 
 ---
 
 ## 🚀 Perintah Standar Pengembangan
 - `npm run dev` — Menjalankan development server Fastify.
-- `npm run typecheck` — Memverifikasi seluruh kode TypeScript (wajib 0 error).
+- `npm run typecheck` — Memverifikasi seluruh kode TypeScript + project `prisma/` (wajib 0 error).
+- `npm test` — Unit/checker suite (`docs.check`, `menus.check`, `org-scope.check`, dll).
+- `npm run build` — Kompilasi produksi (`tsc` + `tsc-alias`) — wajib lolos sebelum commit.
 - `npm run db:seed` — Menjalankan database seeder idempoten.
-- `npm run db:smoke` — Menjalankan unified smoke test suite (~0.8s).
+- `npm run db:smoke` — Menjalankan unified smoke test suite (~0.8s, butuh server dev hidup).
 - `npm run db:smoke -- <modul>` — Menjalankan pengujian spesifik per modul.
+
+**Bukti selesai satu tugas = 4 kanal hijau:** typecheck → test → build → db:smoke.
+Jalankan `db:smoke` dengan server dev di port **3100** (`PORT=3100 npx tsx src/server.ts`),
+lalu matikan setelahnya.
+
+### ⚠️ Jebakan operasional yang sudah memakan waktu (wajib diingat)
+1. **`tsx watch` tidak andal me-reload service di Windows.** Perubahan pada `*.service.ts`
+   sering tidak ikut termuat, sehingga UI/HTTP menyajikan kode LAMA dan menyesatkan
+   diagnosis. **Selalu restart server dev** sebelum menyimpulkan ada bug — dan pastikan
+   tidak ada proses lama yang masih memegang port.
+2. **Jangan pernah menaruh `new Date()` di konstanta modul.** Nilainya membeku saat modul
+   dimuat; filter waktu jadi salah setelah server berjalan lama. Pakai **fungsi** yang
+   dievaluasi per-request (`publicRateFilter()`).
+3. **Seeder harus idempoten** (kunci: slug/kode) dan produk hasil seed tetap `DRAFT` —
+   data riset wajib ditinjau manusia sebelum terbit.
+4. **`npm run db:seed` me-reset tabel aplikasi**, sehingga aplikasi `lapak-jambi-web`
+   bisa hilang dan semua endpoint lapak balas `500`. Jalankan ulang seed bila itu terjadi.
+5. **Smoke suite wajib idempoten** — bersihkan artefak run sebelumnya **berbasis pola**
+   (mis. `slug endsWith "-prod"`), bukan daftar manual yang cepat basi.
 
 ---
 
@@ -84,9 +110,9 @@ Dokumentasi kontrak API tinggal di repo, dikelompokkan **per aplikasi → per mo
 ## 🛒 Roadmap Lapak Jambi (`/api/lapak`, PRD 04)
 > *(Fokus aktif. **Sumber kebenaran progres = pipeline tugas [`.agents/tasks/lapak-jambi.md`](file:///.agents/tasks/lapak-jambi.md)** — baca sebelum mulai, kerjakan satu tugas `🟡` saja, tandai ✅ hanya setelah buktinya lolos, lalu salin status fase ke sini. Aturan pipeline: [`.agents/tasks/README.md`](file:///.agents/tasks/README.md).)*
 
-0. 🟡 **Fondasi core** (`LJ-0.x`) — OPD + lingkup penugasan, API OPD, seed RBAC/menu Lapak, registrasi akun PUBLIC — *sedang dikerjakan*.
-1. ⏳ **Katalog** (`LJ-1.x`) — kategori, produk + tarif/persyaratan/media, alur persetujuan, katalog publik.
-2. ⏳ **Transaksi** (`LJ-2.x`) — ketersediaan, keranjang per OPD, checkout, SKRD, transfer manual, tiket QR.
+0. ✅ **Fondasi core** (`LJ-0.x`) — OPD + lingkup penugasan, API OPD, seed RBAC/menu Lapak, registrasi akun PUBLIC — *selesai (7/7)*.
+1. ✅ **Katalog** (`LJ-1.x`) — kategori, produk + tarif/persyaratan/media/fasilitas, alur persetujuan tarif terpisah, katalog publik + profil OPD, seed dari Perda Jambi No. 5/2024 — *selesai (7/7)*.
+2. 🟡 **Transaksi** (`LJ-2.x`) — ketersediaan & reservasi, keranjang per OPD, checkout, SKRD, transfer manual, tiket QR — *berjalan; `LJ-2.1` (jam operasional & tanggal tutup) ✅*.
 3. ⏳ **Monitoring PAD** (`LJ-3.x`) — dashboard, transaksi & ekspor, transparansi publik. *(MVP = Fase 0–3)*
 4. ⏳ **Pasca-MVP** (`LJ-4.x`) — konten OPD, ulasan, komentar, wishlist, target OPD.
 5. ⏳ **Lanjutan** (`LJ-5.x`) — VA/QRIS, gabung web+mobile & auth PUBLIC, mobile.
