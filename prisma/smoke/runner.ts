@@ -1172,7 +1172,13 @@ async function runLapakProductsSuite() {
         { name: "Sesi Uji Siang", unit: "SESSION", price: 1_000_000, minQty: 1, startTime: "08:00", endTime: "17:00" },
       ],
       addons: [{ name: "Proyektor Uji", unit: "DAY", price: 250_000 }],
-      requirements: [{ label: "Surat permohonan", fieldType: "FILE", isRequired: true }],
+      requirements: [
+        { label: "Surat permohonan", fieldType: "FILE", isRequired: true },
+        { label: "Jumlah peserta", fieldType: "NUMBER", isRequired: false, sortOrder: 1 },
+        { label: "Tanggal kegiatan", fieldType: "DATE", isRequired: true, sortOrder: 2 },
+        { label: "Kategori kegiatan", fieldType: "SELECT", options: ["Rapat", "Pelatihan"], sortOrder: 3 },
+        { label: "Catatan tambahan", fieldType: "TEXT", isRequired: false, sortOrder: 4 },
+      ],
       facilities: [{ name: "Wifi" }, { name: "Parkir" }],
       images: [{ url: "https://example.com/aula.jpg", isPrimary: true }],
     },
@@ -1186,10 +1192,37 @@ async function runLapakProductsSuite() {
   assert("2 tarif tersimpan", (created.data?.data?.rates ?? []).length === 2, (created.data?.data?.rates ?? []).length);
   assert("Addon, persyaratan, fasilitas, gambar tersimpan",
     (created.data?.data?.addons ?? []).length === 1 &&
-    (created.data?.data?.requirements ?? []).length === 1 &&
+    (created.data?.data?.requirements ?? []).length === 5 &&
     (created.data?.data?.facilities ?? []).length === 2 &&
     (created.data?.data?.images ?? []).length === 1);
+  const reqs = created.data?.data?.requirements ?? [];
+  assert("Kelima tipe persyaratan terwakili", ["FILE", "TEXT", "NUMBER", "DATE", "SELECT"].every((t) =>
+    reqs.some((r: any) => r.fieldType === t)), reqs.map((r: any) => r.fieldType));
+  assert("Opsi SELECT tersimpan", (reqs.find((r: any) => r.fieldType === "SELECT")?.options ?? []).length === 2);
+  assert("sortOrder persyaratan terjaga", reqs.find((r: any) => r.label === "Catatan tambahan")?.sortOrder === 4);
   assert("Status awal DRAFT", created.data?.data?.status === "DRAFT");
+
+  // LJ-1.4: SELECT tanpa opsi DITOLAK — form publik tak akan bisa dirender.
+  const selNoOpts = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: gedung.id,
+      name: "Produk Uji SELECT", description: "Deskripsi minimal sepuluh karakter.",
+      requirements: [{ label: "Pilihan kosong", fieldType: "SELECT" }],
+    },
+  });
+  assert("SELECT tanpa opsi ditolak 400", selNoOpts.status === 400, selNoOpts.status);
+
+  // Opsi pada tipe non-SELECT juga ditolak (data mati).
+  const optsOnFile = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: gedung.id,
+      name: "Produk Uji Opsi FILE", description: "Deskripsi minimal sepuluh karakter.",
+      requirements: [{ label: "Surat", fieldType: "FILE", options: ["A", "B"] }],
+    },
+  });
+  assert("Opsi pada tipe non-SELECT ditolak 400", optsOnFile.status === 400, optsOnFile.status);
 
   // ── 2. Validasi.
   const badOrg = await request("/lapak/products", {

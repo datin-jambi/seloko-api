@@ -165,7 +165,7 @@ Hanya `status: PUBLISHED`. `startingPrice` = tarif aktif termurah.
 | `coverFileId` | — | string | ≤100 | — | ✓ | — |
 | `rates` | — | array | maks 50 | `[]` | — | `id?` ada = (di update) perbarui |
 | `addons` | — | array | maks 50 | `[]` | — | — |
-| `requirements` | — | array | maks 30 | `[]` | — | `options` wajib bila `SELECT` |
+| `requirements` | — | array | maks 30 | `[]` | — | `options` wajib bila `SELECT`, dan **hanya** boleh pada `SELECT` |
 | `facilities` | — | array | maks 50 | `[]` | — | — |
 | `images` | — | array | maks 20 | `[]` | — | — |
 

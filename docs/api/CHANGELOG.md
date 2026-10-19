@@ -7,6 +7,19 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-21 — Persyaratan/Dokumen Produk (LJ-1.4)
+
+**Berubah — VALIDASI KONTRAK**
+- `requirements[].options` kini **wajib** bila `fieldType: "SELECT"` (tanpa opsi, form publik
+  tak bisa dirender) dan **dilarang** pada tipe lain (`400 VALIDATION_ERROR`). Sebelumnya
+  kombinasi keduanya diterima dan menyimpan data mati.
+
+**Catatan** — model `lapak_product_requirements` dan nested CRUD sudah ada sejak LJ-1.2;
+LJ-1.4 menutup celah validasi tersebut dan memperluas cakupan smoke ke kelima tipe
+(`FILE`/`TEXT`/`NUMBER`/`DATE`/`SELECT`) termasuk penjagaan `sortOrder`.
+
+---
+
 ## 2026-10-21 — Persetujuan Tarif Terpisah Lapak (LJ-1.3)
 
 **Ditambah** — prefix `/api/lapak/rates` (8 endpoint)

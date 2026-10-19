@@ -40,15 +40,39 @@ export const AddonInputSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-export const RequirementInputSchema = z.object({
-  id: z.string().uuid().optional(),
-  label: z.string().trim().min(2).max(150),
-  fieldType: RequirementFieldTypeSchema,
-  /** Pilihan untuk SELECT — array string 1–20 item. */
-  options: z.array(z.string().trim().min(1).max(100)).min(1).max(20).nullable().optional(),
-  isRequired: z.boolean().default(true),
-  sortOrder: z.number().int().min(0).max(999).default(0),
-});
+/**
+ * Persyaratan/dokumen per produk (LJ-1.4). Field `options` hanya bermakna
+ * untuk tipe SELECT: tanpa opsi, form publik tak bisa dirender; pada tipe
+ * lain, opsi yang tersimpan hanyalah data mati. Keduanya ditolak di sini
+ * agar tidak lahir baris yang mustahil dipakai.
+ */
+export const RequirementInputSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    label: z.string().trim().min(2).max(150),
+    fieldType: RequirementFieldTypeSchema,
+    /** Pilihan untuk SELECT — array string 1–20 item. */
+    options: z.array(z.string().trim().min(1).max(100)).min(1).max(20).nullable().optional(),
+    isRequired: z.boolean().default(true),
+    sortOrder: z.number().int().min(0).max(999).default(0),
+  })
+  .superRefine((q, ctx) => {
+    const hasOptions = Boolean(q.options?.length);
+    if (q.fieldType === "SELECT" && !hasOptions) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Persyaratan bertipe SELECT wajib punya minimal satu opsi",
+      });
+    }
+    if (q.fieldType !== "SELECT" && hasOptions) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: `Opsi hanya berlaku untuk tipe SELECT, bukan ${q.fieldType}`,
+      });
+    }
+  });
 
 export const FacilityInputSchema = z.object({
   id: z.string().uuid().optional(),
