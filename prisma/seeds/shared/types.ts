@@ -88,6 +88,31 @@ export interface LapakCategoriesFile {
   categories: LapakCategoryDef[];
 }
 
+// ─── lapak/products.json — produk & tarif contoh (Perda Jambi 5/2024) ─────────
+export interface LapakSeedRate {
+  name: string;
+  unit: string;
+  price: number;
+  minQty?: number;
+}
+
+export interface LapakSeedProduct {
+  /** Kode OPD pengelola; `null` = belum ada di seed organisasi, dilewati. */
+  opd: string | null;
+  /** Slug kategori layanan (lihat lapak/categories.json). */
+  kategori: string;
+  nama: string;
+  deskripsi: string;
+  pricingUnit: string;
+  rates: LapakSeedRate[];
+}
+
+export interface LapakProductsFile {
+  /** Metadata sumber hukum — tidak dibaca seeder, hanya jejak riset. */
+  _sumber?: Record<string, string>;
+  produk: LapakSeedProduct[];
+}
+
 // ─── users.json ───────────────────────────────────────────────────────────────
 export interface RoleAssignmentDef {
   app: string;

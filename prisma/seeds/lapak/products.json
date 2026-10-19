@@ -1,0 +1,118 @@
+{
+  "_sumber": {
+    "peraturan": "Peraturan Daerah Provinsi Jambi Nomor 5 Tahun 2024",
+    "tentang": "Pajak Daerah dan Retribusi Daerah",
+    "lampiran": "Lampiran II — Struktur dan Besarnya Tarif Retribusi Jasa Usaha",
+    "halaman_pdf": "264 (Penyediaan Tempat Peninggalan) & 263 (Sewa Aula/Laboratorium)",
+    "url_resmi": "https://jdih.jambiprov.go.id/index.php?page=detilperaturan&id=1116",
+    "berlaku": "2024",
+    "catatan": "Tarif diambil dari scan lampiran resmi. Angka dibaca via OCR visual — WAJIB diverifikasi ulang oleh Bapenda sebelum dipakai produksi."
+  },
+  "produk": [
+    {
+      "opd": "BPSDM",
+      "kategori": "penginapan-asrama-rumah-dinas",
+      "nama": "Kamar Asrama Standar — Mess Pemda Jekan",
+      "deskripsi": "Kamar asrama standar di Mess Pemda Jekan. Tarif per kamar per malam sesuai Perda Provinsi Jambi No. 5 Tahun 2024.",
+      "pricingUnit": "NIGHT",
+      "rates": [
+        { "name": "Kamar Standar", "unit": "NIGHT", "price": 350000 }
+      ]
+    },
+    {
+      "opd": "BPSDM",
+      "kategori": "penginapan-asrama-rumah-dinas",
+      "nama": "Kamar Asrama VIP — Mess Pemda Jekan",
+      "deskripsi": "Kamar asrama VIP di Mess Pemda Jekan. Tarif per kamar per malam sesuai Perda Provinsi Jambi No. 5 Tahun 2024.",
+      "pricingUnit": "NIGHT",
+      "rates": [
+        { "name": "Kamar VIP", "unit": "NIGHT", "price": 450000 },
+        { "name": "Extra Bed", "unit": "UNIT", "price": 150000 }
+      ]
+    },
+    {
+      "opd": "BPSDM",
+      "kategori": "sewa-gedung-ruangan",
+      "nama": "Ruang Rapat Mess Pemda Jekan",
+      "deskripsi": "Sewa ruang rapat di Mess Pemda Jekan. Tarif sesuai Perda Provinsi Jambi No. 5 Tahun 2024.",
+      "pricingUnit": "DAY",
+      "rates": [
+        { "name": "Ruang Rapat (per hari)", "unit": "DAY", "price": 500000 },
+        { "name": "Durasi 1–3 Jam", "unit": "HOUR", "price": 750000, "minQty": 1 },
+        { "name": "Durasi 4–6 Jam", "unit": "HOUR", "price": 1000000, "minQty": 1 }
+      ]
+    },
+    {
+      "opd": "BPSDM",
+      "kategori": "penginapan-asrama-rumah-dinas",
+      "nama": "Asrama Pelatihan BPSDM — Kamar AC",
+      "deskripsi": "Kamar asrama ber-AC untuk peserta pelatihan. Tarif per orang per hari sesuai Perda Provinsi Jambi No. 5 Tahun 2024.",
+      "pricingUnit": "NIGHT",
+      "rates": [
+        { "name": "Asrama AC", "unit": "PERSON", "price": 180000 },
+        { "name": "Asrama Non-AC", "unit": "PERSON", "price": 100000 }
+      ]
+    },
+    {
+      "opd": "BAPELKES",
+      "kategori": "penginapan-asrama-rumah-dinas",
+      "nama": "Asrama VIP Balai Pelatihan Kesehatan",
+      "deskripsi": "Kamar asrama VIP di Balai Pelatihan Kesehatan Jiwa Provinsi Jambi. Tarif per orang per hari sesuai Perda No. 5 Tahun 2024.",
+      "pricingUnit": "NIGHT",
+      "rates": [
+        { "name": "Asrama VIP", "unit": "PERSON", "price": 100000 }
+      ]
+    },
+    {
+      "opd": "BAPELKES",
+      "kategori": "sewa-gedung-ruangan",
+      "nama": "Ruang Kelas & Aula Balai Pelatihan Kesehatan",
+      "deskripsi": "Sewa ruang kelas dan aula di Balai Pelatihan Kesehatan Jiwa. Tarif sesuai Perda Provinsi Jambi No. 5 Tahun 2024.",
+      "pricingUnit": "DAY",
+      "rates": [
+        { "name": "Ruang Kelas", "unit": "DAY", "price": 100000 },
+        { "name": "Ruang Kelas VIP", "unit": "DAY", "price": 500000 },
+        { "name": "Aula", "unit": "DAY", "price": 750000 },
+        { "name": "Bus", "unit": "DAY", "price": 1000000 }
+      ]
+    },
+    {
+      "opd": null,
+      "kategori": "penginapan-asrama-rumah-dinas",
+      "nama": "Asrama Mahasiswa Provinsi Jambi",
+      "deskripsi": "Asrama penginapan per hari untuk mahasiswa dan umum. Tarif sesuai Perda Provinsi Jambi No. 5 Tahun 2024. OPD pengelola belum ada di seed organisasi — diisi manual setelah OPD ditambahkan.",
+      "pricingUnit": "NIGHT",
+      "rates": [
+        { "name": "Mahasiswa", "unit": "PERSON", "price": 25000 },
+        { "name": "Umum", "unit": "PERSON", "price": 60000 }
+      ]
+    },
+    {
+      "opd": "DINKES",
+      "kategori": "sewa-gedung-ruangan",
+      "nama": "Sewa Ruangan Rumah Sakit Jiwa Daerah",
+      "deskripsi": "Sewa ruangan hunian per lantai di Rumah Sakit Jiwa Daerah Provinsi Jambi. Tarif per bulan sesuai Perda No. 5 Tahun 2024.",
+      "pricingUnit": "UNIT",
+      "rates": [
+        { "name": "Lantai I", "unit": "UNIT", "price": 500000 },
+        { "name": "Lantai II", "unit": "UNIT", "price": 450000 },
+        { "name": "Lantai III", "unit": "UNIT", "price": 400000 },
+        { "name": "Lantai IV", "unit": "UNIT", "price": 350000 },
+        { "name": "Lantai V", "unit": "UNIT", "price": 80000 }
+      ]
+    },
+    {
+      "opd": null,
+      "kategori": "sewa-gedung-ruangan",
+      "nama": "Sewa Aula & Laboratorium UPTD",
+      "deskripsi": "Sewa aula dan laboratorium pada UPTD. Tarif per jam dan per hari sesuai Perda Provinsi Jambi No. 5 Tahun 2024.",
+      "pricingUnit": "HOUR",
+      "rates": [
+        { "name": "Aula (per jam)", "unit": "HOUR", "price": 50000 },
+        { "name": "Aula (per hari)", "unit": "DAY", "price": 300000 },
+        { "name": "Laboratorium (per jam)", "unit": "HOUR", "price": 100000 },
+        { "name": "Laboratorium (per hari)", "unit": "DAY", "price": 500000 }
+      ]
+    }
+  ]
+}

@@ -7,6 +7,27 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-21 — Seed Produk & Tarif dari Perda (LJ-1.7)
+
+**Ditambah** — data seed, bukan kontrak API
+- `prisma/seeds/lapak/products.json` + `products.seeder.ts`: **7 produk / 18 tarif**
+  bersumber dari **Perda Provinsi Jambi No. 5 Tahun 2024 tentang Pajak Daerah dan
+  Retribusi Daerah**, Lampiran II (Struktur dan Besarnya Tarif Retribusi Jasa Usaha),
+  tabel "Penyediaan Tempat Peninggalan" & "Sewa".
+- Sumber resmi: `https://jdih.jambiprov.go.id/index.php?page=detilperaturan&id=1116`
+- Cakupan: asrama/Mess Pemda Jekan, asrama BPSDM, asrama & aula BAPELKES, sewa ruangan
+  RS Jiwa Daerah.
+
+**Keputusan**
+- Produk seed lahir `status: DRAFT` — data hasil riset **wajib ditinjau Bapenda**
+  sebelum terbit. Tarifnya `APPROVED` karena berasal dari Perda, bukan usulan OPD.
+- Seeder **idempoten** (kunci: slug): run kedua `0 dibuat, 7 diperbarui`, tarif diganti
+  utuh sehingga tidak menumpuk.
+- Entri dengan OPD belum ada di seed organisasi dilewati (`opd: null`) — barisnya
+  dipertahankan di JSON agar hasil riset tidak hilang.
+
+---
+
 ## 2026-10-21 — Katalog Publik OPD (LJ-1.6)
 
 **Ditambah** — prefix `/api/lapak` (2 endpoint publik, PRD 04 §176)
