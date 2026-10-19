@@ -116,3 +116,8 @@ lalu matikan setelahnya.
 3. ⏳ **Monitoring PAD** (`LJ-3.x`) — dashboard, transaksi & ekspor, transparansi publik. *(MVP = Fase 0–3)*
 4. ⏳ **Pasca-MVP** (`LJ-4.x`) — konten OPD, ulasan, komentar, wishlist, target OPD.
 5. ⏳ **Lanjutan** (`LJ-5.x`) — VA/QRIS, gabung web+mobile & auth PUBLIC, mobile.
+
+- **`resetTables` jangan pakai daftar manual.** Versi lama mendaftar tabel satu per satu dan
+  terus tertinggal tiap ada modul baru → `db:seed:reset` gagal di FK tabel yang belum terdaftar
+  (mis. `lapak_products`). Sekarang daftar dibaca dari `pg_tables` + `TRUNCATE ... CASCADE`.
+  Jangan kecualikan `_prisma_migrations`: mengosongkannya membuat `migrate deploy` gagal P3005.

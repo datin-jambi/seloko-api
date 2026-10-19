@@ -21,9 +21,11 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
   ditambahkan ke `allowedEntities` role `editor`; menu CMS grup **Informasi** (FAQ, Kategori FAQ).
 - Seed `bapenda/faqs.json` dari aplikasi lama: 7 kategori / 18 FAQ; tampil publik 6 / 17.
   `viewCount` hanya ditulis saat baris dibuat agar seed ulang tidak menimpa hitungan produksi.
-- `resetTables()` kini ikut mengosongkan `faqs`, `faq_categories`, `gallery_items`, `galleries`.
-  **Catatan:** `db:seed:reset` masih gagal lebih awal di FK `lapak_products_organization_id_fkey`
-  (tabel Lapak belum masuk `resetTables`) — masalah lama, belum diperbaiki di perubahan ini.
+- **`resetTables()` ditulis ulang:** daftar tabel kini dibaca dari `pg_tables` (bukan daftar
+  manual yang terus tertinggal), lalu `TRUNCATE ... RESTART IDENTITY CASCADE` sekali jalan.
+  `_prisma_migrations` dikecualikan agar `migrate deploy` tidak mengira skema belum termigrasi.
+  Sebelumnya `db:seed:reset` selalu gagal di FK `lapak_products_organization_id_fkey` karena
+  tabel Lapak belum terdaftar; kini seluruh 45 tabel ter-reset dan seed lengkap.
 
 ---
 
