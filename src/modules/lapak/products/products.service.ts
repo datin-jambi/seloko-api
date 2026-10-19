@@ -532,13 +532,19 @@ export async function deleteProduct(id: string, scope: string[] | null) {
  * APPROVED/PUBLISHED yang `effectiveFrom` sudah tercapai. Tarif DRAFT tidak
  * pernah bocor ke portal; produk yang belum punya tarif terapprove
  * menyajikan `rates: []` dan `startingPrice: 0`.
+ *
+ * FUNGSI, bukan konstanta: `new Date()` harus dievaluasi per-request.
+ * Bila konstanta modul, batas waktu membeku di momen server start dan
+ * tarif baru yang dibuat setelahnya tidak pernah tampil sampai restart.
  */
-const PUBLIC_RATE_FILTER = {
-  deletedAt: null,
-  isActive: true,
-  status: { in: ["APPROVED", "PUBLISHED"] as ContentStatus[] },
-  effectiveFrom: { lte: new Date() },
-} as const;
+function publicRateFilter() {
+  return {
+    deletedAt: null,
+    isActive: true,
+    status: { in: ["APPROVED", "PUBLISHED"] as ContentStatus[] },
+    effectiveFrom: { lte: new Date() },
+  } as const;
+}
 
 export async function getPublicProducts(query: PublicListProductsQuery) {
   const applicationId = await getLapakAppId();
@@ -564,7 +570,7 @@ export async function getPublicProducts(query: PublicListProductsQuery) {
   if (minPrice !== undefined || maxPrice !== undefined) {
     where.rates = {
       some: {
-        ...PUBLIC_RATE_FILTER,
+        ...publicRateFilter(),
         ...(minPrice !== undefined && { price: { gte: minPrice } }),
         ...(maxPrice !== undefined && { price: { lte: maxPrice } }),
       },
@@ -584,7 +590,7 @@ export async function getPublicProducts(query: PublicListProductsQuery) {
       include: {
         organization: { select: { code: true, name: true } },
         category: { select: { name: true, slug: true } },
-        rates: { where: PUBLIC_RATE_FILTER, orderBy: { price: "asc" }, take: 1 },
+        rates: { where: publicRateFilter(), orderBy: { price: "asc" }, take: 1 },
       },
     }),
   ]);
@@ -620,7 +626,7 @@ export async function getPublicProductBySlug(slug: string) {
     include: {
       organization: { select: { code: true, name: true } },
       category: { select: { name: true, slug: true } },
-      rates: { where: PUBLIC_RATE_FILTER, orderBy: { price: "asc" } },
+      rates: { where: publicRateFilter(), orderBy: { price: "asc" } },
       addons: { where: { deletedAt: null, isActive: true }, orderBy: { name: "asc" } },
       requirements: { where: { deletedAt: null }, orderBy: { sortOrder: "asc" } },
       facilities: { where: { deletedAt: null }, orderBy: { name: "asc" } },

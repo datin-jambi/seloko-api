@@ -7,6 +7,33 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-21 — Persetujuan Tarif Terpisah Lapak (LJ-1.3)
+
+**Ditambah** — prefix `/api/lapak/rates` (8 endpoint)
+- `GET /` (filter `productId`, `status`, paginasi), `GET /:id` — lingkup OPD otomatis.
+- `POST /product/:productId` — tarif baru tanpa mengubah status produk.
+- `PUT /:id` — hanya untuk tarif belum disetujui (`409` bila APPROVED/PUBLISHED).
+- `POST /:id/revise` — membuat baris baru `PENDING_REVIEW`; baris lama tetap aktif.
+- `PATCH /:id/status/:action` — `submit` | `approve` | `reject` (`reject` wajib `note`).
+- `PATCH /:id/deactivate` (`409` bila tarif aktif terakhir), `DELETE /:id` (soft-delete).
+
+**Berubah — PERILAKU KONTRAK**
+- **Tarif publik kini STRICT:** `GET /lapak/products/public` dan `/public/:slug` hanya
+  menyajikan tarif `APPROVED`/`PUBLISHED`. Sebelumnya `DRAFT` ikut tampil. Produk terbit
+  tanpa tarif terapprove menyajikan `rates: []` dan `startingPrice: 0`.
+- **Filter waktu dinamis:** batas `effectiveFrom` dievaluasi per-request. Sebelumnya berupa
+  konstanta modul yang membeku saat server start sehingga tarif baru tak pernah muncul
+  sampai restart.
+
+**Keputusan kontrak**
+- Tarif adalah entitas ber-status sendiri: revisi harga tidak menurunkan status produk.
+- `admin-opd` memegang `product:approve` untuk OPD-nya sendiri; batasnya adalah **lingkup OPD**,
+  bukan kepemilikan izin.
+- Selama revisi berjalan, publik tetap melihat harga lama; baris lama dinonaktifkan otomatis
+  saat revisi **disetujui**, sehingga tidak ada jeda produk tanpa harga.
+
+---
+
 ## 2026-10-20 — Modul Produk Katalog Lapak (LJ-1.2)
 
 **Ditambah** — prefix `/api/lapak/products` (8 endpoint)

@@ -234,7 +234,10 @@ export async function reviseRate(id: string, body: UpdateRateBody, scope: string
     select: { status: true },
   });
 
-  // Baris lama dinonaktifkan (riwayat tetap), baris baru mewarisi nilainya.
+  // Baris lama TETAP aktif selama revisi berjalan: publik harus terus
+  // melihat harga lama sampai revisi disetujui (PRD 04 §C — produk tidak
+  // boleh kehilangan tarif hanya karena sedang direvisi). Penonaktifan
+  // dilakukan di patchRateStatus saat transisi approve/reject selesai.
   const data = {
     name: body.name ?? existing.name,
     unit: body.unit ?? existing.unit,
@@ -246,21 +249,15 @@ export async function reviseRate(id: string, body: UpdateRateBody, scope: string
     isActive: body.isActive ?? existing.isActive,
   };
 
-  const [, created] = await prisma.$transaction([
-    prisma.lapakProductRate.update({
-      where: { id },
-      data: { isActive: false },
-    }),
-    prisma.lapakProductRate.create({
-      data: {
-        productId: existing.productId,
-        ...data,
-        status: initialRateStatus(product.status),
-        effectiveFrom: body.effectiveFrom ? new Date(body.effectiveFrom) : new Date(),
-      },
-      include: RATE_INCLUDE,
-    }),
-  ]);
+  const created = await prisma.lapakProductRate.create({
+    data: {
+      productId: existing.productId,
+      ...data,
+      status: initialRateStatus(product.status),
+      effectiveFrom: body.effectiveFrom ? new Date(body.effectiveFrom) : new Date(),
+    },
+    include: RATE_INCLUDE,
+  });
   return toDto(created);
 }
 
@@ -293,6 +290,33 @@ export async function patchRateStatus(
     throw new BadRequestError("Alasan penolakan (note) wajib diisi");
   }
 
+  // Saat revisi (baris turunan) DISSETUJUI: baris asal yang dinonaktifkan
+  // supaya publik beralih dari harga lama ke harga baru tanpa jeda. Baris
+  // asal ditelusuri lewat productId yang sama dengan harga/nilai sebelum
+  // revisi — ditandai lewat kolom isActive dan status APPROVED/PUBLISHED.
+  // Penonaktifan hanya untuk baris revisi yang punya asal (bukan tarif biasa).
+  if (action === "approve" && existing.status === "PENDING_REVIEW") {
+    const originRate = await prisma.lapakProductRate.findFirst({
+      where: {
+        productId: existing.productId,
+        deletedAt: null,
+        isActive: true,
+        status: { in: ["APPROVED", "PUBLISHED"] as ContentStatus[] },
+        id: { not: existing.id },
+        // Asal revisi: tarif lain pada produk yang sama dengan nilai yang
+        // sama pada seluruh field warisan revise (menandai pasangan revisi).
+        name: existing.name,
+        unit: existing.unit,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    if (originRate) {
+      await prisma.lapakProductRate.update({
+        where: { id: originRate.id },
+        data: { isActive: false },
+      });
+    }
+  }
   const row = await prisma.lapakProductRate.update({
     where: { id: existing.id },
     data: { status: rule.to },

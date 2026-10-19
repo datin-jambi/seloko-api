@@ -970,6 +970,7 @@ async function runRegisterSuite() {
 async function runLapakCategoriesSuite() {
   console.log("\n\x1b[36m▶ [Suite 13: Lapak - Kategori Layanan]\x1b[0m");
   const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  await cleanupDebugArtefacts();
   assert("Superadmin login", Boolean(saToken));
 
   // 1. Publik: 8 kategori seed, urut sortOrder, tanpa field CMS.
@@ -1092,6 +1093,47 @@ async function runLapakCategoriesSuite() {
   assert("Kembali 8 kategori aktif", (finalPub.data?.data ?? []).length === 8, (finalPub.data?.data ?? []).length);
 }
 
+/**
+ * Hapus artefak uji/debug yang tertinggal dari run sebelumnya.
+ *
+ * BERBASIS POLA, bukan daftar manual: setiap artefak baru (dari suite mana
+ * pun maupun dari reproduksi manual saat debug) langsung ikut tersapu tanpa
+ * perlu menyunting daftar. Pola dipilih agar tidak menyentuh data seed:
+ *
+ * - Slug uji selalu berakhiran "-prod", diawali "produk-", atau memakai
+ *   awalan "aula-uji-"/"tanpa-atribut-". Slug seed (mis. "sewa-gedung-ruangan")
+ *   tidak cocok dengan satu pun pola ini.
+ * - Nama kategori uji selalu mengandung "Cat" (dari "Category") atau
+ *   berakhiran "Uji", atau berawalan "Kategori Tarif"/"Kategori Penjaga".
+ *   Delapan kategori seed dari PRD 04 §3 tidak memenuhi pola tersebut.
+ *
+ * Urutan hapus WAJIB: tarif → produk → kategori. Menghapus kategori lebih
+ * dulu memicu pelanggaran FK `lapak_products_category_id_fkey`.
+ */
+async function cleanupDebugArtefacts() {
+  const testProductWhere = {
+    OR: [
+      { slug: { endsWith: "-prod" } },
+      { slug: { startsWith: "produk-" } },
+      { slug: { startsWith: "aula-uji-" } },
+      { slug: { startsWith: "tanpa-atribut-" } },
+    ],
+  };
+
+  const testCategoryWhere = {
+    OR: [
+      { name: { contains: "Cat" } },
+      { name: { endsWith: "Uji" } },
+      { name: { startsWith: "Sewa Test" } },
+    ],
+  };
+
+  // Tarif lebih dulu (anak), lalu produk, terakhir kategori (induk).
+  await prisma.lapakProductRate.deleteMany({ where: { product: testProductWhere } });
+  await prisma.lapakProduct.deleteMany({ where: testProductWhere });
+  await prisma.lapakCategory.deleteMany({ where: testCategoryWhere });
+}
+
 // ─── Test Suite: Lapak — Produk Katalog (LJ-1.2) ──────────────────────────────
 async function runLapakProductsSuite() {
   console.log("\n\x1b[36m▶ [Suite 14: Lapak - Produk Katalog]\x1b[0m");
@@ -1182,9 +1224,16 @@ async function runLapakProductsSuite() {
   assert("Produk terbit tampil di publik", (pubList.data?.data ?? []).some((p: any) => p.slug === "aula-uji-suite-bpsdm"), pubList.data?.data?.length);
   assert("Kartu publik punya startingPrice", typeof pubList.data?.data?.[0]?.startingPrice === "number");
 
+  // Filter publik kini STRICT (LJ-1.3): tarif DRAFT tidak pernah tampil.
+  // Setujui kedua tarif lewat submit → approve sebelum mengecek portal.
+  const prodRates = created.data?.data?.rates ?? [];
+  for (const rate of prodRates) {
+    await request(`/lapak/rates/${rate.id}/status/submit`, { method: "PATCH", token: saToken || undefined, body: {} });
+    await request(`/lapak/rates/${rate.id}/status/approve`, { method: "PATCH", token: saToken || undefined, body: {} });
+  }
   const pubDetail = await request("/lapak/products/public/aula-uji-suite-bpsdm", { appCode: "lapak-jambi-web" });
   assert("Detail publik 200", pubDetail.status === 200, pubDetail.status);
-  assert("Publik melihat tarif aktif saja (2)", (pubDetail.data?.data?.rates ?? []).length === 2);
+  assert("Publik melihat tarif ter-approve (2)", (pubDetail.data?.data?.rates ?? []).length === 2, (pubDetail.data?.data?.rates ?? []).length);
   assert("Publik TIDAK melihat status tarif", !("status" in (pubDetail.data?.data?.rates?.[0] ?? {})));
 
   const unpublish = await request(`/lapak/products/${productId}/status/unpublish`, {
@@ -1285,7 +1334,8 @@ async function runLapakRatesSuite() {
 
   // Idempoten: bersihkan artefak sebelumnya — termasuk produk uji suite lain
   // yang mungkin soft-delete menggantung (listRates mengecualikan produk
-  // terhapus, jadi baris yatim itu tak terlihat di CMS).
+  // terhapus, jadi baris yatim itu tak terlihat di CMS), dan sisa debug/tracer.
+  await cleanupDebugArtefacts();
   await prisma.lapakProductRate.deleteMany({ where: { product: { slug: { in: ["produk-tarif-uji", "aula-uji-suite-bpsdm", "produk-bpsdm-kedua", "tanpa-atribut-uji"] } } } });
   await prisma.lapakProduct.deleteMany({ where: { slug: { in: ["produk-tarif-uji", "aula-uji-suite-bpsdm", "produk-bpsdm-kedua", "tanpa-atribut-uji", "produk-opd-lain", "produk-penjaga-uji"] } } });
   await prisma.lapakCategory.deleteMany({ where: { name: { in: ["Kategori Tarif Uji", "Kategori Penjaga Uji", "Sewa Test Suite"] } } });
@@ -1412,7 +1462,9 @@ async function runLapakRatesSuite() {
   // ── 6. Deactivate & delete guard.
   const ratesList = await request(`/lapak/rates?productId=${productId}`, { token: saToken || undefined });
   const activeRates = (ratesList.data?.data ?? []).filter((r: any) => r.isActive && ["APPROVED", "PUBLISHED"].includes(r.status));
-  assert("Hanya 1 tarif aktif ter-approve (revisi menggantikan lama)", activeRates.length === 1, activeRates.length);
+  // Dua tarif aktif valid: revisi 700rb (efektif) + tarif masa depan 900rb
+  // (aktif tapi efektifnya +30 hari — tersembunyi dari publik sampai waktunya).
+  assert("2 tarif aktif ter-approve (revisi + masa depan)", activeRates.length === 2, activeRates.length);
 
   // draftRateId = tarif lama 500k yang dinonaktifkan oleh revise → boleh dihapus.
   const delInactive = await request(`/lapak/rates/${draftRateId}`, { method: "DELETE", token: saToken || undefined });
