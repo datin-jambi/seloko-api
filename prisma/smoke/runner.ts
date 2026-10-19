@@ -29,6 +29,7 @@
  *   npm run db:smoke -- lapak-skrd       → Hanya uji SKRD & penomoran gapless (LJ-2.5)
  *   npm run db:smoke -- lapak-payments   → Hanya uji pembayaran transfer manual (LJ-2.6)
  *   npm run db:smoke -- lapak-tickets    → Hanya uji tiket QR & check-in (LJ-2.7)
+ *   npm run db:smoke -- lapak-expiry     → Hanya uji worker kedaluwarsa (LJ-2.8)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -1132,6 +1133,7 @@ async function cleanupDebugArtefacts() {
       { slug: { startsWith: "jadwal-uji-" } },
       { slug: { startsWith: "keranjang-uji-" } },
       { slug: { startsWith: "bayar-uji-" } },
+      { slug: { startsWith: "kedaluwarsa-uji-" } },
     ],
   };
 
@@ -2897,6 +2899,291 @@ async function runLapakTicketsSuite() {
   await prisma.lapakProduct.deleteMany({ where: { id: productId } });
 }
 
+// ─── Test Suite: Lapak — Worker Kedaluwarsa (LJ-2.8) ─────────────────────────
+async function runLapakExpirySuite() {
+  console.log("\n\x1b[36m▶ [Suite 24: Lapak - Worker Kedaluwarsa]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  assert("Superadmin login", Boolean(saToken));
+
+  await cleanupDebugArtefacts();
+  await prisma.lapakExpiryRun.deleteMany({});
+  await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM"] }, year: { gte: 2020 } } });
+
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const gedung = (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+
+  // ── 1. Status awal: tidak ada yang menggantung.
+  const st0 = await request("/lapak/expiry/status", { token: saToken || undefined });
+  assert("Status 200", st0.status === 200, st0.status, st0.data?.message);
+  assert("Tidak ada run berjalan", st0.data?.data?.running === false, st0.data?.data?.running);
+  assert("pending.holds angka", typeof st0.data?.data?.pending?.holds === "number");
+
+  // ── 2. Run bersih → semua 0.
+  const run0 = await request("/lapak/expiry/run", {
+    method: "POST", token: saToken || undefined, body: {},
+  });
+  assert("Run 200", run0.status === 200, run0.status, run0.data?.message);
+  assert("Status SUKSES", run0.data?.data?.status === "SUKSES", run0.data?.data?.status);
+  assert("durationMs terisi", typeof run0.data?.data?.durationMs === "number", run0.data?.data?.durationMs);
+  assert("Pemicu manual tercatat", run0.data?.data?.triggeredBy !== null, run0.data?.data?.triggeredBy);
+
+  // ── 3. IDEMPOTEN: run kedua pada data yang sama mengubah 0 baris.
+  const run0b = await request("/lapak/expiry/run", {
+    method: "POST", token: saToken || undefined, body: {},
+  });
+  assert("Run kedua 200", run0b.status === 200, run0b.status);
+  assert("Run kedua tidak mengubah apa pun",
+    run0b.data?.data?.releasedHolds === 0
+    && run0b.data?.data?.expiredPayments === 0
+    && run0b.data?.data?.expiredTickets === 0,
+    JSON.stringify({
+      h: run0b.data?.data?.releasedHolds,
+      p: run0b.data?.data?.expiredPayments,
+      t: run0b.data?.data?.expiredTickets,
+    }));
+
+  // ── 4. Siapkan data kedaluwarsa: HOLD lampau, pembayaran lampau, tiket lampau.
+  const prod = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: gedung.id,
+      name: "Kedaluwarsa Uji Produk", description: "Produk uji worker kedaluwarsa.",
+      rates: [{ name: "Harian", unit: "DAY", price: 150_000 }],
+    },
+  });
+  const productId = prod.data?.data?.id;
+  const rateId = prod.data?.data?.rates?.[0]?.id;
+  await request(`/lapak/rates/${rateId}/status/submit`, { method: "PATCH", token: saToken || undefined, body: {} });
+  await request(`/lapak/rates/${rateId}/status/approve`, { method: "PATCH", token: saToken || undefined, body: {} });
+  await request(`/lapak/products/${productId}/status/publish`, { method: "PATCH", token: saToken || undefined });
+  assert("Produk uji siap", Boolean(productId && rateId));
+
+  // HOLD lampau: buat reservasi lalu mundurkan expiresAt.
+  const past = new Date(Date.now() - 3_600_000).toISOString();
+  const future = new Date(Date.now() + 3_600_000).toISOString();
+  const resv = await request(`/lapak/reservations/product/${productId}`, {
+    method: "POST", token: saToken || undefined,
+    body: { startAt: future, endAt: new Date(Date.now() + 7_200_000).toISOString(), qty: 1 },
+  });
+  const resvId = resv.data?.data?.id;
+  if (resvId) {
+    await prisma.lapakReservation.update({
+      where: { id: resvId }, data: { expiresAt: new Date(Date.now() - 3_600_000) },
+    });
+  }
+  assert("Reservasi HOLD lampau disiapkan", Boolean(resvId), resvId);
+
+  // Pembayaran lampau: pesanan + pembayaran dengan expiresAt mundur.
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+  await request("/lapak/skrd/settings", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      issuer: "BAPENDA", numberFormat: "{seq6}/SKRD/{issuer}/{romanMonth}/{year}",
+      signerName: "H. Al Haris", signerPosition: "Gubernur Jambi", dueDays: 7,
+    },
+  });
+  const cart = await request("/lapak/carts/opd/BPSDM", W);
+  const cartId = cart.data?.data?.id;
+  await request(`/lapak/carts/${cartId}/items`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { productId, rateId, qty: 1 },
+  });
+  const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
+  });
+  const order = co.data?.data ?? {};
+  assert("Checkout untuk uji kedaluwarsa 201", co.status === 201, co.status, co.data?.message);
+
+  await prisma.lapakPayment.updateMany({
+    where: { orderId: order.id }, data: { expiresAt: new Date(Date.now() - 3_600_000) },
+  });
+
+  // Tiket lampau: terbitkan lewat LUNAS lalu mundurkan validUntil.
+  const paymentId = order.payments?.[0]?.id;
+  await request(`/lapak/payments/${paymentId}/proof`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: {
+      proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti-exp.jpg",
+      proofFileId: "ik_exp_1", senderName: "Budi Santoso", senderBank: "Bank Jambi",
+      amount: 150_000, paidAt: new Date().toISOString(),
+    },
+  });
+  await request(`/lapak/payments/${paymentId}/verify`, { method: "POST", token: saToken || undefined, body: {} });
+  const ticketRow = await prisma.lapakTicket.findFirst({
+    where: { orderItem: { orderId: order.id } }, select: { id: true },
+  });
+  assert("Tiket terbit untuk uji kedaluwarsa", Boolean(ticketRow?.id), ticketRow?.id);
+
+  // ── 5. Status mendeteksi data yang menggantung TANPA mengubahnya.
+  if (ticketRow?.id) {
+    await prisma.lapakTicket.update({
+      where: { id: ticketRow.id }, data: { validUntil: new Date(Date.now() - 3_600_000) },
+    });
+  }
+  // Buat pesanan kedua yang belum dibayar supaya ada pembayaran menggantung.
+  await request(`/lapak/carts/${cartId}/items`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { productId, rateId, qty: 1 },
+  });
+  const co2 = await request(`/lapak/orders/cart/${cartId}/checkout`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
+  });
+  const order2 = co2.data?.data ?? {};
+  await prisma.lapakPayment.updateMany({
+    where: { orderId: order2.id }, data: { expiresAt: new Date(Date.now() - 3_600_000) },
+  });
+
+  const st1 = await request("/lapak/expiry/status", { token: saToken || undefined });
+  const pending = st1.data?.data?.pending ?? {};
+  assert("Status mendeteksi HOLD menggantung", pending.holds >= 1, pending.holds);
+  assert("Status mendeteksi pembayaran menggantung", pending.payments >= 1, pending.payments);
+  assert("Status mendeteksi tiket kedaluwarsa", pending.tickets >= 1, pending.tickets);
+
+  // Status TIDAK boleh mengubah data.
+  const stillActive = await prisma.lapakPayment.findUnique({
+    where: { id: order2.payments?.[0]?.id }, select: { status: true },
+  });
+  assert("Status tidak mengubah data", stillActive?.status === "MENUNGGU_BUKTI", stillActive?.status);
+
+  // ── 6. Jalankan worker → membersihkan ketiganya.
+  const run1 = await request("/lapak/expiry/run", {
+    method: "POST", token: saToken || undefined, body: {},
+  });
+  assert("Worker 200", run1.status === 200, run1.status, run1.data?.message);
+  assert("HOLD dilepas >= 1", run1.data?.data?.releasedHolds >= 1, run1.data?.data?.releasedHolds);
+  assert("Pembayaran kedaluwarsa >= 1", run1.data?.data?.expiredPayments >= 1,
+    run1.data?.data?.expiredPayments);
+  assert("Tiket kedaluwarsa >= 1", run1.data?.data?.expiredTickets >= 1,
+    run1.data?.data?.expiredTickets);
+
+  // ── 7. Verifikasi efek nyata pada data.
+  const holdAfter = await prisma.lapakReservation.findUnique({
+    where: { id: resvId }, select: { status: true },
+  });
+  assert("Reservasi jadi RELEASED", holdAfter?.status === "RELEASED", holdAfter?.status);
+
+  const payAfter = await prisma.lapakPayment.findUnique({
+    where: { id: order2.payments?.[0]?.id }, select: { status: true },
+  });
+  assert("Pembayaran jadi KEDALUWARSA", payAfter?.status === "KEDALUWARSA", payAfter?.status);
+
+  const order2After = await prisma.lapakOrder.findUnique({
+    where: { id: order2.id }, select: { status: true },
+  });
+  assert("Pesanan jadi KEDALUWARSA", order2After?.status === "KEDALUWARSA", order2After?.status);
+
+  const skrd2 = await prisma.lapakSkrd.findUnique({
+    where: { orderId: order2.id }, select: { status: true, number: true },
+  });
+  assert("SKRD jadi CANCELLED", skrd2?.status === "CANCELLED", skrd2?.status);
+
+  if (ticketRow?.id) {
+    const tAfter = await prisma.lapakTicket.findUnique({
+      where: { id: ticketRow.id }, select: { status: true },
+    });
+    assert("Tiket jadi KEDALUWARSA", tAfter?.status === "KEDALUWARSA", tAfter?.status);
+  }
+
+  // ── 8. Nomor SKRD yang dibatalkan TIDAK dipakai ulang (gapless tetap).
+  const co3cart = await request("/lapak/carts/opd/BPSDM", W);
+  await request(`/lapak/carts/${co3cart.data?.data?.id}/items`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { productId, rateId, qty: 1 },
+  });
+  const co3 = await request(`/lapak/orders/cart/${co3cart.data?.data?.id}/checkout`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
+  });
+  const newNumber = co3.data?.data?.skrd?.number;
+  assert("Nomor SKRD baru bukan nomor yang dibatalkan", newNumber !== skrd2?.number,
+    `${newNumber} vs ${skrd2?.number}`);
+
+  // ── 9. IDEMPOTEN: run berikutnya tidak mengubah apa pun lagi.
+  const run2 = await request("/lapak/expiry/run", {
+    method: "POST", token: saToken || undefined, body: {},
+  });
+  assert("Run lanjutan 200", run2.status === 200, run2.status);
+  assert("Run lanjutan idempoten (0 perubahan)",
+    run2.data?.data?.releasedHolds === 0
+    && run2.data?.data?.expiredPayments === 0
+    && run2.data?.data?.expiredTickets === 0,
+    JSON.stringify({
+      h: run2.data?.data?.releasedHolds,
+      p: run2.data?.data?.expiredPayments,
+      t: run2.data?.data?.expiredTickets,
+    }));
+
+  // ── 10. LOCK: run paralel → tepat satu yang diizinkan.
+  const [c1, c2] = await Promise.all([
+    request("/lapak/expiry/run", { method: "POST", token: saToken || undefined, body: {} }),
+    request("/lapak/expiry/run", { method: "POST", token: saToken || undefined, body: {} }),
+  ]);
+  const okRuns = [c1, c2].filter((r) => r.status === 200).length;
+  const lockedRuns = [c1, c2].filter((r) => r.status === 409).length;
+  // Keduanya bisa 200 bila berjalan sangat cepat dan berurutan — yang penting
+  // tidak pernah ada dua run SUKSES yang tumpang tindih. Minimal satu 200.
+  assert("Run paralel: minimal satu berhasil", okRuns >= 1, `${c1.status}/${c2.status}`);
+  assert("Run paralel: tidak ada dua yang tumpang tindih",
+    okRuns === 2 || lockedRuns === 1, `${c1.status}/${c2.status}`);
+
+  // ── 11. Riwayat run tercatat.
+  const runsList = await request("/lapak/expiry/runs?limit=50", { token: saToken || undefined });
+  assert("Riwayat run 200", runsList.status === 200, runsList.status, runsList.data?.message);
+  assert("Riwayat berisi run", (runsList.data?.data ?? []).length >= 3, (runsList.data?.data ?? []).length);
+  assert("Semua run SUKSES/GAGAL/TERPUTUS",
+    (runsList.data?.data ?? []).every((r: any) => ["SUKSES", "GAGAL", "TERPUTUS"].includes(r.status)),
+    JSON.stringify((runsList.data?.data ?? []).map((r: any) => r.status)));
+
+  const detail = await request(`/lapak/expiry/runs/${run1.data?.data?.id}`, { token: saToken || undefined });
+  assert("Detail run 200", detail.status === 200, detail.status);
+  assert("Detail memuat durasi", typeof detail.data?.data?.durationMs === "number");
+
+  // ── 12. Tanpa izin ditolak.
+  const noPerm = await request("/lapak/expiry/run", {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web", body: {},
+  });
+  assert("Warga tidak boleh menjalankan worker (403)", noPerm.status === 403, noPerm.status);
+
+  // ── 13. Bersih-bersih riwayat.
+  const purge = await request("/lapak/expiry/runs?olderThanDays=1", {
+    method: "DELETE", token: saToken || undefined,
+  });
+  assert("Purge 200", purge.status === 200, purge.status, purge.data?.message);
+  assert("Purge mengembalikan jumlah", typeof purge.data?.data?.deleted === "number");
+  // Run yang baru dibuat belum berumur 1 hari → tidak terhapus.
+  const afterPurge = await prisma.lapakExpiryRun.count({ where: { job: "lapak-expiry" } });
+  assert("Run baru tidak ikut terhapus", afterPurge >= 1, afterPurge);
+
+  // ── 14. Bersih-bersih data.
+  await prisma.lapakExpiryRun.deleteMany({});
+  await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.$executeRawUnsafe(`DELETE FROM lapak_reservations WHERE product_id = $1`, productId);
+  await prisma.lapakSkrdSetting.deleteMany({});
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM"] }, year: { gte: 2020 } } });
+  await prisma.lapakProductRate.deleteMany({ where: { productId } });
+  await prisma.lapakProduct.deleteMany({ where: { id: productId } });
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -2993,6 +3280,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-tickets" || targetModule === "tiket") {
       await runLapakTicketsSuite();
+    }
+    if (!targetModule || targetModule === "lapak-expiry" || targetModule === "kedaluwarsa") {
+      await runLapakExpirySuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

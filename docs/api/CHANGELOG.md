@@ -7,6 +7,37 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-23 — Worker Kedaluwarsa (LJ-2.8) — **Fase 2 SELESAI**
+
+**Ditambah** — prefix `/api/lapak/expiry` (5 endpoint) + proses terjadwal
+`src/workers/lapak-expiry.worker.ts`
+- `GET /status` — ringkasan kedaluwarsa **tanpa mengubah data**.
+- `POST /run` — jalankan worker; `force` untuk menghentikan run menggantung.
+- `GET /runs`, `GET /runs/:id`, `DELETE /runs` (housekeeping).
+- DB: `lapak_expiry_runs` + enum `ExpiryJobStatus`, migrasi
+  `20261023090000_add_lapak_expiry_runs`, drift 0.
+
+**Keputusan kontrak**
+- **Hanya satu run berjalan**, ditegakkan **di database** lewat unique index parsial
+  `uq_lapak_expiry_runs_running` (`WHERE status = 'RUNNING'`). Pengecekan di kode saja
+  tidak cukup — dua proses/instance bisa lolos pengecekan bersamaan. Run kedua → `409`.
+- **Setiap run tercatat** (`lapak_expiry_runs`): jumlah baris yang benar-benar diubah per
+  jenis, pemicu, error, mulai/selesai, durasi. Worker mengubah status pesanan/SKRD/slot —
+  perubahan yang tidak tercatat tidak bisa ditelusuri.
+- **Idempoten lintas-run:** ketiga fungsi pembersih memakai `WHERE` berbasis waktu/status;
+  run kedua mengubah 0 baris (diuji).
+- **Run menggantung** (`RUNNING` > 10 menit) ditandai `TERPUTUS` otomatis di awal run
+  baru, atau manual via `force: true`.
+- **`/status` tidak mengubah apa pun** — `pending` hanya menghitung baris yang sudah lewat
+  batas, sehingga operator tahu apakah perlu menjalankan worker.
+- **Nomor SKRD tetap gapless:** pesanan kedaluwarsa → SKRD `CANCELLED`, nomor **tidak**
+  dipakai ulang (diuji end-to-end).
+- **Proses terpisah**, bukan `setInterval` di server: bila API di-scale, tiap instance akan
+  menjalankan worker sendiri. SIGTERM/SIGINT menunggu run aktif selesai; log hanya dicetak
+  bila ada yang berubah.
+
+---
+
 ## 2026-10-22 — Tiket QR & Check-in (LJ-2.7)
 
 **Ditambah** — prefix `/api/lapak/tickets` (5 endpoint)

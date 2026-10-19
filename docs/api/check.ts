@@ -47,6 +47,7 @@ const APP_MODULES: Record<string, Record<string, string>> = {
     skrd: "src/modules/lapak/skrd/skrd.routes.ts",
     payments: "src/modules/lapak/payments/payments.routes.ts",
     tickets: "src/modules/lapak/tickets/tickets.routes.ts",
+    expiry: "src/modules/lapak/expiry/expiry.routes.ts",
   },
 };
 

@@ -1318,6 +1318,45 @@ model LapakTicket {
   @@map("lapak_tickets")
 }
 
+enum ExpiryJobStatus {
+  /// Sedang berjalan — bisa menggantung bila proses mati di tengah.
+  RUNNING
+  SUKSES
+  GAGAL
+  /// Run yang menggantung terlalu lama ditandai agar tidak menghalangi run baru.
+  TERPUTUS
+}
+
+/// Catatan setiap kali worker kedaluwarsa dijalankan (LJ-2.8).
+///
+/// WAJIB ADA untuk akuntabilitas: worker ini mengubah status pesanan, SKRD, dan
+/// memutuskan slot jadi tidak tersedia — kesalahan yang tidak tercatat tidak
+/// bisa ditelusuri.
+///
+/// `lockKey` dipakai untuk memastikan HANYA SATU worker berjalan pada satu
+/// waktu, bahkan bila dijalankan dari dua proses/instance berbeda.
+model LapakExpiryRun {
+  id          String          @id @default(uuid(7)) @db.VarChar(36)
+  job         String          @db.VarChar(60)
+  /// Kunci tunggal, mis. "lapak-expiry". Unique index parsial di DB menjaga
+  /// hanya satu baris ber-status RUNNING per job.
+  lockKey     String?         @map("lock_key") @db.VarChar(80)
+  status      ExpiryJobStatus @default(RUNNING)
+  /// Berapa baris yang benar-benar diubah, per jenis.
+  releasedHolds   Int         @default(0) @map("released_holds")
+  expiredPayments Int         @default(0) @map("expired_payments")
+  expiredTickets  Int         @default(0) @map("expired_tickets")
+  /// Dipicu oleh siapa: "scheduler" atau id user (manual).
+  triggeredBy String?         @map("triggered_by") @db.VarChar(36)
+  error       String?         @db.VarChar(500)
+  startedAt   DateTime        @default(now()) @map("started_at") @db.Timestamptz()
+  finishedAt  DateTime?       @map("finished_at") @db.Timestamptz()
+  durationMs  Int?            @map("duration_ms")
+
+  @@index([job, startedAt], map: "idx_lapak_expiry_runs_job_time")
+  @@map("lapak_expiry_runs")
+}
+
 /// Tarif per sesi/satuan. Punya status sendiri (PRD 04 §C): mengubah tarif
 /// produk TERBIT tidak menurunkan produk — buat baris baru ber-status
 /// DRAFT/PENDING_REVIEW, publik hanya melihat APPROVED/PUBLISHED aktif,

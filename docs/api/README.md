@@ -89,10 +89,11 @@ ikhtisar + satu berkas per modul.
 | SKRD & Penomoran Gapless | [lapak/skrd.md](./lapak/skrd.md) | 10 | publik (verify) + `order:*` |
 | Pembayaran Transfer Manual | [lapak/payments.md](./lapak/payments.md) | 6 | login + `payment:*` |
 | Tiket QR & Check-in | [lapak/tickets.md](./lapak/tickets.md) | 5 | publik (verify) + `ticket:*` |
+| Worker Kedaluwarsa | [lapak/expiry.md](./lapak/expiry.md) | 5 | `order:read` / `order:update` |
 
 **Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 167 endpoint.**
+**Total keseluruhan: 172 endpoint.**
 
 ---
 
