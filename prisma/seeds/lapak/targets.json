@@ -1,0 +1,29 @@
+{
+  "$comment": "Target penerimaan retribusi per OPD per tahun (model lapak_targets). Mengikuti model TargetOPD backend Bapenda sebelumnya, TANPA kolom `achieve` — realisasi selalu dihitung dari pesanan LUNAS agar tidak bisa menyimpang dari data transaksi. Angka target di sini ILUSTRASI berdasarkan proporsi aset yang dikelola (bukan pagu resmi APBD): produk penginapan/asrama BPSDM & Bapelkes menjadi porsi terbesar. Ganti dengan pagu resmi dari dokumen APBD sebelum produksi — dashboard memakai angka ini sebagai pembanding realisasi.",
+  "targets": [
+    {
+      "yearOffset": 0,
+      "organizationCode": "BPSDM",
+      "amount": 450000000,
+      "note": "Ilustrasi: asrama & mess BPSDM (3 produk penginapan + 1 ruang rapat)"
+    },
+    {
+      "yearOffset": 0,
+      "organizationCode": "BAPELKES",
+      "amount": 180000000,
+      "note": "Ilustrasi: asrama VIP & aula pelatihan Bapelkes"
+    },
+    {
+      "yearOffset": 0,
+      "organizationCode": "DINKES",
+      "amount": 120000000,
+      "note": "Ilustrasi: sewa ruangan Rumah Sakit Jiwa Daerah"
+    },
+    {
+      "yearOffset": 1,
+      "organizationCode": "BPSDM",
+      "amount": 495000000,
+      "note": "Ilustrasi tahun berikutnya (+10%) — agar dashboard punya pembanding antar tahun"
+    }
+  ]
+}

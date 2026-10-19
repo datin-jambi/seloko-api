@@ -1,0 +1,85 @@
+{
+  "$comment": "Jam operasional per produk Lapak (model lapak_operating_hours). weekday: 0=Minggu … 6=Sabtu, selaras Date.getDay(). Hari yang TIDAK didaftarkan berarti TUTUP (skema tidak punya kolom isOpen). Jam mengikuti jam kerja OPD pengelola: Senin–Jumat 08:00–16:00, Sabtu 08:00–12:00, Minggu tutup (tanpa baris). Produk penginapan (NIGHT) dijaga 24 jam karena resepsionis mess/asrama menerima tamu di luar jam kantor — check-in malam tetap bisa dilayani. Angka ini adalah nilai wajar untuk demo; jam sebenarnya per OPD perlu dikonfirmasi ke masing-masing pengelola sebelum produksi.",
+  "hours": [
+    {
+      "productSlug": "ruang-rapat-mess-pemda-jekan",
+      "schedule": {
+        "1": ["08:00", "16:00"],
+        "2": ["08:00", "16:00"],
+        "3": ["08:00", "16:00"],
+        "4": ["08:00", "16:00"],
+        "5": ["08:00", "16:00"],
+        "6": ["08:00", "12:00"]
+      }
+    },
+    {
+      "productSlug": "ruang-kelas-aula-balai-pelatihan-kesehatan",
+      "schedule": {
+        "1": ["07:30", "16:00"],
+        "2": ["07:30", "16:00"],
+        "3": ["07:30", "16:00"],
+        "4": ["07:30", "16:00"],
+        "5": ["07:30", "16:00"],
+        "6": ["07:30", "12:00"]
+      }
+    },
+    {
+      "productSlug": "sewa-ruangan-rumah-sakit-jiwa-daerah",
+      "schedule": {
+        "1": ["08:00", "15:00"],
+        "2": ["08:00", "15:00"],
+        "3": ["08:00", "15:00"],
+        "4": ["08:00", "15:00"],
+        "5": ["08:00", "15:00"]
+      }
+    },
+    {
+      "productSlug": "kamar-asrama-standar-mess-pemda-jekan",
+      "schedule": {
+        "0": ["00:00", "23:59"],
+        "1": ["00:00", "23:59"],
+        "2": ["00:00", "23:59"],
+        "3": ["00:00", "23:59"],
+        "4": ["00:00", "23:59"],
+        "5": ["00:00", "23:59"],
+        "6": ["00:00", "23:59"]
+      }
+    },
+    {
+      "productSlug": "kamar-asrama-vip-mess-pemda-jekan",
+      "schedule": {
+        "0": ["00:00", "23:59"],
+        "1": ["00:00", "23:59"],
+        "2": ["00:00", "23:59"],
+        "3": ["00:00", "23:59"],
+        "4": ["00:00", "23:59"],
+        "5": ["00:00", "23:59"],
+        "6": ["00:00", "23:59"]
+      }
+    },
+    {
+      "productSlug": "asrama-pelatihan-bpsdm-kamar-ac",
+      "schedule": {
+        "0": ["00:00", "23:59"],
+        "1": ["00:00", "23:59"],
+        "2": ["00:00", "23:59"],
+        "3": ["00:00", "23:59"],
+        "4": ["00:00", "23:59"],
+        "5": ["00:00", "23:59"],
+        "6": ["00:00", "23:59"]
+      }
+    },
+    {
+      "productSlug": "asrama-vip-balai-pelatihan-kesehatan",
+      "schedule": {
+        "0": ["00:00", "23:59"],
+        "1": ["00:00", "23:59"],
+        "2": ["00:00", "23:59"],
+        "3": ["00:00", "23:59"],
+        "4": ["00:00", "23:59"],
+        "5": ["00:00", "23:59"],
+        "6": ["00:00", "23:59"]
+      }
+    }
+  ]
+}

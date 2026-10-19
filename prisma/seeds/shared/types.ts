@@ -395,4 +395,46 @@ export interface PagesFile {
   pages: PageDef[];
 }
 
+// ─── lapak/operating-hours.json ───────────────────────────────────────────────
+/** `[buka, tutup]` dalam format "HH:MM"; hari tanpa entri = tutup. */
+export type LapakDaySchedule = [string, string];
 
+export interface LapakOperatingHoursDef {
+  productSlug: string;
+  /** Kunci = weekday 0(Minggu)…6(Sabtu), selaras Date.getDay(). */
+  schedule: Record<string, LapakDaySchedule>;
+}
+
+export interface LapakOperatingHoursFile {
+  hours: LapakOperatingHoursDef[];
+}
+
+// ─── lapak/blackouts.json ─────────────────────────────────────────────────────
+export interface LapakBlackoutDef {
+  productSlug: string;
+  /** 0 = tahun berjalan saat seed dijalankan. */
+  yearOffset: number;
+  /** "MM-DD" — tahun dihitung dari yearOffset. */
+  startDate: string;
+  endDate: string;
+  reason?: string | null;
+  /** Bila rentang melewati tahun (mis. 31 Des → 1 Jan). */
+  endYearOffset?: number;
+}
+
+export interface LapakBlackoutsFile {
+  blackouts: LapakBlackoutDef[];
+}
+
+// ─── lapak/targets.json ───────────────────────────────────────────────────────
+export interface LapakTargetDef {
+  yearOffset: number;
+  organizationCode: string;
+  /** Rupiah, bilangan bulat. */
+  amount: number;
+  note?: string | null;
+}
+
+export interface LapakTargetsFile {
+  targets: LapakTargetDef[];
+}

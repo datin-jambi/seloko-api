@@ -66,7 +66,9 @@ Dokumentasi kontrak API tinggal di repo, dikelompokkan **per aplikasi → per mo
 - `npm run typecheck` — Memverifikasi seluruh kode TypeScript + project `prisma/` (wajib 0 error).
 - `npm test` — Unit/checker suite (`docs.check`, `menus.check`, `org-scope.check`, dll).
 - `npm run build` — Kompilasi produksi (`tsc` + `tsc-alias`) — wajib lolos sebelum commit.
-- `npm run db:seed` — Menjalankan database seeder idempoten.
+- `npm run db:seed` — Menjalankan database seeder idempoten. Cakupan Lapak: kategori (8),
+  produk + tarif (7/18 dari Perda 5/2024), **jam operasional** (45 baris), **tanggal tutup**
+  (4), dan **target penerimaan per OPD per tahun** (4).
 - `npm run db:smoke` — Menjalankan unified smoke test suite (~0.8s, butuh server dev hidup).
 - `npm run db:smoke -- <modul>` — Menjalankan pengujian spesifik per modul.
 

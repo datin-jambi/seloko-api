@@ -1,0 +1,34 @@
+{
+  "$comment": "Tanggal tutup (model lapak_blackout_dates). Rentang INKLUSIF: startDate=endDate berarti tutup satu hari. Tanggal sengaja memakai tahun BERJALAN agar contoh tetap relevan saat demo — hitung relatif terhadap tahun saat seed dijalankan lewat kolom `yearOffset` (0 = tahun berjalan, 1 = tahun depan). Tujuannya mendemokan dua kasus: libur nasional (semua produk gedung/aula tutup) dan pemeliharaan terjadwal (satu produk saja).",
+  "blackouts": [
+    {
+      "productSlug": "ruang-rapat-mess-pemda-jekan",
+      "yearOffset": 0,
+      "startDate": "08-17",
+      "endDate": "08-17",
+      "reason": "Hari Kemerdekaan Republik Indonesia"
+    },
+    {
+      "productSlug": "ruang-kelas-aula-balai-pelatihan-kesehatan",
+      "yearOffset": 0,
+      "startDate": "08-17",
+      "endDate": "08-17",
+      "reason": "Hari Kemerdekaan Republik Indonesia"
+    },
+    {
+      "productSlug": "sewa-ruangan-rumah-sakit-jiwa-daerah",
+      "yearOffset": 0,
+      "startDate": "12-24",
+      "endDate": "12-26",
+      "reason": "Libur Natal dan pemeliharaan ruangan"
+    },
+    {
+      "productSlug": "ruang-rapat-mess-pemda-jekan",
+      "yearOffset": 0,
+      "startDate": "12-31",
+      "endDate": "01-01",
+      "reason": "Libur akhir tahun",
+      "endYearOffset": 1
+    }
+  ]
+}
