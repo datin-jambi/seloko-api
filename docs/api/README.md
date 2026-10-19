@@ -84,10 +84,11 @@ ikhtisar + satu berkas per modul.
 | Katalog Publik OPD | [lapak/catalog.md](./lapak/catalog.md) | 2 | publik |
 | Jam Operasional & Tanggal Tutup | [lapak/availability.md](./lapak/availability.md) | 6 | publik + `product:*` |
 | Reservasi Slot | [lapak/reservations.md](./lapak/reservations.md) | 4 | publik + `product:read` |
+| Keranjang per OPD | [lapak/carts.md](./lapak/carts.md) | 8 | login (warga) |
 
 **Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 133 endpoint.**
+**Total keseluruhan: 141 endpoint.**
 
 ---
 

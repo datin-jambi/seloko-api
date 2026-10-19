@@ -7,6 +7,29 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-21 — Keranjang per OPD (LJ-2.3)
+
+**Ditambah** — prefix `/api/lapak/carts` (8 endpoint, semua butuh login)
+- `GET /` (semua keranjang user), `GET /opd/:code` (ambil/buat per OPD),
+  `GET /:id`, `POST /:id/items`, `PUT /:id/items/:itemId`,
+  `DELETE /:id/items/:itemId`, `POST /:id/clear`, `DELETE /:id`.
+- DB: tabel `lapak_carts` + `lapak_cart_items`, migrasi
+  `20261021180000_add_lapak_carts`, drift 0.
+
+**Keputusan kontrak — SATU KERANJANG PER (user, OPD)**
+- Ditegakkan **dua lapis**: unique index `uq_lapak_carts_user_org` (jaminan DB) dan
+  pemeriksaan ramah di service yang membalas `409`.
+- Menambah produk dari OPD lain ke keranjang yang sudah ada **DITOLAK**, bukan digabung:
+  penggabungan akan membuat satu checkout berisi dua penerbit SKRD (mustahil diterbitkan,
+  PRD 04 §4.F).
+- **Harga TIDAK disimpan di keranjang.** `unitPrice`/`subtotal` hanya informasi dari tarif
+  aktif saat ini; angka final dibekukan sebagai snapshot saat quote/checkout (LJ-2.4).
+- Tidak ada endpoint yang menerima `userId` dari klien — keranjang selalu milik user yang
+  login. Keranjang milik orang lain dibalas `404` (bukan `403`) agar tidak terbocorkan.
+- Duplikat identik (produk + tarif + rentang waktu) menambah `qty`, bukan membuat baris baru.
+
+---
+
 ## 2026-10-21 — Reservasi Slot & Anti Double-Booking (LJ-2.2)
 
 **Ditambah** — prefix `/api/lapak/reservations` (4 endpoint)

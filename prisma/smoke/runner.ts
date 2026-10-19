@@ -24,6 +24,7 @@
  *   npm run db:smoke -- lapak-catalog   → Hanya uji katalog publik OPD (LJ-1.6)
  *   npm run db:smoke -- lapak-availability → Hanya uji jam operasional & tanggal tutup (LJ-2.1)
  *   npm run db:smoke -- lapak-reservations → Hanya uji reservasi & anti double-booking (LJ-2.2)
+ *   npm run db:smoke -- lapak-cart       → Hanya uji keranjang per OPD (LJ-2.3)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -1866,6 +1867,170 @@ async function runLapakReservationsSuite() {
   void adjId;
 }
 
+// ─── Test Suite: Lapak — Keranjang per OPD (LJ-2.3) ───────────────────────────
+async function runLapakCartSuite() {
+  console.log("\n\x1b[36m▶ [Suite 19: Lapak - Keranjang per OPD]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  assert("Superadmin login", Boolean(saToken));
+  assert("Warga login ke lapak", Boolean(wargaToken));
+
+  await cleanupDebugArtefacts();
+  // Bersihkan keranjang warga dari run sebelumnya.
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const gedung = (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+  const disbudpar = (orgs.data?.data ?? []).find((o: any) => o.code === "DISBUDPAR");
+
+  // Dua produk TERBIT di OPD BERBEDA — inti uji aturan §4.F.
+  const mkProduct = async (name: string, orgId: string, slug: string) => {
+    const r = await request("/lapak/products", {
+      method: "POST", token: saToken || undefined,
+      body: {
+        organizationId: orgId, categoryId: gedung.id,
+        name, description: `Produk uji keranjang ${name}.`,
+        rates: [{ name: "Harian", unit: "DAY", price: 200_000 }],
+      },
+    });
+    const id = r.data?.data?.id;
+    const rateId = r.data?.data?.rates?.[0]?.id;
+    // Tarif harus disetujui dulu: sejak LJ-1.3 tarif publik hanya APPROVED,
+    // dan keranjang menolak tarif yang belum disetujui.
+    await request(`/lapak/rates/${rateId}/status/submit`, { method: "PATCH", token: saToken || undefined, body: {} });
+    await request(`/lapak/rates/${rateId}/status/approve`, { method: "PATCH", token: saToken || undefined, body: {} });
+    await request(`/lapak/products/${id}/status/publish`, { method: "PATCH", token: saToken || undefined });
+    void slug;
+    return { id, rateId, name };
+  };
+
+  const prodA = await mkProduct("Keranjang Uji BPSDM", bpsdm.id, "keranjang-uji-bpsdm");
+  const prodB = await mkProduct("Keranjang Uji DISBUDPAR", disbudpar.id, "keranjang-uji-disbudpar");
+  assert("Dua produk terbit di OPD berbeda", Boolean(prodA.id && prodB.id));
+
+  // ── 1. Butuh login.
+  const anon = await request("/lapak/carts");
+  assert("Tanpa token ditolak 401", anon.status === 401, anon.status);
+
+  // ── 2. Ambil/buat keranjang per OPD.
+  const cartA = await request("/lapak/carts/opd/BPSDM", { token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  assert("Keranjang OPD BPSDM 200", cartA.status === 200, cartA.status, cartA.data?.message);
+  assert("Keranjang memuat organisasi", cartA.data?.data?.organization?.code === "BPSDM",
+    cartA.data?.data?.organization?.code);
+  assert("Keranjang baru kosong", (cartA.data?.data?.items ?? []).length === 0);
+  const cartAId = cartA.data?.data?.id;
+
+  // Idempoten: meminta lagi mengembalikan keranjang yang SAMA.
+  const cartA2 = await request("/lapak/carts/opd/BPSDM", { token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  assert("Keranjang OPD sama dipakai ulang", cartA2.data?.data?.id === cartAId, cartA2.data?.data?.id);
+
+  // ── 3. Tambah produk OPD yang sama → berhasil.
+  const addA = await request(`/lapak/carts/${cartAId}/items`, {
+    method: "POST", token: wargaToken || undefined,
+    appCode: "lapak-jambi-web",
+    body: { productId: prodA.id, rateId: prodA.rateId, qty: 2 },
+  });
+  assert("Tambah produk OPD sama 201", addA.status === 201, addA.status, addA.data?.message);
+  const itemsA = addA.data?.data?.items ?? [];
+  assert("Item masuk keranjang", itemsA.length === 1, itemsA.length);
+  assert("Harga satuan terbaca dari tarif", itemsA[0]?.unitPrice === 200_000, itemsA[0]?.unitPrice);
+  assert("lineTotal = harga × qty", itemsA[0]?.lineTotal === 400_000, itemsA[0]?.lineTotal);
+  assert("subtotal dihitung", addA.data?.data?.subtotal === 400_000, addA.data?.data?.subtotal);
+  assert("itemCount = total qty", addA.data?.data?.itemCount === 2, addA.data?.data?.itemCount);
+
+  // ── 4. INTI: produk OPD LAIN ditolak 409 (satu pesanan = satu OPD).
+  const addCross = await request(`/lapak/carts/${cartAId}/items`, {
+    method: "POST", token: wargaToken || undefined,
+    appCode: "lapak-jambi-web",
+    body: { productId: prodB.id, qty: 1 },
+  });
+  assert("Produk OPD lain ditolak 409", addCross.status === 409, addCross.status, addCross.data?.message);
+
+  // ── 5. Keranjang terpisah untuk OPD kedua → berhasil.
+  const cartB = await request("/lapak/carts/opd/DISBUDPAR", { token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  assert("Keranjang OPD kedua dibuat", cartB.status === 200, cartB.status);
+  assert("Keranjang OPD kedua berbeda", cartB.data?.data?.id !== cartAId);
+  const cartBId = cartB.data?.data?.id;
+
+  const addB = await request(`/lapak/carts/${cartBId}/items`, {
+    method: "POST", token: wargaToken || undefined,
+    appCode: "lapak-jambi-web",
+    body: { productId: prodB.id, qty: 1 },
+  });
+  assert("Produk OPD kedua masuk keranjangnya sendiri", addB.status === 201, addB.status, addB.data?.message);
+
+  // ── 6. Daftar keranjang: dua keranjang, satu per OPD.
+  const listCarts = await request("/lapak/carts", { token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  assert("Daftar keranjang 200", listCarts.status === 200, listCarts.status);
+  assert("Tepat 2 keranjang (satu per OPD)", (listCarts.data?.data ?? []).length === 2,
+    (listCarts.data?.data ?? []).length);
+
+  // ── 7. Duplikat item identik → qty bertambah, bukan baris baru.
+  const addDup = await request(`/lapak/carts/${cartAId}/items`, {
+    method: "POST", token: wargaToken || undefined,
+    appCode: "lapak-jambi-web",
+    body: { productId: prodA.id, rateId: prodA.rateId, qty: 1 },
+  });
+  assert("Item duplikat menambah qty", (addDup.data?.data?.items ?? []).length === 1,
+    (addDup.data?.data?.items ?? []).length);
+  assert("Qty jadi 3", addDup.data?.data?.items?.[0]?.qty === 3, addDup.data?.data?.items?.[0]?.qty);
+
+  // ── 8. Ubah qty & hapus item.
+  const itemId = addDup.data?.data?.items?.[0]?.id;
+  const upd = await request(`/lapak/carts/${cartAId}/items/${itemId}`, {
+    method: "PUT", token: wargaToken || undefined, appCode: "lapak-jambi-web", body: { qty: 5, note: "Tolong siapkan kursi" },
+  });
+  assert("Ubah qty 200", upd.status === 200, upd.status, upd.data?.message);
+  assert("Qty jadi 5", upd.data?.data?.items?.[0]?.qty === 5, upd.data?.data?.items?.[0]?.qty);
+  assert("Catatan tersimpan", upd.data?.data?.items?.[0]?.note === "Tolong siapkan kursi");
+
+  const del = await request(`/lapak/carts/${cartAId}/items/${itemId}`, {
+    method: "DELETE", token: wargaToken || undefined,
+  appCode: "lapak-jambi-web",
+  });
+  assert("Hapus item 200", del.status === 200, del.status);
+  assert("Keranjang kosong setelah hapus", (del.data?.data?.items ?? []).length === 0);
+
+  // ── 9. Produk belum terbit ditolak.
+  const draftProd = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: gedung.id,
+      name: "Keranjang Uji DRAFT", description: "Produk DRAFT untuk uji keranjang.",
+      rates: [{ name: "Harian", unit: "DAY", price: 100_000 }],
+    },
+  });
+  const draftId = draftProd.data?.data?.id;
+  const addDraft = await request(`/lapak/carts/${cartAId}/items`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web", body: { productId: draftId, qty: 1 },
+  });
+  assert("Produk DRAFT ditolak 400", addDraft.status === 400, addDraft.status, addDraft.data?.message);
+
+  // ── 10. Keranjang milik orang lain tidak bisa diakses (404, bukan 403).
+  const otherCart = await request(`/lapak/carts/${cartAId}`, { token: saToken || undefined });
+  assert("Keranjang orang lain 404", otherCart.status === 404, otherCart.status);
+
+  // ── 11. Kosongkan & hapus keranjang.
+  const cleared = await request(`/lapak/carts/${cartBId}/clear`, { method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  assert("Kosongkan keranjang 200", cleared.status === 200, cleared.status);
+  assert("Keranjang kosong", (cleared.data?.data?.items ?? []).length === 0);
+
+  const delCart = await request(`/lapak/carts/${cartBId}`, { method: "DELETE", token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  assert("Hapus keranjang 200", delCart.status === 200, delCart.status);
+  assert("Hapus mengembalikan deleted:true", delCart.data?.data?.deleted === true);
+
+  // ── 12. Bersih-bersih.
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  for (const pid of [prodA.id, prodB.id, draftId].filter(Boolean)) {
+    await prisma.lapakProductRate.deleteMany({ where: { productId: pid } });
+    await prisma.lapakProduct.deleteMany({ where: { id: pid } });
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -1947,6 +2112,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-reservations" || targetModule === "reservasi") {
       await runLapakReservationsSuite();
+    }
+    if (!targetModule || targetModule === "lapak-cart" || targetModule === "keranjang") {
+      await runLapakCartSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

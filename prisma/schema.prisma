@@ -65,6 +65,7 @@ model Application {
   faqs              Faq[]
   lapakCategories   LapakCategory[]
   lapakProducts     LapakProduct[]
+  lapakCarts        LapakCart[]
 
   @@map("applications")
 }
@@ -231,6 +232,7 @@ model User {
   faqsAuthored      Faq[]                @relation("FaqAuthor")
   faqsUpdated       Faq[]                @relation("FaqUpdatedBy")
   vehicleTaxChecks  VehicleTaxCheckLog[]
+  lapakCarts        LapakCart[]
 
   @@unique([accountType, email], map: "uq_users_account_email")
   @@index([deletedAt], map: "idx_users_deleted_at")
@@ -302,6 +304,7 @@ model Organization {
   children          Organization[]            @relation("OrganizationTree")
   userAppRoleScopes UserAppRoleOrganization[]
   lapakProducts     LapakProduct[]
+  lapakCarts        LapakCart[]
 
   @@index([parentId])
   @@index([type, isActive])
@@ -773,6 +776,7 @@ model LapakProduct {
   operatingHours LapakOperatingHour[]
   blackoutDates  LapakBlackoutDate[]
   reservations   LapakReservation[]
+  cartItems      LapakCartItem[]
 
   @@unique([applicationId, slug], map: "uq_lapak_products_app_slug")
   @@index([applicationId, status], map: "idx_lapak_products_app_status")
@@ -865,9 +869,73 @@ model LapakReservation {
 
   product LapakProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  cartItem LapakCartItem?
+
   @@index([productId, status], map: "idx_lapak_reservations_product_status")
   @@index([expiresAt], map: "idx_lapak_reservations_expires")
   @@map("lapak_reservations")
+}
+
+/// Keranjang belanja warga (LJ-2.3, PRD 04 §4.F).
+///
+/// SATU KERANJANG PER (user, OPD). Warga boleh punya beberapa keranjang —
+/// satu untuk tiap OPD — karena SKRD diterbitkan per penerbit sehingga
+/// checkout lintas OPD dipecah menjadi beberapa pesanan. Aturan "satu pesanan
+/// = satu OPD" ditegakkan di sini lewat unique index, bukan dicek manual:
+/// memasukkan produk OPD lain ke keranjang yang sudah ada akan ditolak DB.
+///
+/// Keranjang sengaja TIDAK menyimpan harga: harga diambil dari tarif aktif
+/// saat quote/checkout (LJ-2.4) dan dibekukan sebagai snapshot di pesanan.
+/// Menyimpan harga di keranjang berarti harga basi bisa ikut ter-checkout.
+model LapakCart {
+  id             String   @id @default(uuid(7)) @db.VarChar(36)
+  userId         String   @map("user_id") @db.VarChar(36)
+  organizationId String   @map("organization_id") @db.VarChar(36)
+  applicationId  String   @map("app_id") @db.VarChar(36)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization          @relation(fields: [organizationId], references: [id])
+  application  Application           @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  items        LapakCartItem[]
+
+  /// Kunci aturan §4.F: satu keranjang per user per OPD.
+  @@unique([userId, organizationId], map: "uq_lapak_carts_user_org")
+  @@index([userId], map: "idx_lapak_carts_user")
+  @@map("lapak_carts")
+}
+
+/// Satu baris barang di keranjang.
+///
+/// `reservationId` menautkan blok waktu yang sudah di-HOLD (LJ-2.2) ke baris
+/// keranjang. Bila keranjang ditinggalkan, HOLD kedaluwarsa sendiri lewat
+/// `expiresAt` — baris keranjang tidak perlu ikut dihapus.
+model LapakCartItem {
+  id            String   @id @default(uuid(7)) @db.VarChar(36)
+  cartId        String   @map("cart_id") @db.VarChar(36)
+  productId     String   @map("product_id") @db.VarChar(36)
+  /// Tarif yang dipilih; NULL = pakai tarif termurah saat quote.
+  rateId        String?  @map("rate_id") @db.VarChar(36)
+  /// Reservasi HOLD yang menahan slot untuk baris ini (opsional).
+  reservationId String?  @unique @map("reservation_id") @db.VarChar(36)
+  qty           Int      @default(1)
+  /// Rentang waktu yang dipilih (untuk produk bertipe SLOT/DATE_RANGE).
+  startAt       DateTime? @map("start_at") @db.Timestamptz()
+  endAt         DateTime? @map("end_at") @db.Timestamptz()
+  /// Catatan pemohon untuk baris ini.
+  note          String?  @db.VarChar(500)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  cart        LapakCart         @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product     LapakProduct      @relation(fields: [productId], references: [id])
+  rate        LapakProductRate? @relation(fields: [rateId], references: [id])
+  reservation LapakReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+
+  @@index([cartId], map: "idx_lapak_cart_items_cart")
+  @@index([productId], map: "idx_lapak_cart_items_product")
+  @@map("lapak_cart_items")
 }
 
 /// Tarif per sesi/satuan. Punya status sendiri (PRD 04 §C): mengubah tarif
@@ -894,7 +962,8 @@ model LapakProductRate {
   updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt     DateTime?     @map("deleted_at") @db.Timestamptz()
 
-  product LapakProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   LapakProduct     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems LapakCartItem[]
 
   @@index([productId, status], map: "idx_lapak_product_rates_product_status")
   @@map("lapak_product_rates")

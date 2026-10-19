@@ -23,8 +23,9 @@ penjualan hasil usaha (PRD 04). Data dikelola **per OPD**, disajikan ke publik *
 | Katalog Publik OPD | [catalog.md](./catalog.md) | 2 | `/api/lapak/organizations` |
 | Jam Operasional & Tanggal Tutup | [availability.md](./availability.md) | 6 | `/api/lapak/availability` |
 | Reservasi Slot | [reservations.md](./reservations.md) | 4 | `/api/lapak/reservations` |
+| Keranjang per OPD | [carts.md](./carts.md) | 8 | `/api/lapak/carts` |
 
-**Total: 37 endpoint.**
+**Total: 45 endpoint.**
 
 ## Peta Fase (PRD 04 §9)
 
