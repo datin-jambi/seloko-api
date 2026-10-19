@@ -92,10 +92,11 @@ ikhtisar + satu berkas per modul.
 | Worker Kedaluwarsa | [lapak/expiry.md](./lapak/expiry.md) | 5 | `order:read` / `order:update` |
 | Dashboard & Target PAD | [lapak/dashboard.md](./lapak/dashboard.md) | 4 | `report:read` / `report:update` |
 | Daftar Transaksi & Ekspor | [lapak/reports.md](./lapak/reports.md) | 2 | `report:read` / `report:export` |
+| Transparansi PAD Publik | [lapak/public-stats.md](./lapak/public-stats.md) | 1 | publik (tanpa login) |
 
 **Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 178 endpoint.**
+**Total keseluruhan: 179 endpoint.**
 
 ---
 

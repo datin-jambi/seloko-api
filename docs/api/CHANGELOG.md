@@ -7,6 +7,34 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-23 — Transparansi PAD Publik (LJ-3.3) — **Fase 3 SELESAI**
+
+**Ditambah** — prefix `/api/lapak/public-stats` (1 endpoint)
+- `GET /` — **publik tanpa login**: agregat penerimaan per kategori & bulan.
+- Tanpa migrasi (memakai tabel yang sudah ada).
+
+**Keputusan kontrak**
+- **Disajikan per KATEGORI, bukan per OPD** — mengikuti PRD 04 §1: *"data dikelola per
+  OPD, tetapi disajikan ke publik per kategori agar mudah dicerna."* Alasan tambahan:
+  perbandingan "OPD A menerima lebih dari OPD B" mudah menjadi polemik padahal jumlah
+  aset dan tarif tiap OPD berbeda.
+- **SUPPRESSION, bukan sekadar agregasi.** Kelompok dengan **< 3 pesanan** disembunyikan
+  nominalnya (`realized: null`, `suppressed: true`). Dengan 1 pesanan senilai Rp5 jt,
+  menampilkan "Kategori X: Rp5 jt" sama dengan membuka nilai transaksi satu orang.
+  Jumlah pesanan tetap dilaporkan agar aktivitas tetap terlihat.
+- **Hanya pesanan `LUNAS`.** Janji belum dibayar bukan penerimaan (diuji).
+- **12 bulan penuh dikirim.** Bulan kosong bernilai `0` + `suppressed: false` — berbeda
+  makna dari `null` + `suppressed: true` ("ada tapi disembunyikan"). Grafik berlubang
+  membuat publik mengira data tidak tersedia.
+- **Tidak pernah dikirim:** kode pesanan, nama pemohon, NIK, nominal transaksi tunggal,
+  identitas OPD per transaksi (semua diuji terhadap string respons).
+- **Publik = tanpa login, tetapi `X-App-Code` tetap wajib** (`400` tanpa header) — header
+  menandai aplikasi yang dilayani untuk resolusi izin; diuji sebagai perilaku eksplisit.
+
+**Fase 3 (Monitoring PAD) SELESAI 3/3.**
+
+---
+
 ## 2026-10-23 — Daftar Transaksi & Ekspor CSV (LJ-3.2)
 
 **Ditambah** — prefix `/api/lapak/reports` (2 endpoint)

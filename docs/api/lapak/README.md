@@ -31,8 +31,9 @@ penjualan hasil usaha (PRD 04). Data dikelola **per OPD**, disajikan ke publik *
 | Worker Kedaluwarsa | [expiry.md](./expiry.md) | 5 | `/api/lapak/expiry` |
 | Dashboard & Target PAD | [dashboard.md](./dashboard.md) | 4 | `/api/lapak/dashboard` |
 | Daftar Transaksi & Ekspor | [reports.md](./reports.md) | 2 | `/api/lapak/reports` |
+| Transparansi PAD Publik | [public-stats.md](./public-stats.md) | 1 | `/api/lapak/public-stats` |
 
-**Total: 82 endpoint.**
+**Total: 83 endpoint.**
 
 ## Peta Fase (PRD 04 §9)
 

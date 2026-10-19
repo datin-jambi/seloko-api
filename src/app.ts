@@ -315,6 +315,10 @@ export async function buildApp(): Promise<FastifyInstance> {
       const { lapakReportsRoutes } = await import("~/modules/lapak/reports/reports.routes.js");
       await api.register(lapakReportsRoutes, { prefix: "/lapak/reports" });
 
+      // Transparansi PAD publik — agregat tanpa PII (Fase 3).
+      const { lapakPublicStatsRoutes } = await import("~/modules/lapak/public-stats/public-stats.routes.js");
+      await api.register(lapakPublicStatsRoutes, { prefix: "/lapak/public-stats" });
+
       // Lapak modules
       // await api.register(merchantsRoutes, { prefix: "/merchants" });
       // await api.register(productsRoutes, { prefix: "/products" });

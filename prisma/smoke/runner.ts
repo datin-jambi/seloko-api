@@ -32,6 +32,7 @@
  *   npm run db:smoke -- lapak-expiry     → Hanya uji worker kedaluwarsa (LJ-2.8)
  *   npm run db:smoke -- lapak-dashboard  → Hanya uji dashboard & target (LJ-3.1)
  *   npm run db:smoke -- lapak-reports    → Hanya uji daftar transaksi & ekspor CSV (LJ-3.2)
+ *   npm run db:smoke -- lapak-public-stats → Hanya uji transparansi PAD publik (LJ-3.3)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -1144,6 +1145,7 @@ async function cleanupDebugArtefacts() {
       { slug: { startsWith: "kedaluwarsa-uji-" } },
       { slug: { startsWith: "dashboard-uji-" } },
       { slug: { startsWith: "laporan-uji-" } },
+      { slug: { startsWith: "stats-uji-" } },
     ],
   };
 
@@ -3705,6 +3707,187 @@ async function runLapakReportsSuite() {
   }
 }
 
+// ─── Test Suite: Lapak — Transparansi PAD Publik (LJ-3.3) ────────────────────
+async function runLapakPublicStatsSuite() {
+  console.log("\n\x1b[36m▶ [Suite 27: Lapak - Transparansi PAD Publik]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  assert("Superadmin login", Boolean(saToken));
+  assert("Warga login lapak", Boolean(wargaToken));
+
+  await cleanupDebugArtefacts();
+  await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM"] }, year: { gte: 2020 } } });
+
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const gedung = (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+
+  const mkProduct = async (name: string, price: number) => {
+    const r = await request("/lapak/products", {
+      method: "POST", token: saToken || undefined,
+      body: {
+        organizationId: bpsdm.id, categoryId: gedung.id,
+        name, description: `Produk uji stats ${name}.`,
+        rates: [{ name: "Harian", unit: "DAY", price }],
+      },
+    });
+    const id = r.data?.data?.id;
+    const rateId = r.data?.data?.rates?.[0]?.id;
+    await request(`/lapak/rates/${rateId}/status/submit`, { method: "PATCH", token: saToken || undefined, body: {} });
+    await request(`/lapak/rates/${rateId}/status/approve`, { method: "PATCH", token: saToken || undefined, body: {} });
+    await request(`/lapak/products/${id}/status/publish`, { method: "PATCH", token: saToken || undefined });
+    return { id, rateId };
+  };
+
+  await request("/lapak/skrd/settings", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      issuer: "BAPENDA", numberFormat: "{seq6}/SKRD/{issuer}/{romanMonth}/{year}",
+      signerName: "H. Al Haris", signerPosition: "Gubernur Jambi", dueDays: 7,
+    },
+  });
+
+  const prod = await mkProduct("Stats Uji Produk", 1_000_000);
+  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+
+  const makePaidOrder = async (applicant: any) => {
+    const cart = await request("/lapak/carts/opd/BPSDM", W);
+    const cartId = cart.data?.data?.id;
+    await request(`/lapak/carts/${cartId}/items`, {
+      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      body: { productId: prod.id, rateId: prod.rateId, qty: 1 },
+    });
+    const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
+      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      body: { applicant },
+    });
+    const order = co.data?.data ?? {};
+    const payId = order.payments?.[0]?.id;
+    await request(`/lapak/payments/${payId}/proof`, {
+      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      body: {
+        proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/pub.jpg",
+        proofFileId: `ik_pub_${Math.random().toString(36).slice(2, 8)}`,
+        senderName: "Budi Santoso", senderBank: "Bank Jambi",
+        amount: 1_000_000, paidAt: new Date().toISOString(),
+      },
+    });
+    await request(`/lapak/payments/${payId}/verify`, { method: "POST", token: saToken || undefined, body: {} });
+    return order;
+  };
+
+  // ── 1. Akses PUBLIK tanpa login.
+  const pub = await request("/lapak/public-stats", { appCode: "lapak-jambi-web" });
+  assert("Stats publik 200 tanpa login", pub.status === 200, pub.status, pub.data?.message);
+  assert("Tahun terisi", typeof pub.data?.data?.year === "number", pub.data?.data?.year);
+  assert("12 bulan penuh dikirim", (pub.data?.data?.byMonth ?? []).length === 12,
+    (pub.data?.data?.byMonth ?? []).length);
+  assert("Penjelasan ambang ada", typeof pub.data?.data?.disclosure?.minOrders === "number",
+    pub.data?.data?.disclosure?.minOrders);
+
+  // ── 2. INTI: TIDAK ada PII dalam respons.
+  const raw = JSON.stringify(pub.data ?? {});
+  assert("Tidak memuat NIK", !raw.includes("1234567890123456"));
+  assert("Tidak memuat nama pemohon utuh", !raw.includes("Budi Santoso"));
+  assert("Tidak memuat kode pesanan", !raw.includes("LJK-"), "kode pesanan bocor");
+  assert("Tidak memuat kode OPD", !raw.includes("BPSDM"), "identitas OPD bocor ke publik");
+
+  // ── 3. SUPPRESSION: 1 pesanan → nominal disembunyikan.
+  await makePaidOrder({ name: "Budi Santoso", nik: "1234567890123456", phone: "081234567890" });
+  const st1 = await request("/lapak/public-stats", { appCode: "lapak-jambi-web" });
+  const cat1 = (st1.data?.data?.byCategory ?? [])[0];
+  assert("Kategori terdeteksi", Boolean(cat1), JSON.stringify(st1.data?.data?.byCategory));
+  assert("1 pesanan → orderCount 1", cat1?.orderCount === 1, cat1?.orderCount);
+  assert("1 pesanan → nominal DISEMBUNYIKAN", cat1?.realized === null, cat1?.realized);
+  assert("1 pesanan → suppressed true", cat1?.suppressed === true, cat1?.suppressed);
+  assert("Total juga disembunyikan saat <3 pesanan",
+    st1.data?.data?.total?.suppressed === true, st1.data?.data?.total?.suppressed);
+
+  // ── 4. Ambang terlewati: 3 pesanan → nominal terbuka.
+  await makePaidOrder({ name: "Siti Aminah", phone: "081298765432" });
+  await makePaidOrder({ name: "Andi Wijaya", phone: "081200001111" });
+  const st3 = await request("/lapak/public-stats", { appCode: "lapak-jambi-web" });
+  const cat3 = (st3.data?.data?.byCategory ?? [])[0];
+  assert("3 pesanan → orderCount 3", cat3?.orderCount === 3, cat3?.orderCount);
+  assert("3 pesanan → nominal TERBUKA", cat3?.realized === 3_000_000, cat3?.realized);
+  assert("3 pesanan → suppressed false", cat3?.suppressed === false, cat3?.suppressed);
+  assert("Total terbuka", st3.data?.data?.total?.realized === 3_000_000,
+    st3.data?.data?.total?.realized);
+
+  // ── 5. Pesanan belum dibayar TIDAK dihitung.
+  const cartUnpaid = await request("/lapak/carts/opd/BPSDM", W);
+  await request(`/lapak/carts/${cartUnpaid.data?.data?.id}/items`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { productId: prod.id, rateId: prod.rateId, qty: 1 },
+  });
+  await request(`/lapak/orders/cart/${cartUnpaid.data?.data?.id}/checkout`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { applicant: { name: "Belum Bayar", phone: "081200002222" } },
+  });
+  const stUnpaid = await request("/lapak/public-stats", { appCode: "lapak-jambi-web" });
+  assert("Pesanan belum bayar tidak menambah total",
+    stUnpaid.data?.data?.total?.realized === 3_000_000, stUnpaid.data?.data?.total?.realized);
+  assert("Pesanan belum bayar tidak menambah count",
+    stUnpaid.data?.data?.total?.orderCount === 3, stUnpaid.data?.data?.total?.orderCount);
+
+  // ── 6. PII tetap tidak bocor setelah ada data.
+  const raw3 = JSON.stringify(st3.data ?? {});
+  assert("Masih tanpa NIK", !raw3.includes("1234567890123456"));
+  assert("Masih tanpa nama pemohon", !raw3.includes("Budi Santoso") && !raw3.includes("Siti Aminah"));
+
+  // ── 7. Bulan tanpa transaksi bernilai 0, bukan suppressed.
+  const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+  const thisMonthRow = (st3.data?.data?.byMonth ?? []).find((m: any) => m.month === currentMonth);
+  assert("Bulan berjalan ditemukan", Boolean(thisMonthRow), currentMonth);
+  assert("Bulan berjalan ada transaksi", thisMonthRow?.orderCount === 3, thisMonthRow?.orderCount);
+
+  const emptyMonths = (st3.data?.data?.byMonth ?? []).filter((m: any) => m.orderCount === 0);
+  assert("Bulan kosong bernilai 0 (bukan null)", emptyMonths.every((m: any) => m.realized === 0),
+    JSON.stringify(emptyMonths.slice(0, 2)));
+  assert("Bulan kosong tidak ditandai suppressed", emptyMonths.every((m: any) => m.suppressed === false));
+
+  // ── 8. Filter tahun.
+  const otherYear = await request(`/lapak/public-stats?year=${new Date().getFullYear() - 1}`, {
+    appCode: "lapak-jambi-web",
+  });
+  assert("Filter tahun 200", otherYear.status === 200, otherYear.status);
+  assert("Tahun lain kosong", otherYear.data?.data?.total?.orderCount === 0,
+    otherYear.data?.data?.total?.orderCount);
+
+  const badYear = await request("/lapak/public-stats?year=1800", { appCode: "lapak-jambi-web" });
+  assert("Tahun tidak valid ditolak 400", badYear.status === 400, badYear.status);
+
+  // ── 9. Header aplikasi tetap wajib (guard multi-tenant global).
+  // Endpoint ini publik dalam arti TANPA LOGIN, bukan tanpa identitas aplikasi:
+  // `X-App-Code` menandai aplikasi mana yang dilayani dan dipakai untuk resolusi
+  // izin. Uji ini mendokumentasikan perilaku tersebut secara eksplisit.
+  const noHeader = await fetch(`${BASE}/lapak/public-stats`);
+  assert("Tanpa X-App-Code ditolak 400 (guard multi-tenant)", noHeader.status === 400, noHeader.status);
+
+  // ── 10. Bersih-bersih.
+  await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSetting.deleteMany({});
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM"] }, year: { gte: 2020 } } });
+  await prisma.lapakProductRate.deleteMany({ where: { productId: prod.id } });
+  await prisma.lapakProduct.deleteMany({ where: { id: prod.id } });
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -3810,6 +3993,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-reports" || targetModule === "laporan") {
       await runLapakReportsSuite();
+    }
+    if (!targetModule || targetModule === "lapak-public-stats" || targetModule === "transparansi") {
+      await runLapakPublicStatsSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
