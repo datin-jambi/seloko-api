@@ -291,6 +291,10 @@ export async function buildApp(): Promise<FastifyInstance> {
       const { lapakOrdersRoutes } = await import("~/modules/lapak/orders/orders.routes.js");
       await api.register(lapakOrdersRoutes, { prefix: "/lapak/orders" });
 
+      // Pengaturan & penerbitan SKRD + penomoran gapless (Fase 2).
+      const { lapakSkrdRoutes } = await import("~/modules/lapak/skrd/skrd.routes.js");
+      await api.register(lapakSkrdRoutes, { prefix: "/lapak/skrd" });
+
       // Lapak modules
       // await api.register(merchantsRoutes, { prefix: "/merchants" });
       // await api.register(productsRoutes, { prefix: "/products" });

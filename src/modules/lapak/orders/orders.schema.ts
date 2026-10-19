@@ -100,6 +100,20 @@ export const OrderItemShape = z.object({
   note: z.string().nullable(),
 });
 
+/** Ringkasan SKRD yang menempel pada pesanan (null bila belum terbit). */
+export const OrderSkrdShape = z.object({
+  id: z.string().uuid(),
+  number: z.string(),
+  documentType: z.enum(["SKRD", "DIPERSAMAKAN"]),
+  issuer: z.enum(["BAPENDA", "OPD"]),
+  issuerCode: z.string(),
+  issuerName: z.string(),
+  amount: z.number().int(),
+  issuedAt: z.string().datetime(),
+  dueAt: z.string().datetime(),
+  status: z.enum(["TERBIT", "LUNAS", "CANCELLED"]),
+});
+
 export const OrderShape = z.object({
   id: z.string().uuid(),
   code: z.string(),
@@ -111,6 +125,8 @@ export const OrderShape = z.object({
   purpose: z.string().nullable(),
   expiresAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
+  /** SKRD yang terbit saat checkout (PRD 04 §D); null bila belum terbit. */
+  skrd: OrderSkrdShape.nullable(),
 });
 
 /** Detail pesanan menampilkan pemohon TERMASKING — PII tidak pernah utuh. */

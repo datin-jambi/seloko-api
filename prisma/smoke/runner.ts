@@ -26,6 +26,7 @@
  *   npm run db:smoke -- lapak-reservations → Hanya uji reservasi & anti double-booking (LJ-2.2)
  *   npm run db:smoke -- lapak-cart       → Hanya uji keranjang per OPD (LJ-2.3)
  *   npm run db:smoke -- lapak-orders     → Hanya uji quote & checkout pesanan (LJ-2.4)
+ *   npm run db:smoke -- lapak-skrd       → Hanya uji SKRD & penomoran gapless (LJ-2.5)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -1122,6 +1123,12 @@ async function cleanupDebugArtefacts() {
       { slug: { startsWith: "produk-" } },
       { slug: { startsWith: "aula-uji-" } },
       { slug: { startsWith: "tanpa-atribut-" } },
+      { slug: { startsWith: "skrd-uji-" } },
+      { slug: { startsWith: "pesanan-uji-" } },
+      { slug: { startsWith: "reservasi-uji-" } },
+      { slug: { startsWith: "jangan-judul" } },
+      { slug: { startsWith: "jadwal-uji-" } },
+      { slug: { startsWith: "keranjang-uji-" } },
     ],
   };
 
@@ -2069,6 +2076,16 @@ async function runLapakOrdersSuite() {
   await request(`/lapak/products/${productId}/status/publish`, { method: "PATCH", token: saToken || undefined });
   assert("Produk pesanan siap", Boolean(productId && rateId));
 
+  // Checkout menerbitkan SKRD (LJ-2.5), jadi pengaturan SKRD wajib ada.
+  await request("/lapak/skrd/settings", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      issuer: "BAPENDA",
+      numberFormat: "{seq6}/SKRD/{issuer}/{romanMonth}/{year}",
+      signerName: "H. Al Haris", signerPosition: "Gubernur Jambi", dueDays: 7,
+    },
+  });
+
   // Keranjang + 2 item.
   const cart = await request("/lapak/carts/opd/BPSDM", W);
   const cartId = cart.data?.data?.id;
@@ -2183,11 +2200,218 @@ async function runLapakOrdersSuite() {
   assert("Checkout keranjang kosong 400", emptyCheckout.status === 400, emptyCheckout.status);
 
   // ── 12. Bersih-bersih.
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
   await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
   await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
   await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
   await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
   await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakProductRate.deleteMany({ where: { productId } });
+  await prisma.lapakProduct.deleteMany({ where: { id: productId } });
+}
+
+// ─── Test Suite: Lapak — Pengaturan SKRD & Penomoran Gapless (LJ-2.5) ────────
+async function runLapakSkrdSuite() {
+  console.log("\n\x1b[36m▶ [Suite 21: Lapak - SKRD & Penomoran Gapless]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  assert("Superadmin login", Boolean(saToken));
+  assert("Warga login lapak", Boolean(wargaToken));
+  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+
+  await cleanupDebugArtefacts();
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  // Sequence & pengaturan uji dibersihkan agar nomor mulai dari 1.
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM"] }, year: { gte: 2020 } } });
+
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const gedung = (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+
+  // ── 1. Belum ada pengaturan → checkout sakral gagal dengan pesan jelas.
+  const prod = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: gedung.id,
+      name: "SKRD Uji Produk", description: "Produk uji penerbitan SKRD.",
+      rates: [{ name: "Harian", unit: "DAY", price: 250_000 }],
+    },
+  });
+  const productId = prod.data?.data?.id;
+  const rateId = prod.data?.data?.rates?.[0]?.id;
+  assert("Produk SKRD uji berhasil dibuat", prod.status === 201, prod.status, prod.data?.message);
+  assert("Tarif produk SKRD ada", Boolean(rateId), String(rateId ?? "undefined"));
+  await request(`/lapak/rates/${rateId}/status/submit`, { method: "PATCH", token: saToken || undefined, body: {} });
+  await request(`/lapak/rates/${rateId}/status/approve`, { method: "PATCH", token: saToken || undefined, body: {} });
+  await request(`/lapak/products/${productId}/status/publish`, { method: "PATCH", token: saToken || undefined });
+
+  const mkOrder = async () => {
+    const cart = await request("/lapak/carts/opd/BPSDM", W);
+    const cartId = cart.data?.data?.id;
+    const added = await request(`/lapak/carts/${cartId}/items`, {
+      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      body: { productId, rateId, qty: 1 },
+    });
+    assert("Item masuk keranjang (prasyarat)", added.status === 201, added.status, added.data?.message);
+    return cartId;
+  };
+  const checkout = async (cartId: string) => request(`/lapak/orders/cart/${cartId}/checkout`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { applicant: { name: "Budi Santoso", nik: "1234567890123456", phone: "081234567890" } },
+  });
+
+  // Bersihkan pengaturan lama supaya uji "belum ada pengaturan" valid.
+  await prisma.lapakSkrdSetting.deleteMany({});
+  const noSettingCart = await mkOrder();
+  const noSetting = await checkout(noSettingCart);
+  assert("Checkout tanpa pengaturan SKRD ditolak 400", noSetting.status === 400, noSetting.status);
+  assert("Pesan menyebut pengaturan SKRD",
+    String(noSetting.data?.message ?? "").toLowerCase().includes("pengaturan skrd"), noSetting.data?.message);
+
+  // ── 2. Simpan pengaturan DEFAULT (Bapenda).
+  const setDefault = await request("/lapak/skrd/settings", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      issuer: "BAPENDA",
+      numberFormat: "{seq6}/SKRD/{issuer}/{romanMonth}/{year}",
+      signerName: "H. Al Haris",
+      signerNip: "196505121990031010",
+      signerPosition: "Gubernur Jambi",
+      bankName: "Bank Jambi",
+      bankAccount: "001-02-000123-4",
+      bankHolder: "Kas Daerah Provinsi Jambi",
+      dueDays: 7,
+    },
+  });
+  assert("Pengaturan default disimpan 200", setDefault.status === 200, setDefault.status, setDefault.data?.message);
+  assert("Pengaturan default tanpa OPD", setDefault.data?.data?.organizationCode === null,
+    setDefault.data?.data?.organizationCode);
+
+  // ── 3. Format nomor salah ditolak (tanpa {seq}).
+  const badFmt = await request("/lapak/skrd/settings", {
+    method: "POST", token: saToken || undefined,
+    body: { issuer: "BAPENDA", numberFormat: "SKRD/{year}", signerName: "Pejabat" },
+  });
+  assert("Format tanpa {seq} ditolak 400", badFmt.status === 400, badFmt.status);
+
+  const badToken = await request("/lapak/skrd/settings", {
+    method: "POST", token: saToken || undefined,
+    body: { issuer: "BAPENDA", numberFormat: "{seqq}/SKRD/{year}", signerName: "Pejabat" },
+  });
+  assert("Token tak dikenal ditolak 400", badToken.status === 400, badToken.status);
+
+  // ── 4. Pratinjau nomor berikutnya.
+  const preview = await request("/lapak/skrd/settings/preview/BPSDM", { token: saToken || undefined });
+  assert("Pratinjau nomor 200", preview.status === 200, preview.status, preview.data?.message);
+  assert("Nomor pratinjau mulai dari 1", preview.data?.data?.nextSeq === 1, preview.data?.data?.nextSeq);
+  const year = new Date().getFullYear();
+  assert("Format nomor sesuai template",
+    preview.data?.data?.preview === `000001/SKRD/BAPENDA/${["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII"][new Date().getMonth()]}/${year}`,
+    preview.data?.data?.preview);
+
+  // ── 5. Checkout → SKRD terbit otomatis dengan nomor 1.
+  const co1 = await checkout(await mkOrder());
+  assert("Checkout 201 dengan pengaturan ada", co1.status === 201, co1.status, co1.data?.message);
+  const order1 = co1.data?.data ?? {};
+  assert("Pesanan menyertakan SKRD", Boolean(order1.skrd), JSON.stringify(order1.skrd));
+  assert("Nomor SKRD = 000001", order1.skrd?.number?.startsWith("000001/SKRD/BAPENDA/"), order1.skrd?.number);
+  assert("SKRD menerbitkan status TERBIT", order1.skrd?.status === "TERBIT", order1.skrd?.status);
+  assert("SKRD memuat snapshot penandatangan", order1.skrd?.issuerCode === "BAPENDA", order1.skrd?.issuerCode);
+  assert("Jumlah SKRD = total pesanan", order1.skrd?.amount === order1.total, `${order1.skrd?.amount} vs ${order1.total}`);
+
+  // ── 6. GAUNTLESS: checkout berikutnya nomor 2, 3 (tanpa lompat).
+  const co2 = await checkout(await mkOrder());
+  const co3 = await checkout(await mkOrder());
+  assert("Nomor kedua = 000002", co2.data?.data?.skrd?.number?.startsWith("000002/"), co2.data?.data?.skrd?.number);
+  assert("Nomor ketiga = 000003", co3.data?.data?.skrd?.number?.startsWith("000003/"), co3.data?.data?.skrd?.number);
+
+  // ── 7. INTI: dua checkout PARALEL → nomor tetap unik & berurutan.
+  // Kedua keranjang HARUS disiapkan sebelum Promise.all: satu keranjang per
+  // OPD, sehingga menyiapkan di dalam callback membuat keduanya memakai
+  // keranjang yang sama dan yang kedua menemukannya kosong.
+  const cartP1 = await mkOrder();
+  const cartP2 = await mkOrder();
+  const [p1, p2] = await Promise.all([checkout(cartP1), checkout(cartP2)]);
+  const nums = [p1, p2].filter((r) => r.status === 201).map((r) => r.data?.data?.skrd?.number);
+  assert("Dua checkout paralel sama-sama 201", nums.length === 2, `${p1.status}/${p2.status}`);
+  assert("Nomor paralel TIDAK kembar", nums[0] !== nums[1], nums.join(" vs "));
+  const seqs = nums.map((n) => Number(String(n).split("/")[0]));
+  assert("Nomor paralel berurutan (4 dan 5)",
+    seqs.sort((a, b) => a - b).join(",") === "4,5", seqs.join(","));
+
+  // ── 8. Verifikasi publik lewat token QR.
+  const skrdId = order1.skrd?.id;
+  const full = await request(`/lapak/skrd/${skrdId}`, { token: saToken || undefined });
+  assert("Detail SKRD 200", full.status === 200, full.status);
+  const qrToken = await prisma.lapakSkrd.findUnique({ where: { id: skrdId }, select: { qrToken: true } });
+  const verify = await request(`/lapak/skrd/verify/${qrToken?.qrToken}`, { appCode: "lapak-jambi-web" });
+  assert("Verifikasi publik 200 (tanpa login)", verify.status === 200, verify.status, verify.data?.message);
+  assert("Verifikasi menyatakan valid", verify.data?.data?.valid === true);
+  assert("Verifikasi TIDAK membocorkan NIK", !("nik" in (verify.data?.data ?? {})),
+    Object.keys(verify.data?.data ?? {}).join(","));
+  assert("Nama pemohon termasking di verifikasi",
+    verify.data?.data?.applicantName !== "Budi Santoso", verify.data?.data?.applicantName);
+
+  const badTokenVerify = await request("/lapak/skrd/verify/token-palsu-123456", { appCode: "lapak-jambi-web" });
+  assert("Token palsu 404", badTokenVerify.status === 404, badTokenVerify.status);
+
+  // ── 9. Batalkan SKRD → nomor TIDAK dipakai ulang (gapless).
+  const cancel = await request(`/lapak/skrd/${skrdId}/cancel`, { method: "POST", token: saToken || undefined });
+  assert("Batalkan SKRD 200", cancel.status === 200, cancel.status, cancel.data?.message);
+  assert("Status jadi CANCELLED", cancel.data?.data?.status === "CANCELLED", cancel.data?.data?.status);
+
+  const coNext = await checkout(await mkOrder());
+  const nextNum = coNext.data?.data?.skrd?.number;
+  assert("Nomor setelah pembatalan TIDAK memakai ulang 000001",
+    !String(nextNum).startsWith("000001/"), nextNum);
+  assert("Nomor lanjut ke 000006", String(nextNum).startsWith("000006/"), nextNum);
+
+  const verifyCancelled = await request(`/lapak/skrd/verify/${qrToken?.qrToken}`, { appCode: "lapak-jambi-web" });
+  assert("SKRD dibatalkan ditandai tidak valid", verifyCancelled.data?.data?.valid === false);
+
+  // ── 10. Pengaturan per OPD menimpa default.
+  const setOpd = await request("/lapak/skrd/settings", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationCode: "BPSDM", issuer: "OPD",
+      numberFormat: "{seq6}/SKRD/{orgCode}/{romanMonth}/{year}",
+      signerName: "Kepala BPSDM", signerPosition: "Kepala Badan", dueDays: 14,
+    },
+  });
+  assert("Pengaturan per OPD disimpan", setOpd.status === 200, setOpd.status, setOpd.data?.message);
+  assert("Pengaturan OPD menyebut kode", setOpd.data?.data?.organizationCode === "BPSDM",
+    setOpd.data?.data?.organizationCode);
+
+  const coOpd = await checkout(await mkOrder());
+  const opdNum = coOpd.data?.data?.skrd?.number;
+  assert("Penerbit OPD memakai kode OPD", String(opdNum).includes("BPSDM"), opdNum);
+  assert("Sequence OPD terpisah (mulai 000001)", String(opdNum).startsWith("000001/"), opdNum);
+  assert("SKRD penerbit OPD", coOpd.data?.data?.skrd?.issuer === "OPD", coOpd.data?.data?.skrd?.issuer);
+
+  // ── 11. Daftar SKRD & sinkron dengan nomor urut.
+  const listSkrd = await request("/lapak/skrd?limit=100", { token: saToken || undefined });
+  assert("Daftar SKRD 200", listSkrd.status === 200, listSkrd.status, listSkrd.data?.message);
+  const all = listSkrd.data?.data ?? [];
+  assert("SKRD tercatat di daftar", all.some((s: any) => s.id === skrdId));
+  const numbers = all.map((s: any) => s.number);
+  assert("Tidak ada nomor kembar", new Set(numbers).size === numbers.length,
+    `${numbers.length} vs ${new Set(numbers).size}`);
+
+  // ── 12. Bersih-bersih.
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSetting.deleteMany({});
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM"] }, year: { gte: 2020 } } });
   await prisma.lapakProductRate.deleteMany({ where: { productId } });
   await prisma.lapakProduct.deleteMany({ where: { id: productId } });
 }
@@ -2279,6 +2503,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-orders" || targetModule === "pesanan") {
       await runLapakOrdersSuite();
+    }
+    if (!targetModule || targetModule === "lapak-skrd" || targetModule === "skrd") {
+      await runLapakSkrdSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

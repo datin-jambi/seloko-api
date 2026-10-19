@@ -86,10 +86,11 @@ ikhtisar + satu berkas per modul.
 | Reservasi Slot | [lapak/reservations.md](./lapak/reservations.md) | 4 | publik + `product:read` |
 | Keranjang per OPD | [lapak/carts.md](./lapak/carts.md) | 8 | login (warga) |
 | Quote & Checkout Pesanan | [lapak/orders.md](./lapak/orders.md) | 5 | login + `order:read` |
+| SKRD & Penomoran Gapless | [lapak/skrd.md](./lapak/skrd.md) | 10 | publik (verify) + `order:*` |
 
 **Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 146 endpoint.**
+**Total keseluruhan: 156 endpoint.**
 
 ---
 

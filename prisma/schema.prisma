@@ -67,6 +67,7 @@ model Application {
   lapakProducts     LapakProduct[]
   lapakCarts        LapakCart[]
   lapakOrders       LapakOrder[]
+  lapakSkrdSettings LapakSkrdSetting[]
 
   @@map("applications")
 }
@@ -308,6 +309,7 @@ model Organization {
   lapakProducts     LapakProduct[]
   lapakCarts        LapakCart[]
   lapakOrders       LapakOrder[]
+  lapakSkrdSettings LapakSkrdSetting[]
 
   @@index([parentId])
   @@index([type, isActive])
@@ -999,6 +1001,7 @@ model LapakOrder {
   organization Organization    @relation(fields: [organizationId], references: [id])
   items        LapakOrderItem[]
   statusLogs   LapakOrderStatusLog[]
+  skrd         LapakSkrd?
 
   /// Kode pesanan unik per aplikasi — dipakai warga untuk melacak.
   @@unique([applicationId, code], map: "uq_lapak_orders_app_code")
@@ -1055,6 +1058,129 @@ model LapakOrderStatusLog {
 
   @@index([orderId, createdAt], map: "idx_lapak_order_logs_order_time")
   @@map("lapak_order_status_logs")
+}
+
+/// Penerbit SKRD (PRD 04 §D). Bapenda atau OPD itu sendiri.
+enum SkrdIssuer {
+  BAPENDA
+  OPD
+}
+
+enum SkrdDocumentType {
+  SKRD
+  /// "Dokumen Transaksi (dipersamakan SKRD)" — kategori 8 penjualan hasil usaha.
+  DIPERSAMAKAN
+}
+
+enum SkrdStatus {
+  /// Terbit & menunggu pembayaran.
+  TERBIT
+  LUNAS
+  /// Pesanan dibatalkan/kedaluwarsa. Nomor TIDAK dipakai ulang (gapless).
+  CANCELLED
+}
+
+/// Pengaturan penerbitan SKRD (PRD 04 §D).
+///
+/// `organizationId = null` adalah baris DEFAULT (Bapenda) — dipakai bila OPD
+/// belum punya pengaturan sendiri. Tingkat kekhususan: OPD > default.
+///
+/// `numberFormat` adalah template; token yang dikenali:
+/// `{seq}` urutan, `{seq6}` urutan 6 digit, `{issuer}`, `{romanMonth}`,
+/// `{month}`, `{year}`, `{orgCode}`.
+model LapakSkrdSetting {
+  id             String     @id @default(uuid(7)) @db.VarChar(36)
+  applicationId  String     @map("app_id") @db.VarChar(36)
+  /// NULL = pengaturan default (Bapenda).
+  organizationId String?    @map("organization_id") @db.VarChar(36)
+  issuer         SkrdIssuer
+  /// Template nomor, mis. "{seq6}/SKRD/{issuer}/{romanMonth}/{year}".
+  numberFormat   String     @map("number_format") @db.VarChar(200)
+  /// Penandatangan — disalin sebagai snapshot ke tiap SKRD saat terbit.
+  signerName     String     @map("signer_name") @db.VarChar(150)
+  signerNip      String?    @map("signer_nip") @db.VarChar(30)
+  signerPosition String?    @map("signer_position") @db.VarChar(150)
+  /// Rekening tujuan (RKUD).
+  bankName       String?    @map("bank_name") @db.VarChar(100)
+  bankAccount    String?    @map("bank_account") @db.VarChar(50)
+  bankHolder     String?    @map("bank_holder") @db.VarChar(150)
+  /// Jatuh tempo pembayaran (hari) sejak terbit.
+  dueDays        Int        @default(7) @map("due_days")
+  isActive       Boolean    @default(true) @map("is_active")
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz()
+
+  application  Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Satu pengaturan per (aplikasi, OPD) — termasuk baris default (null).
+  @@unique([applicationId, organizationId], map: "uq_lapak_skrd_settings_app_org")
+  @@map("lapak_skrd_settings")
+}
+
+/// Penomoran gapless per (penerbit, tahun) — PRD 04 §D.
+///
+/// GAUNTLESS DIMAKSUD DI SINI: nomor yang terbit berurutan tanpa lompat, dan
+/// nomor yang sudah dipakai TIDAK PERNAH dipakai ulang meski SKRD-nya
+/// dibatalkan. Karena itu `lastNumber` hanya pernah NAIK.
+///
+/// Kunci baris (`SELECT ... FOR UPDATE`) di dalam transaksi yang sama dengan
+/// penerbitan SKRD mencegah dua checkout bersamaan memperoleh nomor yang sama.
+/// `INSERT` sequence dilakukan SETELAH order tersimpan, dalam transaksi yang
+/// sama, sehingga bila penerbitan SKRD gagal seluruhnya rollback — nomor tidak
+/// terbuang (lubang nomor = temuan audit).
+model LapakSkrdSequence {
+  id        String   @id @default(uuid(7)) @db.VarChar(36)
+  /// Kunci penerbit: "BAPENDA" atau kode OPD. Disimpan sebagai teks agar
+  /// sequence tetap bisa ditelusuri walau baris OPD berubah kode.
+  issuerKey String   @map("issuer_key") @db.VarChar(60)
+  year      Int
+  lastNumber Int     @default(0) @map("last_number")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@unique([issuerKey, year], map: "uq_lapak_skrd_seq_issuer_year")
+  @@map("lapak_skrd_sequences")
+}
+
+/// SKRD / Dokumen dipersamakan SKRD (PRD 04 §D).
+///
+/// Menerbitkan SKRD = tindakan hukum; karena itu seluruh isinya disalin sebagai
+/// SNAPSHOT (penerbit, penandatangan, rekening, jumlah). Bila pengaturan SKRD
+/// diubah besok, dokumen yang sudah terbit TIDAK berubah.
+///
+/// `qrToken` unik dipakai halaman verifikasi publik untuk memastikan dokumen
+/// yang ditunjukkan warga memang asli terbit dari sistem ini.
+model LapakSkrd {
+  id             String           @id @default(uuid(7)) @db.VarChar(36)
+  orderId        String           @unique @map("order_id") @db.VarChar(36)
+  number         String           @db.VarChar(100)
+  documentType   SkrdDocumentType @default(SKRD) @map("document_type")
+  issuer         SkrdIssuer
+  /// Snapshot penerbit: kode & nama OPD (atau Bapenda bila issuer=BAPENDA).
+  issuerCode     String           @map("issuer_code") @db.VarChar(50)
+  issuerName     String           @map("issuer_name") @db.VarChar(150)
+  /// Snapshot penandatangan & rekening — TIDAK mengikuti perubahan setting.
+  signerName     String           @map("signer_name") @db.VarChar(150)
+  signerNip      String?          @map("signer_nip") @db.VarChar(30)
+  signerPosition String?          @map("signer_position") @db.VarChar(150)
+  bankName       String?          @map("bank_name") @db.VarChar(100)
+  bankAccount    String?          @map("bank_account") @db.VarChar(50)
+  bankHolder     String?          @map("bank_holder") @db.VarChar(150)
+  amount         Int
+  issuedAt       DateTime         @map("issued_at") @db.Timestamptz()
+  dueAt          DateTime         @map("due_at") @db.Timestamptz()
+  status         SkrdStatus       @default(TERBIT)
+  /// Token verifikasi publik — acak, tidak bisa ditebak dari nomor.
+  qrToken        String           @unique @map("qr_token") @db.VarChar(64)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+
+  order LapakOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// Nomor unik per penerbit per tahun — dua SKRD tak boleh bernomor sama.
+  @@unique([issuerCode, number], map: "uq_lapak_skrds_issuer_number")
+  @@index([status, dueAt], map: "idx_lapak_skrds_status_due")
+  @@map("lapak_skrds")
 }
 
 /// Tarif per sesi/satuan. Punya status sendiri (PRD 04 §C): mengubah tarif

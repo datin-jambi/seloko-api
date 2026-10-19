@@ -7,6 +7,39 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-22 — Pengaturan & Penerbitan SKRD + Penomoran Gapless (LJ-2.5)
+
+**Ditambah** — prefix `/api/lapak/skrd` (10 endpoint)
+- `GET /verify/:token` — **publik**, verifikasi keaslian dokumen lewat QR (tanpa PII).
+- `GET|POST /settings`, `DELETE /settings/:id`, `GET /settings/preview/:code`.
+- `GET /`, `POST /order/:orderId`, `GET /order/:orderId`, `GET /:id`, `POST /:id/cancel`.
+- DB: `lapak_skrd_settings`, `lapak_skrd_sequences`, `lapak_skrds` + enum
+  `SkrdIssuer`/`SkrdDocumentType`/`SkrdStatus`, migrasi `20261022090000_add_lapak_skrd`,
+  drift 0.
+
+**Keputusan kontrak — PENOMORAN GAPLESS (PRD 04 §D)**
+- Nomor berurutan tanpa lompat per `(penerbit, tahun)`; nomor yang sudah dipakai
+  **tidak pernah dipakai ulang** meski SKRD dibatalkan (`last_number` hanya naik).
+- Ditegakkan `SELECT ... FOR UPDATE` pada baris sequence **di dalam transaksi
+  penerbitan SKRD**. Tanpa row lock, dua checkout paralel membaca `last_number` sama
+  dan menghasilkan nomor kembar. Diuji nyata: dua checkout paralel → `000004` & `000005`.
+- Konsumsi nomor terjadi dalam transaksi yang **sama** dengan pembuatan SKRD: gagal
+  di tengah = rollback total, nomor tidak terbuang (lubang nomor = temuan audit).
+- **SKRD terbit SAAT CHECKOUT**, bukan saat pembayaran. Checkout **ditolak `400`** bila
+  pengaturan SKRD belum ada — lebih baik gagal terang-terangan daripada menerbitkan
+  dokumen negara tanpa penandatangan & rekening.
+- **Snapshot penuh:** penerbit, penandatangan, rekening, jumlah, jatuh tempo disalin
+  saat terbit. Ubah pengaturan besok tidak mengubah dokumen kemarin.
+- **Format nomor divalidasi saat menyimpan** (wajib `{seq}`/`{seq6}`, token harus
+  dikenal) — salah ketik tertangkap sebelum menerbitkan dokumen, bukan sesudah.
+- Sequence terpisah per penerbit: `BAPENDA` global, `OPD` per kode OPD (masing-masing
+  mulai `000001`).
+- **Verifikasi publik tanpa PII:** token QR 24 byte acak (bukan turunan nomor), respons
+  hanya memuat data dokumen + nama pemohon termasking.
+- Pembatalan **tidak mengembalikan nomor** ke sequence.
+
+---
+
 ## 2026-10-21 — Quote & Checkout → Pesanan (LJ-2.4)
 
 **Ditambah** — prefix `/api/lapak/orders` (5 endpoint)

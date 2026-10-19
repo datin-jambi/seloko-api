@@ -2,9 +2,11 @@ import { Prisma, type ContentStatus } from "@prisma/client";
 import { prisma } from "~/config/database.js";
 import { NotFoundError, BadRequestError, ConflictError } from "~/common/errors/index.js";
 import { APP_CODES } from "~/common/constants/index.js";
+import { issueSkrdInTx } from "../skrd/skrd.service.js";
 import type {
   CheckoutBody,
   QuoteDto,
+  OrderDto,
   OrderDetailDto,
   ListOrdersQuery,
   Applicant,
@@ -312,6 +314,15 @@ export async function checkoutCart(
         }
       }
 
+      // SKRD terbit SAAT CHECKOUT (PRD 04 §D) — bukan saat pembayaran.
+      // Nomor diambil dalam transaksi yang sama supaya nomor tidak terbuang
+      // bila ada langkah berikutnya yang gagal (gapless = wajib).
+      await issueSkrdInTx(
+        tx,
+        { orderId: created.id, organizationId: cart.organization.id, amount: total },
+        { documentType: "SKRD" },
+      );
+
       return created;
     });
 
@@ -319,7 +330,13 @@ export async function checkoutCart(
     // dipindahkan sebagai snapshot ke pesanan.
     await prisma.lapakCartItem.deleteMany({ where: { cartId: cart.id } });
 
-    return toDetailDto(order);
+    // `order` dibuat SEBELUM SKRD terbit, jadi objeknya belum memuat relasi
+    // `skrd`. Baca ulang agar respons checkout menyertakan nomor SKRD.
+    const fresh = await prisma.lapakOrder.findUniqueOrThrow({
+      where: { id: order.id },
+      include: ORDER_INCLUDE,
+    });
+    return toDetailDto(fresh);
   } catch (err) {
     // Pelanggaran exclusion constraint saat konfirmasi ulang slot.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2010") {
@@ -336,6 +353,13 @@ export async function checkoutCart(
 const ORDER_INCLUDE = {
   organization: { select: { code: true, name: true } },
   items: { orderBy: { createdAt: "asc" as const } },
+  skrd: {
+    select: {
+      id: true, number: true, documentType: true, issuer: true,
+      issuerCode: true, issuerName: true, amount: true,
+      issuedAt: true, dueAt: true, status: true,
+    },
+  },
 } as const;
 
 type OrderRow = Prisma.LapakOrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
@@ -364,6 +388,20 @@ function toBaseDto(row: OrderRow) {
     purpose: row.purpose,
     expiresAt: row.expiresAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
+    skrd: row.skrd
+      ? {
+          id: row.skrd.id,
+          number: row.skrd.number,
+          documentType: row.skrd.documentType,
+          issuer: row.skrd.issuer,
+          issuerCode: row.skrd.issuerCode,
+          issuerName: row.skrd.issuerName,
+          amount: row.skrd.amount,
+          issuedAt: row.skrd.issuedAt.toISOString(),
+          dueAt: row.skrd.dueAt.toISOString(),
+          status: row.skrd.status,
+        }
+      : null,
   };
 }
 
