@@ -4331,6 +4331,97 @@ async function runFaqsSuite() {
   await clean();
 }
 
+// ─── Test Suite: Bapenda Regulasi ─────────────────────────────────────────────
+async function runRegulationsSuite() {
+  console.log("\n\x1b[36m▶ [Suite: Domain Bapenda - Regulasi & Dokumen]\x1b[0m");
+  const P = { appCode: "bapenda-profile" };
+  const PREFIX = "smoke-regulasi-";
+  const clean = () => prisma.regulation.deleteMany({ where: { slug: { startsWith: PREFIX } } });
+  await clean();
+
+  // 1. Publik — data seed dari app lama
+  const pubList = await request("/bapenda/regulations/public?limit=50", P);
+  assert("Daftar regulasi publik merespons sukses (200)", pubList.status === 200, pubList.status, 200);
+  assert("Hanya regulasi PUBLISHED (4 dari seed)", pubList.data?.data?.length === 4, pubList.data?.data?.length, 4);
+  assert("Setiap regulasi publik berupa PDF", pubList.data?.data?.every((r: any) => r.fileUrl.endsWith(".pdf")));
+
+  const search = await request("/bapenda/regulations/public?search=bbnkb", P);
+  assert("Pencarian 'bbnkb' menemukan regulasi", search.data?.data?.length === 1, search.data?.data?.length, 1);
+
+  const detail = await request("/bapenda/regulations/public/perda-no-8-tahun-2010-tentang-pajak-daerah", P);
+  assert("Detail regulasi publik via slug (200)", detail.status === 200, detail.status, 200);
+
+  const draftSlug = await request("/bapenda/regulations/public/draft-revisi-pergub-tarif-pajak-air-2025", P);
+  assert("Regulasi draft tidak bisa dibuka publik (404)", draftSlug.status === 404, draftSlug.status, 404);
+
+  // 2. CMS
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const editorToken = await login("editor.profil", DEFAULT_PASSWORD, "seloko");
+  const viewerToken = await login("belum.verifikasi", DEFAULT_PASSWORD, "seloko");
+  const sa = { token: saToken || undefined };
+  const ed = { token: editorToken || undefined };
+
+  const viewerCreate = await request("/bapenda/regulations", {
+    method: "POST", token: viewerToken || undefined,
+    body: { title: "Tidak boleh dibuat", fileUrl: "https://ik.imagekit.io/x/a.pdf" },
+  });
+  assert("Role viewer ditolak membuat regulasi (403)", viewerCreate.status === 403, viewerCreate.status, 403);
+
+  const notPdf = await request("/bapenda/regulations", {
+    method: "POST", ...ed,
+    body: { title: "Smoke Regulasi Bukan PDF", slug: `${PREFIX}bukan-pdf`, fileUrl: "https://ik.imagekit.io/x/dokumen.docx" },
+  });
+  const notPdfId = notPdf.data?.data?.id;
+  assert("Berkas non-PDF tetap boleh disimpan sebagai draft", notPdf.status === 201, notPdf.status, 201);
+  const notPdfPublish = await request(`/bapenda/regulations/${notPdfId}/status`, {
+    method: "PATCH", ...sa, body: { status: "PUBLISHED" },
+  });
+  assert("Terbit dengan berkas non-PDF ditolak (400)", notPdfPublish.status === 400, notPdfPublish.status, 400);
+
+  const created = await request("/bapenda/regulations", {
+    method: "POST", ...ed,
+    body: {
+      title: "Smoke Regulasi Sementara", slug: `${PREFIX}sementara`,
+      description: "Dokumen uji", fileUrl: "https://ik.imagekit.io/x/smoke.pdf",
+      fileName: "smoke.pdf", fileSize: 1024,
+    },
+  });
+  const rid = created.data?.data?.id;
+  assert("Editor membuat regulasi (201) berstatus DRAFT", created.status === 201 && created.data?.data?.status === "DRAFT", created.status, 201);
+
+  const dup = await request("/bapenda/regulations", {
+    method: "POST", ...sa,
+    body: { title: "Bentrok", slug: `${PREFIX}sementara`, fileUrl: "https://ik.imagekit.io/x/b.pdf" },
+  });
+  assert("Slug yang sudah dipakai ditolak (409)", dup.status === 409, dup.status, 409);
+
+  const edPublish = await request(`/bapenda/regulations/${rid}/status`, { method: "PATCH", ...ed, body: { status: "PUBLISHED" } });
+  assert("Editor tidak punya izin terbit (403)", edPublish.status === 403, edPublish.status, 403);
+
+  const pub = await request(`/bapenda/regulations/${rid}/status`, { method: "PATCH", ...sa, body: { status: "PUBLISHED" } });
+  assert("Admin menerbitkan → publishedAt terisi", pub.data?.data?.status === "PUBLISHED" && Boolean(pub.data?.data?.publishedAt));
+
+  const nowPublic = await request(`/bapenda/regulations/public/${PREFIX}sementara`, P);
+  assert("Regulasi terbit muncul di publik (200)", nowPublic.status === 200, nowPublic.status, 200);
+
+  const upd = await request(`/bapenda/regulations/${rid}`, { method: "PUT", ...ed, body: { description: "Diubah" } });
+  assert("Editor mengubah regulasi saat terbit (200)", upd.status === 200 && upd.data?.data?.description === "Diubah", upd.status, 200);
+
+  const unpub = await request(`/bapenda/regulations/${rid}/status`, { method: "PATCH", ...sa, body: { status: "DRAFT" } });
+  assert("Tarik ke draft → publishedAt dikosongkan", unpub.data?.data?.status === "DRAFT" && unpub.data?.data?.publishedAt === null);
+
+  const edDelete = await request(`/bapenda/regulations/${rid}`, { method: "DELETE", ...ed });
+  assert("Editor tidak punya izin hapus (403)", edDelete.status === 403, edDelete.status, 403);
+
+  const del = await request(`/bapenda/regulations/${rid}`, { method: "DELETE", ...sa });
+  assert("Admin menghapus (soft-delete) regulasi (200)", del.data?.data?.deleted === true, del.status, 200);
+  const gone = await request(`/bapenda/regulations/${rid}`, sa);
+  assert("Regulasi terhapus tidak bisa dibuka CMS (404)", gone.status === 404, gone.status, 404);
+
+  if (notPdfId) await request(`/bapenda/regulations/${notPdfId}`, { method: "DELETE", ...sa });
+  await clean();
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -4385,6 +4476,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "faqs" || targetModule === "faq") {
       await runFaqsSuite();
+    }
+    if (!targetModule || targetModule === "regulations" || targetModule === "regulasi") {
+      await runRegulationsSuite();
     }
     if (!targetModule || targetModule === "pages" || targetModule === "halaman") {
       await runPagesSuite();

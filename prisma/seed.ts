@@ -25,6 +25,7 @@ import { seedBanners } from "./seeds/bapenda/banners.seeder.js";
 import { seedNews } from "./seeds/bapenda/news.seeder.js";
 import { seedGalleries } from "./seeds/bapenda/galleries.seeder.js";
 import { seedFaqs } from "./seeds/bapenda/faqs.seeder.js";
+import { seedRegulations } from "./seeds/bapenda/regulations.seeder.js";
 import { seedPages } from "./seeds/bapenda/pages.seeder.js";
 import { seedLapakCategories } from "./seeds/lapak/categories.seeder.js";
 import { seedLapakProducts } from "./seeds/lapak/products.seeder.js";
@@ -40,6 +41,7 @@ import type {
   NewsFile,
   GalleriesFile,
   FaqsFile,
+  RegulationsFile,
   PagesFile,
   OrganizationsFile,
 } from "./seeds/shared/types.js";
@@ -106,7 +108,7 @@ async function main(): Promise<void> {
 
   if (process.argv.includes("--reset")) await resetTables();
 
-  const [appsFile, rolesFile, usersFile, menusFile, uptdsFile, bannersFile, newsFile, pagesFile, orgsFile, lapakCategoriesFile, lapakProductsFile, galleriesFile, faqsFile] =
+  const [appsFile, rolesFile, usersFile, menusFile, uptdsFile, bannersFile, newsFile, pagesFile, orgsFile, lapakCategoriesFile, lapakProductsFile, galleriesFile, faqsFile, regulationsFile] =
     await Promise.all([
       loadJson<ApplicationsFile>("core/applications.json"),
       loadJson<RolesFile>("core/roles.json"),
@@ -121,6 +123,7 @@ async function main(): Promise<void> {
       loadJson<LapakProductsFile>("lapak/products.json"),
       loadJson<GalleriesFile>("bapenda/galleries.json"),
       loadJson<FaqsFile>("bapenda/faqs.json"),
+      loadJson<RegulationsFile>("bapenda/regulations.json"),
     ]);
 
   // Urutan WAJIB: menu dan user menautkan diri ke permission/role yang dibuat
@@ -165,6 +168,9 @@ async function main(): Promise<void> {
 
   console.log("");
   await seedFaqs(faqsFile);
+
+  console.log("");
+  await seedRegulations(regulationsFile);
 
   console.log("");
   await seedLapakCategories(lapakCategoriesFile.categories);

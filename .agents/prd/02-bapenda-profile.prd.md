@@ -3,7 +3,7 @@
 - **Kode Aplikasi Tenant:** `bapenda-profile`
 - **Tipe Domain:** Portal Informasi Publik Resmi, Direktori Layanan Samsat, Publikasi Berita, Galeri, FAQ, & Regulasi
 - **Referensi Aplikasi Lama:** [`datin-jambi/Bapenda-Jambi-Profile`](https://github.com/datin-jambi/Bapenda-Jambi-Profile) (Next.js 15 + Prisma, single-tenant, ID integer, role hardcode). Lokal: `C:\Users\ASUS\Documents\BPKPD\Code\Bapeda-Jambi-Profile-CRF`.
-- **Status Modul Saat Ini:** 🟡 **Dalam Pengerjaan (Modul 7: Regulasi)** — Galeri & FAQ ✅ 2026-10-24
+- **Status Modul Saat Ini:** 🟡 **Dalam Pengerjaan (Modul 8: Pengaturan Situs)** — Galeri, FAQ & Regulasi ✅ 2026-10-24
 
 ---
 
@@ -122,8 +122,8 @@ Pemetaan role lama → role SELOKO (`roles.json`):
 | **4** | **Halaman Profil (Pages)** | `/api/bapenda/pages` | ✅ **Selesai** | `pages.json` (5) |
 | **5** | **Galeri** | `/api/bapenda/galleries` | ✅ **Selesai** | `galleries.json` (3), `gallery_items.json` (7) |
 | **6** | **FAQ & Kategori** | `/api/bapenda/faqs` | ✅ **Selesai** | `faqs.json` (18), `faq_categories.json` (7) |
-| **7** | **Regulasi & Dokumen** | `/api/bapenda/regulations` | ⏳ **Target Berikutnya** | `regulations.json` (5) |
-| **8** | **Pengaturan Situs** | via `Application.settings` (core) | ⏳ *Antrean* | `settings.json` (18 key) |
+| **7** | **Regulasi & Dokumen** | `/api/bapenda/regulations` | ✅ **Selesai** | `regulations.json` (5) |
+| **8** | **Pengaturan Situs** | via `Application.settings` (core) | ⏳ **Target Berikutnya** | `settings.json` (18 key) |
 
 ---
 
@@ -211,12 +211,13 @@ Memakai tabel universal `articles` / `article_categories` dengan `type = NEWS` (
 - Permission: `faq` (grup `content` + `publish`), `faq-category` (grup `content`).
 - **Keputusan implementasi (2026-10-24):** daftar publik tanpa paginasi; FAQ di kategori nonaktif ikut tersembunyi; `view` hanya menghitung FAQ yang tayang; `reorder` per kategori & wajib lengkap; FAQ baru draft di akhir kategori; publik tanpa data penulis. Kontrak: `docs/api/bapenda/faqs.md`. Uji: `npm run db:smoke -- faqs` (27 skenario).
 
-### G. Modul 7: Regulasi & Dokumen (`/api/bapenda/regulations`) — ⏳ Antrean
+### G. Modul 7: Regulasi & Dokumen (`/api/bapenda/regulations`) — ✅ Selesai
 - Skema `Regulation` sudah ada: `title`, `slug`, `description?`, `fileUrl` + `fileId?` + `fileName?` + `fileSize?` (PDF ImageKit), `status`, `publishedAt?`.
 - Status cukup `DRAFT` / `PUBLISHED` (tanpa review).
 - **Publik:** `GET /public` (pagination, search). **CMS:** CRUD + `PATCH /:id/status`.
 - Permission: `regulation` (grup `content` + `publish`).
 - *Ekstensi opsional (belum ada di app lama):* `type` (PERDA/PERGUB/UU), `number`, `year`, `about`, status BERLAKU/DICABUT — tambahkan bila diminta.
+- **Keputusan implementasi (2026-10-24):** validasi PDF hanya saat terbit; `fileId` kosong dilewati karena data migrasi tidak menyimpannya (4 dokumen sudah tayang di app lama); berkas non-PDF boleh draft; batas ukuran 20 MB. Kontrak: `docs/api/bapenda/regulations.md`. Uji: `npm run db:smoke -- regulations` (19 skenario).
 
 ### H. Modul 8: Pengaturan Situs — ⏳ Antrean
 - Key lama (`site_name`, `contact_*`, `social_*`, `office_hours`, `location_*`, `google_analytics_id`, `footer_text`, `logo_url`, `favicon_url`) dipetakan ke `Application.settings` (`branding`, `contact`, `seo`, `features`) milik `bapenda-profile`.

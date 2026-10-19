@@ -194,6 +194,13 @@
               "icon": "tags",
               "path": "/bapenda/faq/kategori",
               "permission": "faq-category:list"
+            },
+            {
+              "code": "informasi.regulasi",
+              "label": "Regulasi & Dokumen",
+              "icon": "file-text",
+              "path": "/bapenda/regulasi",
+              "permission": "regulation:list"
             }
           ]
         }

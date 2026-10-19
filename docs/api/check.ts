@@ -36,6 +36,7 @@ const APP_MODULES: Record<string, Record<string, string>> = {
     pages: "src/modules/bapenda/pages/pages.routes.ts",
     galleries: "src/modules/bapenda/galleries/galleries.routes.ts",
     faqs: "src/modules/bapenda/faqs/faqs.routes.ts",
+    regulations: "src/modules/bapenda/regulations/regulations.routes.ts",
   },
   lapak: {
     categories: "src/modules/lapak/categories/categories.routes.ts",

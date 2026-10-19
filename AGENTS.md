@@ -100,10 +100,11 @@ lalu matikan setelahnya.
 4. ✅ **Halaman Profil** (`/api/bapenda/pages`) — *Selesai & ter-seed 5 halaman dari app lama*.
 5. ✅ **Galeri** (`/api/bapenda/galleries`) — *Selesai, alur review + item & urutan, ter-seed 1 galeri dari app lama*.
 6. ✅ **FAQ & Kategori** (`/api/bapenda/faqs`) — *Selesai, toggle terbit + urutan, ter-seed 18 FAQ dari app lama*.
-7. ⏳ **Regulations** (`/api/bapenda/regulations`) — *Target pengerjaan berikutnya*.
+7. ✅ **Regulasi & Dokumen** (`/api/bapenda/regulations`) — *Selesai, validasi PDF saat terbit, ter-seed 5 dokumen*.
+8. ⏳ **Pengaturan Situs** (`Application.settings`) — *Target pengerjaan berikutnya*.
 8. ⏳ **Pengaturan Situs** (via `Application.settings`).
 
-> ▶️ Bapenda Profile **dilanjutkan** (2026-10-24) — Lapak dijeda di LJ-4.1 (berita OPD ✅; artikel/galeri/banner OPD menyusul). Berikutnya Modul 7 Regulasi.
+> ▶️ Bapenda Profile **dilanjutkan** (2026-10-24) — Lapak dijeda di LJ-4.1 (berita OPD ✅; artikel/galeri/banner OPD menyusul). Berikutnya Modul 8 Pengaturan Situs.
 
 ---
 

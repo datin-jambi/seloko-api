@@ -73,8 +73,9 @@ ikhtisar + satu berkas per modul.
 | Halaman Profil | [bapenda/pages.md](./bapenda/pages.md) | 8 | publik + `page:*` |
 | Galeri | [bapenda/galleries.md](./bapenda/galleries.md) | 11 | publik + `gallery:*` |
 | FAQ & Kategori | [bapenda/faqs.md](./bapenda/faqs.md) | 15 | publik + `faq:*`, `faq-category:*` |
+| Regulasi & Dokumen | [bapenda/regulations.md](./bapenda/regulations.md) | 8 | publik + `regulation:*` |
 
-**Total Bapenda: 65 endpoint.**
+**Total Bapenda: 73 endpoint.**
 
 ### Lapak Jambi — aplikasi `lapak-jambi-web`
 
@@ -99,7 +100,7 @@ ikhtisar + satu berkas per modul.
 
 **Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 213 endpoint.**
+**Total keseluruhan: 221 endpoint.**
 
 ---
 

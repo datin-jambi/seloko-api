@@ -79,6 +79,7 @@
         { "module": "Media", "entity": "gallery", "label": "Galeri", "actions": ["reviewable"] },
         { "module": "Informasi", "entity": "faq", "label": "FAQ", "actions": ["publishable"] },
         { "module": "Informasi", "entity": "faq-category", "label": "Kategori FAQ", "actions": ["content"] },
+        { "module": "Informasi", "entity": "regulation", "label": "Regulasi & Dokumen", "actions": ["publishable"] },
         { "module": "Layanan", "entity": "uptd", "label": "UPTD Samsat", "actions": ["content"] }
       ]
     },

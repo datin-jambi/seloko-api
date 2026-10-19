@@ -12,8 +12,9 @@ milik aplikasi `bapenda-profile`.
 | Halaman Profil | [pages.md](./pages.md) | 8 | `/api/bapenda/pages` | `src/modules/bapenda/pages/` |
 | Galeri | [galleries.md](./galleries.md) | 11 | `/api/bapenda/galleries` | `src/modules/bapenda/galleries/` |
 | FAQ & Kategori | [faqs.md](./faqs.md) | 15 | `/api/bapenda/faqs` | `src/modules/bapenda/faqs/` |
+| Regulasi & Dokumen | [regulations.md](./regulations.md) | 8 | `/api/bapenda/regulations` | `src/modules/bapenda/regulations/` |
 
-**Total: 65 endpoint.**
+**Total: 73 endpoint.**
 
 ## Peta izin aplikasi `bapenda-profile`
 
@@ -21,7 +22,8 @@ milik aplikasi `bapenda-profile`.
 Konten   news:*             news-category:create|read|update|delete|list
          page:create|read|update|delete|list|publish
 Media    banner:*           gallery:* (reviewable: + approve|reject|publish)
-Informasi faq:*             faq-category:create|read|update|delete|list
+Informasi faq:*             faq-category:*
+         regulation:create|read|update|delete|list|publish
 Layanan  uptd:*
 ```
 
@@ -45,7 +47,7 @@ Layanan  uptd:*
 | Halaman Profil | ✅ Selesai (5 halaman ter-seed) |
 | Galeri | ✅ Selesai (alur review + item + 1 galeri ter-seed) |
 | FAQ | ✅ Selesai (toggle terbit + urutan, 18 FAQ ter-seed) |
-| Regulasi | ⏳ Antrean |
+| Regulasi | ✅ Selesai (PDF + validasi saat terbit, 5 dokumen ter-seed) |
 | Pengaturan Situs | ⏳ Antrean (`Application.settings`) |
 
 Roadmap detail: `.agents/tasks/` dan `.agents/prd/02-bapenda-profile.prd.md`.

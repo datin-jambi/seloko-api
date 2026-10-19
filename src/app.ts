@@ -267,6 +267,9 @@ export async function buildApp(): Promise<FastifyInstance> {
       const { faqsRoutes } = await import("~/modules/bapenda/faqs/faqs.routes.js");
       await api.register(faqsRoutes, { prefix: "/bapenda/faqs" });
 
+      const { regulationsRoutes } = await import("~/modules/bapenda/regulations/regulations.routes.js");
+      await api.register(regulationsRoutes, { prefix: "/bapenda/regulations" });
+
       // Lapak Jambi (Fase 1) — katalog aset daerah
       const { lapakCategoriesRoutes } = await import("~/modules/lapak/categories/categories.routes.js");
       await api.register(lapakCategoriesRoutes, { prefix: "/lapak/categories" });

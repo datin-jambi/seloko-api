@@ -69,7 +69,8 @@ Repositori ini adalah **SELOKO API** — Centralized Core API & Multi-App Engine
 - ✅ **Halaman Profil** (`/api/bapenda/pages`) — *Selesai & ter-seed 5 halaman dari app lama*.
 - ✅ **Galeri** (`/api/bapenda/galleries`) — *Selesai, alur review dari `shared/article`*.
 - ✅ **FAQ & Kategori** (`/api/bapenda/faqs`) — *Selesai*
-- ⏳ **Regulasi** — *Target pengerjaan berikutnya*
+- ✅ **Regulasi & Dokumen** (`/api/bapenda/regulations`) — *Selesai*
+- ⏳ **Pengaturan Situs** — *Target pengerjaan berikutnya*
 
 ---
 

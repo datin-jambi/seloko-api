@@ -1,0 +1,75 @@
+{
+  "$comment": "Migrasi dari Bapenda-Jambi-Profile (prisma/data/regulations.json). Waktu dump lama = WIB, disimpan sebagai UTC. fileId kosong di app lama — berkas tetap ada di ImageKit tapi ID-nya tidak tersimpan.",
+  "regulations": [
+    {
+      "slug": "perda-no-8-tahun-2010-tentang-pajak-daerah",
+      "title": "Perda No. 8 Tahun 2010 tentang Pajak Daerah",
+      "description": "Peraturan Daerah Provinsi Jambi tentang Pajak Daerah",
+      "fileUrl": "https://ik.imagekit.io/o7kpef481o/bapenda/perda-8-2010.pdf",
+      "fileId": null,
+      "fileName": "perda-8-2010.pdf",
+      "fileSize": null,
+      "status": "PUBLISHED",
+      "publishedAt": "2009-12-31T17:00:00.000Z",
+      "createdAt": "2026-06-17T04:25:59.776Z",
+      "updatedAt": "2026-06-17T04:25:59.776Z",
+      "deletedAt": null
+    },
+    {
+      "slug": "pergub-no-12-tahun-2024-tentang-tarif-pkb",
+      "title": "Pergub No. 12 Tahun 2024 tentang Tarif PKB",
+      "description": "Peraturan Gubernur tentang Tarif Pajak Kendaraan Bermotor",
+      "fileUrl": "https://ik.imagekit.io/o7kpef481o/bapenda/pergub-12-2024.pdf",
+      "fileId": null,
+      "fileName": "pergub-12-2024.pdf",
+      "fileSize": null,
+      "status": "PUBLISHED",
+      "publishedAt": "2024-01-14T17:00:00.000Z",
+      "createdAt": "2026-06-17T04:25:59.862Z",
+      "updatedAt": "2026-06-17T04:25:59.862Z",
+      "deletedAt": null
+    },
+    {
+      "slug": "pergub-no-5-tahun-2023-tentang-tata-cara-pengelolaan-pad",
+      "title": "Pergub No. 5 Tahun 2023 tentang Tata Cara Pengelolaan PAD",
+      "description": "Peraturan Gubernur tentang tata cara pengelolaan Pendapatan Asli Daerah Provinsi Jambi",
+      "fileUrl": "https://ik.imagekit.io/o7kpef481o/bapenda/pergub-5-2023.pdf",
+      "fileId": null,
+      "fileName": "pergub-5-2023.pdf",
+      "fileSize": null,
+      "status": "PUBLISHED",
+      "publishedAt": "2023-03-09T17:00:00.000Z",
+      "createdAt": "2026-06-17T04:25:59.909Z",
+      "updatedAt": "2026-06-17T04:25:59.909Z",
+      "deletedAt": null
+    },
+    {
+      "slug": "perda-no-2-tahun-2019-tentang-bbnkb",
+      "title": "Perda No. 2 Tahun 2019 tentang BBNKB",
+      "description": "Peraturan Daerah tentang Bea Balik Nama Kendaraan Bermotor Provinsi Jambi",
+      "fileUrl": "https://ik.imagekit.io/o7kpef481o/bapenda/perda-2-2019.pdf",
+      "fileId": null,
+      "fileName": "perda-2-2019.pdf",
+      "fileSize": null,
+      "status": "PUBLISHED",
+      "publishedAt": "2019-05-31T17:00:00.000Z",
+      "createdAt": "2026-06-17T04:25:59.955Z",
+      "updatedAt": "2026-06-17T04:25:59.955Z",
+      "deletedAt": null
+    },
+    {
+      "slug": "draft-revisi-pergub-tarif-pajak-air-2025",
+      "title": "Draft Revisi Pergub Tarif Pajak Air 2025",
+      "description": "Rancangan revisi peraturan gubernur mengenai tarif pajak air permukaan",
+      "fileUrl": "https://ik.imagekit.io/o7kpef481o/bapenda/draft-pergub-pajak-air-2025.pdf",
+      "fileId": null,
+      "fileName": "draft-pergub-pajak-air-2025.pdf",
+      "fileSize": null,
+      "status": "DRAFT",
+      "publishedAt": null,
+      "createdAt": "2026-06-17T04:26:00.000Z",
+      "updatedAt": "2026-06-17T04:26:00.000Z",
+      "deletedAt": null
+    }
+  ]
+}

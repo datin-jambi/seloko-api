@@ -7,6 +7,21 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-24 — Regulasi & Dokumen Bapenda (Modul 7)
+
+**Ditambah** — prefix `/api/bapenda/regulations` (8 endpoint): 2 publik + 6 CMS.
+- Status cukup `DRAFT`/`PUBLISHED` via `PATCH /:id/status` — tanpa alur review (PRD 02 §G).
+- Validasi saat terbit: URL wajib `.pdf`; bila `fileId` ada, berkas harus ada di ImageKit & ≤20 MB.
+  **`fileId` kosong tidak menghalangi terbit** — 5 dokumen hasil migrasi tidak menyimpan `fileId`
+  padahal 4 di antaranya sudah tayang di portal lama. Menolaknya akan memblokir data sah.
+- Berkas non-PDF tetap boleh disimpan sebagai draft, ditolak hanya saat terbit.
+- Berkas lama dibersihkan dari ImageKit setelah DB tersimpan (hanya bila `fileId` ada).
+- Seed RBAC: entity `regulation` (`publishable`), ditambahkan ke `allowedEntities` role `editor`;
+  menu CMS **Informasi → Regulasi & Dokumen**.
+- Seed `bapenda/regulations.json` dari aplikasi lama: 5 dokumen (4 PUBLISHED, 1 DRAFT).
+
+---
+
 ## 2026-10-24 — FAQ & Kategori Bapenda (Modul 6)
 
 **Ditambah** — prefix `/api/bapenda/faqs` (15 endpoint): 3 publik + 5 kategori + 7 FAQ.

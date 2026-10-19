@@ -339,6 +339,26 @@ export interface FaqsFile {
   faqs: FaqDef[];
 }
 
+// ─── regulations.json ─────────────────────────────────────────────────────────
+export interface RegulationDef {
+  slug: string;
+  title: string;
+  description?: string | null;
+  fileUrl: string;
+  fileId?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
+  status: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "PUBLISHED";
+  publishedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  deletedAt?: string | null;
+}
+
+export interface RegulationsFile {
+  regulations: RegulationDef[];
+}
+
 // ─── organizations.json ───────────────────────────────────────────────────────
 export type OrganizationTypeDef = "OPD" | "UPTD" | "BIRO" | "LAINNYA";
 
