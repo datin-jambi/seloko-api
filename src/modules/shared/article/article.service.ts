@@ -87,7 +87,7 @@ export const AUTHOR_EDITABLE: readonly ContentStatus[] = ["DRAFT", "REJECTED"];
 export const THUMBNAIL_RULES = { maxSizeBytes: 3 * 1024 * 1024, minWidth: 600 } as const;
 
 /** Validasi berkas thumbnail di ImageKit — hanya dipanggil saat konten tayang. */
-async function validateThumbnail(fileId: string | null | undefined): Promise<void> {
+export async function validateThumbnail(fileId: string | null | undefined): Promise<void> {
   if (!fileId?.trim()) return;
 
   const file = await ImageKitService.getFileDetails(fileId);
@@ -113,7 +113,7 @@ async function validateThumbnail(fileId: string | null | undefined): Promise<voi
   }
 }
 
-function cleanupFile(fileId: string | null | undefined): void {
+export function cleanupFile(fileId: string | null | undefined): void {
   if (!fileId) return;
   ImageKitService.deleteFile(fileId).catch((err) => {
     console.error(`[ArticleService] Gagal menghapus file lama ImageKit (${fileId}):`, err);

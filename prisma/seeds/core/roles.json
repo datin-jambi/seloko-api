@@ -35,7 +35,7 @@
       "description": "Membuat dan mengubah konten, tanpa hapus/terbit",
       "allowedActions": ["create", "read", "update", "list"],
       "allowedEntities": [
-        "news", "news-category", "page", "banner", "gallery", "uptd",
+        "news", "news-category", "page", "banner", "gallery", "faq", "faq-category", "uptd",
         "product", "order", "payment", "ticket", "article", "review", "report"
       ]
     },

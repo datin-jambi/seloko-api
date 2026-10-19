@@ -98,12 +98,12 @@ lalu matikan setelahnya.
 2. ✅ **Banners** (`/api/bapenda/banners`) — *Selesai, verifikasi ImageKit, & ter-seed 3 Banner*.
 3. ✅ **Berita & Kategori** (`/api/bapenda/news`, tabel universal `articles` `type=NEWS`) — *Selesai, alur review, & ter-seed 5 kategori + 7 berita dari app lama*.
 4. ✅ **Halaman Profil** (`/api/bapenda/pages`) — *Selesai & ter-seed 5 halaman dari app lama*.
-5. ⏳ **Galeri** (`/api/bapenda/galleries`) — *Target pengerjaan berikutnya*.
-6. ⏳ **FAQs** (`/api/bapenda/faqs`).
-7. ⏳ **Regulations** (`/api/bapenda/regulations`).
+5. ✅ **Galeri** (`/api/bapenda/galleries`) — *Selesai, alur review + item & urutan, ter-seed 1 galeri dari app lama*.
+6. ✅ **FAQ & Kategori** (`/api/bapenda/faqs`) — *Selesai, toggle terbit + urutan, ter-seed 18 FAQ dari app lama*.
+7. ⏳ **Regulations** (`/api/bapenda/regulations`) — *Target pengerjaan berikutnya*.
 8. ⏳ **Pengaturan Situs** (via `Application.settings`).
 
-> ⏸️ Bapenda Profile **dijeda** (2026-10-17) — fokus pindah ke Lapak Jambi. Lanjut dari Modul 5 Galeri bila kembali.
+> ▶️ Bapenda Profile **dilanjutkan** (2026-10-24) — Lapak dijeda di LJ-4.1 (berita OPD ✅; artikel/galeri/banner OPD menyusul). Berikutnya Modul 7 Regulasi.
 
 ---
 

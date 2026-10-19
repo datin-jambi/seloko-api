@@ -277,6 +277,68 @@ export interface NewsFile {
   news: NewsDef[];
 }
 
+// ─── galleries.json ───────────────────────────────────────────────────────────
+export interface GalleryItemDef {
+  mediaType: "IMAGE" | "VIDEO" | "PDF";
+  fileUrl: string;
+  title?: string | null;
+  description?: string | null;
+  sortOrder: number;
+  createdAt?: string | null;
+  deletedAt?: string | null;
+}
+
+export interface GalleryDef {
+  slug: string;
+  title: string;
+  description?: string | null;
+  coverImageUrl?: string | null;
+  status: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "PUBLISHED";
+  publishedAt?: string | null;
+  authorUsername: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  deletedAt?: string | null;
+  items: GalleryItemDef[];
+}
+
+export interface GalleriesFile {
+  galleries: GalleryDef[];
+}
+
+// ─── faqs.json ────────────────────────────────────────────────────────────────
+export interface FaqCategoryDef {
+  slug: string;
+  name: string;
+  description?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  deletedAt?: string | null;
+}
+
+export interface FaqDef {
+  categorySlug: string;
+  slug: string;
+  question: string;
+  answer: string;
+  sortOrder: number;
+  isPublished: boolean;
+  viewCount?: number;
+  publishedAt?: string | null;
+  authorUsername: string;
+  updatedByUsername?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  deletedAt?: string | null;
+}
+
+export interface FaqsFile {
+  categories: FaqCategoryDef[];
+  faqs: FaqDef[];
+}
+
 // ─── organizations.json ───────────────────────────────────────────────────────
 export type OrganizationTypeDef = "OPD" | "UPTD" | "BIRO" | "LAINNYA";
 

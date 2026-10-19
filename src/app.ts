@@ -261,6 +261,12 @@ export async function buildApp(): Promise<FastifyInstance> {
       const { pagesRoutes } = await import("~/modules/bapenda/pages/pages.routes.js");
       await api.register(pagesRoutes, { prefix: "/bapenda/pages" });
 
+      const { galleriesRoutes } = await import("~/modules/bapenda/galleries/galleries.routes.js");
+      await api.register(galleriesRoutes, { prefix: "/bapenda/galleries" });
+
+      const { faqsRoutes } = await import("~/modules/bapenda/faqs/faqs.routes.js");
+      await api.register(faqsRoutes, { prefix: "/bapenda/faqs" });
+
       // Lapak Jambi (Fase 1) — katalog aset daerah
       const { lapakCategoriesRoutes } = await import("~/modules/lapak/categories/categories.routes.js");
       await api.register(lapakCategoriesRoutes, { prefix: "/lapak/categories" });

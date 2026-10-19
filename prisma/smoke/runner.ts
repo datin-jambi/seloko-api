@@ -4099,6 +4099,238 @@ async function runLapakNewsSuite() {
   await prismaClient.articleCategory.deleteMany({ where: { name: { startsWith: "Kategori Uji" } } });
 }
 
+// ─── Test Suite: Bapenda Galeri ───────────────────────────────────────────────
+async function runGalleriesSuite() {
+  console.log("\n\x1b[36m▶ [Suite: Domain Bapenda - Galeri & Alur Review]\x1b[0m");
+  const P = { appCode: "bapenda-profile" };
+  const SLUG = "smoke-test-galeri-sementara";
+  await prisma.gallery.deleteMany({ where: { slug: { startsWith: SLUG } } });
+
+  // 1. Publik: hanya PUBLISHED, data seed dari app lama
+  const pubList = await request("/bapenda/galleries/public", P);
+  assert("Daftar galeri publik merespons sukses (200)", pubList.status === 200, pubList.status, 200);
+  assert("Hanya galeri PUBLISHED & tidak terhapus (1 dari seed)", pubList.data?.data?.length === 1, pubList.data?.data?.length, 1);
+  assert("Daftar publik membawa itemCount (2 item aktif)", pubList.data?.data?.[0]?.itemCount === 2, pubList.data?.data?.[0]?.itemCount, 2);
+  assert("Penulis hanya id + fullName (tanpa email/PII)", pubList.data?.data?.every((g: any) => g.author && !("email" in g.author)));
+
+  const seedSlug = pubList.data?.data?.[0]?.slug;
+  const detail = await request(`/bapenda/galleries/public/${seedSlug}`, P);
+  assert("Detail galeri publik via slug (200)", detail.status === 200, detail.status, 200);
+  assert("Item terhapus tidak ikut tampil (2 item)", detail.data?.data?.items?.length === 2, detail.data?.data?.items?.length, 2);
+
+  const deletedSlug = await request("/bapenda/galleries/public/lorem", P);
+  assert("Galeri terhapus tidak bisa dibuka publik (404)", deletedSlug.status === 404, deletedSlug.status, 404);
+
+  // 2. CMS & alur review
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const editorToken = await login("editor.profil", DEFAULT_PASSWORD, "seloko");
+  const viewerToken = await login("belum.verifikasi", DEFAULT_PASSWORD, "seloko");
+  const sa = { token: saToken || undefined };
+  const ed = { token: editorToken || undefined };
+
+  const viewerCreate = await request("/bapenda/galleries", {
+    method: "POST", token: viewerToken || undefined, body: { title: "Tidak boleh dibuat" },
+  });
+  assert("Role viewer ditolak membuat galeri (403)", viewerCreate.status === 403, viewerCreate.status, 403);
+
+  const img = (n: number) => ({ fileUrl: `https://ik.imagekit.io/seloko/bapenda/galleries/uji-${n}.jpg` });
+  const created = await request("/bapenda/galleries", {
+    method: "POST", ...ed,
+    body: { title: "Smoke Test Galeri Sementara", description: "Galeri uji", items: [img(1), img(2)] },
+  });
+  const gid = created.data?.data?.id;
+  assert("Editor membuat galeri + 2 item awal (201)", created.status === 201 && created.data?.data?.items?.length === 2, created.status, 201);
+  assert("Galeri baru berstatus DRAFT", created.data?.data?.status === "DRAFT");
+  assert("Slug dibentuk dari judul", created.data?.data?.slug === SLUG, created.data?.data?.slug);
+
+  const dup = await request("/bapenda/galleries", {
+    method: "POST", ...sa, body: { title: "Galeri Slug Bentrok", slug: SLUG },
+  });
+  assert("Slug manual yang sudah dipakai ditolak (409)", dup.status === 409, dup.status, 409);
+
+  const edList = await request("/bapenda/galleries?limit=100", ed);
+  assert("Editor hanya melihat galeri miliknya", (edList.data?.data ?? []).every((g: any) => g.author?.fullName === "Andi Saputra"), edList.data?.data?.length);
+
+  if (gid) {
+    // Item: tambah, urut ulang, hapus
+    const added = await request(`/bapenda/galleries/${gid}/items`, { method: "POST", ...ed, body: { items: [img(3)] } });
+    assert("Tambah item → 3 item, item baru di urutan akhir", added.status === 201 && added.data?.data?.length === 3 && added.data?.data?.[2]?.fileUrl.endsWith("uji-3.jpg"), added.status, 201);
+    const ids: string[] = (added.data?.data ?? []).map((i: any) => i.id);
+
+    const partial = await request(`/bapenda/galleries/${gid}/items/reorder`, { method: "PATCH", ...ed, body: { itemIds: ids.slice(0, 2) } });
+    assert("Reorder dengan daftar tidak lengkap ditolak (400)", partial.status === 400, partial.status, 400);
+
+    const reordered = await request(`/bapenda/galleries/${gid}/items/reorder`, { method: "PATCH", ...ed, body: { itemIds: [...ids].reverse() } });
+    assert("Reorder membalik urutan item", reordered.data?.data?.[0]?.id === ids[2] && reordered.data?.data?.[2]?.id === ids[0], reordered.status, 200);
+
+    const delItem = await request(`/bapenda/galleries/${gid}/items/${ids[1]}`, { method: "DELETE", ...ed });
+    assert("Hapus satu item (200)", delItem.data?.data?.deleted === true, delItem.status, 200);
+
+    // Alur review
+    const edPublish = await request(`/bapenda/galleries/${gid}/status`, { method: "PATCH", ...ed, body: { action: "publish" } });
+    assert("Editor tidak bisa langsung publish (403)", edPublish.status === 403, edPublish.status, 403);
+
+    const submit = await request(`/bapenda/galleries/${gid}/status`, { method: "PATCH", ...ed, body: { action: "submit" } });
+    assert("Editor mengajukan review → PENDING_REVIEW", submit.data?.data?.status === "PENDING_REVIEW", submit.data?.data?.status);
+
+    const locked = await request(`/bapenda/galleries/${gid}`, { method: "PUT", ...ed, body: { title: "Ubah saat review" } });
+    assert("Editor tidak bisa mengubah galeri yang sedang direview (403)", locked.status === 403, locked.status, 403);
+    const lockedItem = await request(`/bapenda/galleries/${gid}/items`, { method: "POST", ...ed, body: { items: [img(9)] } });
+    assert("Editor tidak bisa menambah item saat direview (403)", lockedItem.status === 403, lockedItem.status, 403);
+
+    const reject = await request(`/bapenda/galleries/${gid}/status`, { method: "PATCH", ...sa, body: { action: "reject", note: "Tambah foto" } });
+    assert("Admin menolak → REJECTED", reject.data?.data?.status === "REJECTED", reject.data?.data?.status);
+
+    await request(`/bapenda/galleries/${gid}/status`, { method: "PATCH", ...ed, body: { action: "submit" } });
+    const approve = await request(`/bapenda/galleries/${gid}/status`, { method: "PATCH", ...sa, body: { action: "approve" } });
+    assert("Ajukan ulang lalu disetujui → APPROVED", approve.data?.data?.status === "APPROVED", approve.data?.data?.status);
+
+    const publish = await request(`/bapenda/galleries/${gid}/status`, { method: "PATCH", ...sa, body: { action: "publish" } });
+    assert("Admin menerbitkan → PUBLISHED + publishedAt terisi", publish.data?.data?.status === "PUBLISHED" && Boolean(publish.data?.data?.publishedAt));
+
+    const nowPublic = await request(`/bapenda/galleries/public/${SLUG}`, P);
+    assert("Galeri terbit muncul di portal publik dengan 2 item (200)", nowPublic.status === 200 && nowPublic.data?.data?.items?.length === 2, nowPublic.status, 200);
+
+    const unpublish = await request(`/bapenda/galleries/${gid}/status`, { method: "PATCH", ...sa, body: { action: "unpublish" } });
+    assert("Unpublish → DRAFT, publishedAt dikosongkan", unpublish.data?.data?.status === "DRAFT" && unpublish.data?.data?.publishedAt === null);
+
+    const edDelete = await request(`/bapenda/galleries/${gid}`, { method: "DELETE", ...ed });
+    assert("Editor tidak punya izin hapus (403)", edDelete.status === 403, edDelete.status, 403);
+
+    const del = await request(`/bapenda/galleries/${gid}`, { method: "DELETE", ...sa });
+    assert("Admin menghapus (soft-delete) galeri (200)", del.data?.data?.deleted === true, del.status, 200);
+    const gone = await request(`/bapenda/galleries/${gid}`, sa);
+    assert("Galeri terhapus tidak bisa dibuka CMS (404)", gone.status === 404, gone.status, 404);
+  }
+
+  // 3. Galeri kosong tidak boleh terbit
+  const empty = await request("/bapenda/galleries", { method: "POST", ...sa, body: { title: "Smoke Test Galeri Sementara Kosong" } });
+  const emptyId = empty.data?.data?.id;
+  if (emptyId) {
+    const pubEmpty = await request(`/bapenda/galleries/${emptyId}/status`, { method: "PATCH", ...sa, body: { action: "publish" } });
+    assert("Galeri tanpa item ditolak terbit (400)", pubEmpty.status === 400, pubEmpty.status, 400);
+  }
+
+  // Bersihkan baris uji agar slug bebas di run berikutnya (soft-delete tetap memegang slug).
+  await prisma.gallery.deleteMany({ where: { slug: { startsWith: SLUG } } });
+}
+
+// ─── Test Suite: Bapenda FAQ ──────────────────────────────────────────────────
+async function runFaqsSuite() {
+  console.log("\n\x1b[36m▶ [Suite: Domain Bapenda - FAQ & Kategori]\x1b[0m");
+  const P = { appCode: "bapenda-profile" };
+  const PREFIX = "smoke-faq-";
+  const clean = async () => {
+    await prisma.faq.deleteMany({ where: { slug: { startsWith: PREFIX } } });
+    await prisma.faqCategory.deleteMany({ where: { slug: { startsWith: PREFIX } } });
+  };
+  await clean();
+
+  // 1. Publik — data seed dari app lama
+  const pubList = await request("/bapenda/faqs/public", P);
+  assert("Daftar FAQ publik merespons sukses (200)", pubList.status === 200, pubList.status, 200);
+  assert("FAQ di kategori nonaktif tersembunyi (17 dari 18)", pubList.data?.data?.length === 17, pubList.data?.data?.length, 17);
+  assert("Publik tidak membawa data penulis", pubList.data?.data?.every((f: any) => !("author" in f)));
+
+  const cats = await request("/bapenda/faqs/public/categories", P);
+  assert("Kategori publik hanya yang aktif (6)", cats.data?.data?.length === 6, cats.data?.data?.length, 6);
+
+  const pkb = await request("/bapenda/faqs/public?category=pkb", P);
+  assert("Filter slug kategori PKB → 4 FAQ berurutan", pkb.data?.data?.length === 4 && pkb.data?.data?.[0]?.sortOrder === 1, pkb.data?.data?.length, 4);
+
+  const search = await request("/bapenda/faqs/public?search=e-samsat", P);
+  assert("Pencarian 'e-samsat' menemukan FAQ", (search.data?.data?.length ?? 0) > 0, search.data?.data?.length);
+
+  const firstId = pubList.data?.data?.[0]?.id;
+  const v1 = await request(`/bapenda/faqs/public/${firstId}/view`, { method: "POST", ...P });
+  const v2 = await request(`/bapenda/faqs/public/${firstId}/view`, { method: "POST", ...P });
+  assert("Hitung pembaca bertambah tiap panggilan", v2.data?.data?.viewCount === v1.data?.data?.viewCount + 1, v2.data?.data?.viewCount);
+
+  // 2. CMS
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const editorToken = await login("editor.profil", DEFAULT_PASSWORD, "seloko");
+  const viewerToken = await login("belum.verifikasi", DEFAULT_PASSWORD, "seloko");
+  const sa = { token: saToken || undefined };
+  const ed = { token: editorToken || undefined };
+
+  const viewerCreate = await request("/bapenda/faqs/categories", {
+    method: "POST", token: viewerToken || undefined, body: { name: "Tidak boleh" },
+  });
+  assert("Role viewer ditolak membuat kategori (403)", viewerCreate.status === 403, viewerCreate.status, 403);
+
+  const cat = await request("/bapenda/faqs/categories", {
+    method: "POST", ...ed, body: { name: "Smoke FAQ Kategori", slug: `${PREFIX}kategori`, sortOrder: 99 },
+  });
+  const catId = cat.data?.data?.id;
+  assert("Editor membuat kategori FAQ (201)", cat.status === 201 && Boolean(catId), cat.status, 201);
+
+  const dupCat = await request("/bapenda/faqs/categories", {
+    method: "POST", ...sa, body: { name: "Bentrok", slug: `${PREFIX}kategori` },
+  });
+  assert("Slug kategori yang sudah dipakai ditolak (409)", dupCat.status === 409, dupCat.status, 409);
+
+  const mk = (question: string, slug: string) =>
+    request("/bapenda/faqs", {
+      method: "POST", ...ed,
+      body: { categoryId: catId, question, slug: `${PREFIX}${slug}`, answer: '<p onclick="x()">Jawaban</p><script>alert(1)</script>' },
+    });
+  const f1 = await mk("Pertanyaan uji pertama?", "satu");
+  const f2 = await mk("Pertanyaan uji kedua?", "dua");
+  const f3 = await mk("Pertanyaan uji ketiga?", "tiga");
+  const ids = [f1, f2, f3].map((r) => r.data?.data?.id);
+  assert("Editor membuat FAQ (201) berstatus draft", f1.status === 201 && f1.data?.data?.isPublished === false, f1.status, 201);
+  assert("Tanpa sortOrder → ditaruh di akhir kategori (1,2,3)", [f1, f2, f3].map((r) => r.data?.data?.sortOrder).join() === "1,2,3");
+  assert("Jawaban disanitasi (script & onclick dibuang)", !/script|onclick/.test(f1.data?.data?.answer ?? "x"));
+  assert("Penulis tercatat tanpa PII", f1.data?.data?.author?.fullName === "Andi Saputra" && !("email" in (f1.data?.data?.author ?? {})));
+
+  const badCat = await request("/bapenda/faqs", {
+    method: "POST", ...sa, body: { categoryId: "00000000-0000-7000-8000-000000000000", question: "Kategori palsu?", answer: "Jawaban" },
+  });
+  assert("Kategori tidak dikenal ditolak (400)", badCat.status === 400, badCat.status, 400);
+
+  // Draft tidak tampil & tidak bisa dihitung pembacanya
+  const draftView = await request(`/bapenda/faqs/public/${ids[0]}/view`, { method: "POST", ...P });
+  assert("Hitung pembaca FAQ draft ditolak (404)", draftView.status === 404, draftView.status, 404);
+
+  const edPublish = await request(`/bapenda/faqs/${ids[0]}/publish`, { method: "PATCH", ...ed, body: { isPublished: true } });
+  assert("Editor tidak punya izin terbit (403)", edPublish.status === 403, edPublish.status, 403);
+
+  const pub = await request(`/bapenda/faqs/${ids[0]}/publish`, { method: "PATCH", ...sa, body: { isPublished: true } });
+  assert("Admin menerbitkan → publishedAt terisi", pub.data?.data?.isPublished === true && Boolean(pub.data?.data?.publishedAt));
+  const nowPublic = await request(`/bapenda/faqs/public?category=${PREFIX}kategori`, P);
+  assert("FAQ terbit muncul di publik", nowPublic.data?.data?.length === 1, nowPublic.data?.data?.length, 1);
+
+  const upd = await request(`/bapenda/faqs/${ids[0]}`, { method: "PUT", ...ed, body: { question: "Pertanyaan uji diubah?" } });
+  assert("Editor mengubah FAQ → updatedBy tercatat", upd.data?.data?.updatedBy?.fullName === "Andi Saputra", upd.data?.data?.updatedBy?.fullName);
+
+  // Reorder
+  const partial = await request("/bapenda/faqs/reorder", { method: "PATCH", ...ed, body: { categoryId: catId, faqIds: ids.slice(0, 2) } });
+  assert("Reorder dengan daftar tidak lengkap ditolak (400)", partial.status === 400, partial.status, 400);
+  const reordered = await request("/bapenda/faqs/reorder", { method: "PATCH", ...ed, body: { categoryId: catId, faqIds: [...ids].reverse() } });
+  assert("Reorder membalik urutan (sortOrder mulai 1)", reordered.data?.data?.[0]?.id === ids[2] && reordered.data?.data?.[0]?.sortOrder === 1, reordered.status, 200);
+
+  // Kategori nonaktif menyembunyikan FAQ-nya
+  await request(`/bapenda/faqs/categories/${catId}/active`, { method: "PATCH", ...ed, body: { isActive: false } });
+  const hidden = await request(`/bapenda/faqs/public?category=${PREFIX}kategori`, P);
+  assert("Kategori nonaktif → FAQ terbitnya tersembunyi", hidden.data?.data?.length === 0, hidden.data?.data?.length, 0);
+
+  // Hapus
+  const usedCat = await request(`/bapenda/faqs/categories/${catId}`, { method: "DELETE", ...sa });
+  assert("Kategori yang masih dipakai ditolak dihapus (409)", usedCat.status === 409, usedCat.status, 409);
+
+  const edDelete = await request(`/bapenda/faqs/${ids[0]}`, { method: "DELETE", ...ed });
+  assert("Editor tidak punya izin hapus (403)", edDelete.status === 403, edDelete.status, 403);
+  for (const id of ids) await request(`/bapenda/faqs/${id}`, { method: "DELETE", ...sa });
+  const gone = await request(`/bapenda/faqs/${ids[0]}`, sa);
+  assert("FAQ terhapus tidak bisa dibuka CMS (404)", gone.status === 404, gone.status, 404);
+
+  const delCat = await request(`/bapenda/faqs/categories/${catId}`, { method: "DELETE", ...sa });
+  assert("Kategori kosong berhasil dihapus (200)", delCat.data?.data?.deleted === true, delCat.status, 200);
+
+  // Bersihkan baris uji agar slug bebas di run berikutnya (soft-delete tetap memegang slug).
+  await clean();
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -4147,6 +4379,12 @@ async function main() {
     }
     if (!targetModule || targetModule === "news" || targetModule === "berita") {
       await runNewsSuite();
+    }
+    if (!targetModule || targetModule === "galleries" || targetModule === "galeri") {
+      await runGalleriesSuite();
+    }
+    if (!targetModule || targetModule === "faqs" || targetModule === "faq") {
+      await runFaqsSuite();
     }
     if (!targetModule || targetModule === "pages" || targetModule === "halaman") {
       await runPagesSuite();

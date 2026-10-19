@@ -3,7 +3,7 @@
 - **Kode Aplikasi Tenant:** `bapenda-profile`
 - **Tipe Domain:** Portal Informasi Publik Resmi, Direktori Layanan Samsat, Publikasi Berita, Galeri, FAQ, & Regulasi
 - **Referensi Aplikasi Lama:** [`datin-jambi/Bapenda-Jambi-Profile`](https://github.com/datin-jambi/Bapenda-Jambi-Profile) (Next.js 15 + Prisma, single-tenant, ID integer, role hardcode). Lokal: `C:\Users\ASUS\Documents\BPKPD\Code\Bapeda-Jambi-Profile-CRF`.
-- **Status Modul Saat Ini:** 🟡 **Dalam Pengerjaan (Modul 5: Galeri)**
+- **Status Modul Saat Ini:** 🟡 **Dalam Pengerjaan (Modul 7: Regulasi)** — Galeri & FAQ ✅ 2026-10-24
 
 ---
 
@@ -120,9 +120,9 @@ Pemetaan role lama → role SELOKO (`roles.json`):
 | **2** | **Carousel Banners** | `/api/bapenda/banners` | ✅ **Selesai** | `banners.json` (6) |
 | **3** | **Berita & Kategori** | `/api/bapenda/news` | ✅ **Selesai** | `news.json` (7), `news_categories.json` (5) |
 | **4** | **Halaman Profil (Pages)** | `/api/bapenda/pages` | ✅ **Selesai** | `pages.json` (5) |
-| **5** | **Galeri** | `/api/bapenda/galleries` | ⏳ **Target Berikutnya** | `galleries.json` (3), `gallery_items.json` (7) |
-| **6** | **FAQ & Kategori** | `/api/bapenda/faqs` | ⏳ *Antrean* | `faqs.json` (18), `faq_categories.json` (7) |
-| **7** | **Regulasi & Dokumen** | `/api/bapenda/regulations` | ⏳ *Antrean* | `regulations.json` (5) |
+| **5** | **Galeri** | `/api/bapenda/galleries` | ✅ **Selesai** | `galleries.json` (3), `gallery_items.json` (7) |
+| **6** | **FAQ & Kategori** | `/api/bapenda/faqs` | ✅ **Selesai** | `faqs.json` (18), `faq_categories.json` (7) |
+| **7** | **Regulasi & Dokumen** | `/api/bapenda/regulations` | ⏳ **Target Berikutnya** | `regulations.json` (5) |
 | **8** | **Pengaturan Situs** | via `Application.settings` (core) | ⏳ *Antrean* | `settings.json` (18 key) |
 
 ---
@@ -195,19 +195,21 @@ Memakai tabel universal `articles` / `article_categories` dengan `type = NEWS` (
 - Konten HTML disanitasi lewat `src/common/utils/html.ts` (dipakai bersama berita): tabel `colspan/rowspan` & `style` aman (`color`, `background-color`, `text-align`, `width`, `min-width`) dipertahankan agar tabel halaman Pejabat utuh.
 - Uji: `npm run db:smoke -- pages` (20 skenario), `src/common/utils/html.check.ts`.
 
-### E. Modul 5: Galeri (`/api/bapenda/galleries`) — ⏳ Antrean
+### E. Modul 5: Galeri (`/api/bapenda/galleries`) — ✅ Selesai
 - Skema `Gallery` (+ `slug`, `coverImageUrl/FileId`, `status`, `authorId`) & `GalleryItem` (`mediaType` IMAGE/VIDEO/PDF, `fileUrl/fileId`, `title?`, `description?`, `sortOrder`).
 - Review workflow sama dengan berita (§4).
 - Item: tambah, hapus, reorder (`PATCH /:id/items/reorder`). Hapus galeri/item → cleanup ImageKit.
 - **Publik:** `GET /public`, `GET /public/:slug` (beserta item). **CMS:** CRUD + status + item.
 - Permission: `gallery` (grup `reviewable`).
+- **Keputusan implementasi (2026-10-24):** alur status & validasi sampul dipakai ulang dari `shared/article`; galeri tanpa item tidak boleh terbit; item terakhir galeri terbit tidak boleh dihapus; `reorder` wajib memuat seluruh item aktif; rute Bapenda hanya membaca `organizationId = NULL` (galeri OPD milik Lapak). Kontrak: `docs/api/bapenda/galleries.md`. Uji: `npm run db:smoke -- galleries` (30 skenario).
 
-### F. Modul 6: FAQ & Kategori (`/api/bapenda/faqs`) — ⏳ Antrean
+### F. Modul 6: FAQ & Kategori (`/api/bapenda/faqs`) — ✅ Selesai
 - Skema `FaqCategory` & `Faq` sudah ada: `question`, `slug`, `answer`, `sortOrder`, `isPublished`, `viewCount`, `publishedAt?`, `authorId`, `updatedById?`.
 - Tanpa review workflow (toggle publish).
 - **Publik:** `GET /public` (filter kategori, search), `GET /public/categories`, `POST /public/:id/view` (increment `viewCount`, dari app lama).
 - **CMS:** CRUD FAQ & kategori, `PATCH /:id/publish`, `PATCH /reorder`.
 - Permission: `faq` (grup `content` + `publish`), `faq-category` (grup `content`).
+- **Keputusan implementasi (2026-10-24):** daftar publik tanpa paginasi; FAQ di kategori nonaktif ikut tersembunyi; `view` hanya menghitung FAQ yang tayang; `reorder` per kategori & wajib lengkap; FAQ baru draft di akhir kategori; publik tanpa data penulis. Kontrak: `docs/api/bapenda/faqs.md`. Uji: `npm run db:smoke -- faqs` (27 skenario).
 
 ### G. Modul 7: Regulasi & Dokumen (`/api/bapenda/regulations`) — ⏳ Antrean
 - Skema `Regulation` sudah ada: `title`, `slug`, `description?`, `fileUrl` + `fileId?` + `fileName?` + `fileSize?` (PDF ImageKit), `status`, `publishedAt?`.

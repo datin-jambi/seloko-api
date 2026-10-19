@@ -175,6 +175,27 @@
               "permission": "gallery:list"
             }
           ]
+        },
+        {
+          "code": "informasi",
+          "label": "Informasi",
+          "icon": "info",
+          "items": [
+            {
+              "code": "informasi.faq",
+              "label": "FAQ",
+              "icon": "circle-help",
+              "path": "/bapenda/faq",
+              "permission": "faq:list"
+            },
+            {
+              "code": "informasi.faq.kategori",
+              "label": "Kategori FAQ",
+              "icon": "tags",
+              "path": "/bapenda/faq/kategori",
+              "permission": "faq-category:list"
+            }
+          ]
         }
       ]
     },

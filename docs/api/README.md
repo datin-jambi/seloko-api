@@ -71,8 +71,10 @@ ikhtisar + satu berkas per modul.
 | Banners | [bapenda/banners.md](./bapenda/banners.md) | 8 | publik + `banner:*` |
 | News & Kategori | [bapenda/news.md](./bapenda/news.md) | 14 | publik + `news:*`, `news-category:*` |
 | Halaman Profil | [bapenda/pages.md](./bapenda/pages.md) | 8 | publik + `page:*` |
+| Galeri | [bapenda/galleries.md](./bapenda/galleries.md) | 11 | publik + `gallery:*` |
+| FAQ & Kategori | [bapenda/faqs.md](./bapenda/faqs.md) | 15 | publik + `faq:*`, `faq-category:*` |
 
-**Total Bapenda: 39 endpoint.**
+**Total Bapenda: 65 endpoint.**
 
 ### Lapak Jambi — aplikasi `lapak-jambi-web`
 
@@ -97,7 +99,7 @@ ikhtisar + satu berkas per modul.
 
 **Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 187 endpoint.**
+**Total keseluruhan: 213 endpoint.**
 
 ---
 

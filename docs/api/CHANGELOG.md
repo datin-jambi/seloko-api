@@ -7,6 +7,42 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-24 — FAQ & Kategori Bapenda (Modul 6)
+
+**Ditambah** — prefix `/api/bapenda/faqs` (15 endpoint): 3 publik + 5 kategori + 7 FAQ.
+- Publik: daftar FAQ terbit tanpa paginasi (filter slug kategori + cari), kategori aktif,
+  `POST /public/:id/view` (hitung pembaca, dari app lama) — hanya FAQ yang benar-benar tayang.
+- CMS: toggle terbit `PATCH /:id/publish` (tanpa alur review, PRD 02 §F); `PATCH /reorder`
+  per kategori, wajib memuat seluruh FAQ kategori itu.
+- FAQ baru selalu draft; tanpa `sortOrder` ditaruh di akhir kategori. Jawaban disanitasi HTML.
+- Kategori nonaktif menyembunyikan seluruh FAQ-nya dari publik; kategori yang masih dipakai → `409`.
+- Respons publik **tidak** membawa penulis; CMS membawa `author` & `updatedBy` hanya `{ id, fullName }`.
+- Seed RBAC: entity `faq` (`publishable`) & `faq-category` (`content`) di `bapenda-profile`,
+  ditambahkan ke `allowedEntities` role `editor`; menu CMS grup **Informasi** (FAQ, Kategori FAQ).
+- Seed `bapenda/faqs.json` dari aplikasi lama: 7 kategori / 18 FAQ; tampil publik 6 / 17.
+  `viewCount` hanya ditulis saat baris dibuat agar seed ulang tidak menimpa hitungan produksi.
+- `resetTables()` kini ikut mengosongkan `faqs`, `faq_categories`, `gallery_items`, `galleries`.
+  **Catatan:** `db:seed:reset` masih gagal lebih awal di FK `lapak_products_organization_id_fkey`
+  (tabel Lapak belum masuk `resetTables`) — masalah lama, belum diperbaiki di perubahan ini.
+
+---
+
+## 2026-10-24 — Galeri Bapenda (Modul 5)
+
+**Ditambah** — prefix `/api/bapenda/galleries` (11 endpoint): 2 publik + 6 CMS galeri + 3 item
+(tambah, urut ulang, hapus).
+- Alur review sama dengan berita: `TRANSITIONS`/`nextStatus`/`validateThumbnail`/`cleanupFile`
+  dipakai ulang dari `shared/article` (kini di-`export`), bukan disalin.
+- Izin `gallery` di `bapenda-profile` diubah `content` → **`reviewable`** (menambah
+  `approve`/`reject`/`publish`) sesuai PRD 02 §E. Tanpa ini hanya superadmin yang bisa menerbitkan.
+- Galeri tanpa item ditolak terbit; item terakhir galeri terbit tidak bisa dihapus.
+- `reorder` wajib memuat seluruh item aktif — daftar kurang/berlebih/duplikat → `400`.
+- Hapus galeri: soft-delete galeri + item dalam satu transaksi, berkas ImageKit dibersihkan asinkron.
+- Rute Bapenda hanya membaca galeri dengan `organizationId = NULL`; galeri OPD (Lapak) tidak ikut.
+- Seed `bapenda/galleries.json` dari aplikasi lama: 3 galeri / 7 item, yang tampil publik 1 galeri / 2 item.
+
+---
+
 ## 2026-10-24 — Berita OPD (LJ-4.1, bagian 1/4)
 
 **Ditambah** — prefix `/api/lapak/news` (8 endpoint): 2 publik per kode OPD + 6 CMS.

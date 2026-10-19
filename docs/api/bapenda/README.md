@@ -10,15 +10,18 @@ milik aplikasi `bapenda-profile`.
 | Banners | [banners.md](./banners.md) | 8 | `/api/bapenda/banners` | `src/modules/bapenda/banners/` |
 | News & Kategori | [news.md](./news.md) | 14 | `/api/bapenda/news` | `src/modules/bapenda/news/` |
 | Halaman Profil | [pages.md](./pages.md) | 8 | `/api/bapenda/pages` | `src/modules/bapenda/pages/` |
+| Galeri | [galleries.md](./galleries.md) | 11 | `/api/bapenda/galleries` | `src/modules/bapenda/galleries/` |
+| FAQ & Kategori | [faqs.md](./faqs.md) | 15 | `/api/bapenda/faqs` | `src/modules/bapenda/faqs/` |
 
-**Total: 39 endpoint.**
+**Total: 65 endpoint.**
 
 ## Peta izin aplikasi `bapenda-profile`
 
 ```
 Konten   news:*             news-category:create|read|update|delete|list
          page:create|read|update|delete|list|publish
-Media    banner:*           gallery:*
+Media    banner:*           gallery:* (reviewable: + approve|reject|publish)
+Informasi faq:*             faq-category:create|read|update|delete|list
 Layanan  uptd:*
 ```
 
@@ -40,8 +43,8 @@ Layanan  uptd:*
 | Banners | ✅ Selesai (ImageKit dua tahap) |
 | News & Kategori | ✅ Selesai (alur review + 7 berita ter-seed) |
 | Halaman Profil | ✅ Selesai (5 halaman ter-seed) |
-| Galeri | ⏳ Antrean |
-| FAQ | ⏳ Antrean |
+| Galeri | ✅ Selesai (alur review + item + 1 galeri ter-seed) |
+| FAQ | ✅ Selesai (toggle terbit + urutan, 18 FAQ ter-seed) |
 | Regulasi | ⏳ Antrean |
 | Pengaturan Situs | ⏳ Antrean (`Application.settings`) |
 

@@ -16,6 +16,10 @@ export async function resetTables(): Promise<void> {
   console.log("🧹 --reset: mengosongkan tabel RBAC & navigasi…");
 
   await prisma.page.deleteMany();
+  await prisma.faq.deleteMany();
+  await prisma.faqCategory.deleteMany();
+  await prisma.galleryItem.deleteMany();
+  await prisma.gallery.deleteMany();
   await prisma.article.deleteMany();
   await prisma.articleCategory.deleteMany();
   await prisma.banner.deleteMany();

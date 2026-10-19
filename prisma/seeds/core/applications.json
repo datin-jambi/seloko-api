@@ -76,7 +76,9 @@
         { "module": "Konten", "entity": "news-category", "label": "Kategori Berita", "actions": ["content"] },
         { "module": "Konten", "entity": "page", "label": "Halaman", "actions": ["publishable"] },
         { "module": "Media", "entity": "banner", "label": "Banner", "actions": ["content"] },
-        { "module": "Media", "entity": "gallery", "label": "Galeri", "actions": ["content"] },
+        { "module": "Media", "entity": "gallery", "label": "Galeri", "actions": ["reviewable"] },
+        { "module": "Informasi", "entity": "faq", "label": "FAQ", "actions": ["publishable"] },
+        { "module": "Informasi", "entity": "faq-category", "label": "Kategori FAQ", "actions": ["content"] },
         { "module": "Layanan", "entity": "uptd", "label": "UPTD Samsat", "actions": ["content"] }
       ]
     },

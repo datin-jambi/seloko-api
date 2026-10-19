@@ -1,0 +1,108 @@
+{
+  "$comment": "Migrasi dari Bapenda-Jambi-Profile (prisma/data/galleries.json & gallery_items.json). Waktu dump lama = WIB, disimpan sebagai UTC. Penulis dipetakan ke username SELOKO (Editor→editor.profil). publishedAt galeri lama tidak tercatat → memakai updatedAt. Galeri & item terhapus ikut dibawa beserta deletedAt agar riwayat utuh dan slug terjaga.",
+  "galleries": [
+    {
+      "slug": "bapenda-provinsi-jambi-ikuti-workshop-asistensi-pengisian-championship-tp2dd-tahun-2026",
+      "title": "Bapenda Provinsi Jambi Ikuti Workshop Asistensi Pengisian Championship TP2DD Tahun 2026",
+      "description": "Jambi, 23 April 2026 – Badan Pendapatan Daerah (Bapenda) Provinsi Jambi menghadiri Workshop Asistensi Pengisian Evaluasi Kinerja (Championship) Tim Percepatan dan Perluasan Digitalisasi Daerah (TP2DD) Tahun 2026 yang diselenggarakan oleh Kantor Perwakilan Bank Indonesia Provinsi Jambi di BW Luxury Hotel Jambi.\n\nKegiatan ini merupakan tindak lanjut dari arahan Kementerian Koordinator Bidang Perekonomian terkait pelaksanaan Evaluasi Kinerja TP2DD Tahun 2025 (Championship 2026). Workshop bertujuan untuk meningkatkan kualitas, akurasi, dan kelengkapan pengisian data evaluasi kinerja TP2DD oleh pemerintah daerah di Provinsi Jambi.\n\nDalam kegiatan tersebut, hadiri langsung oleh bapak Kabid PEPSI Bapak Yopie Said Ramadhany,SE,M.A.k dan Kasubbid PSI Bapak Syafiqqurrahman,S.STP,M.H,  peserta memperoleh pendampingan teknis mengenai mekanisme pengisian instrumen Championship TP2DD, pemahaman terhadap indikator penilaian, serta penyelarasan data dan dokumen pendukung yang menjadi bagian dari proses evaluasi nasional.\n\nWorkshop diikuti oleh perwakilan pemerintah provinsi, pemerintah kabupaten/kota se-Provinsi Jambi, serta mitra strategis lainnya, termasuk Bank Pembangunan Daerah (BPD) Jambi. Seluruh peserta juga diminta membawa perangkat kerja untuk melakukan pengisian data secara langsung dengan pendampingan dari tim Bank Indonesia.\n\nMelalui keikutsertaan dalam kegiatan ini, Bapenda Provinsi Jambi menegaskan komitmennya dalam mendukung percepatan dan perluasan digitalisasi transaksi pemerintah daerah, khususnya pada sektor penerimaan daerah. Upaya ini diharapkan dapat memperkuat tata kelola keuangan daerah yang lebih efektif, transparan, akuntabel, serta meningkatkan kualitas pelayanan kepada masyarakat.\n\nPartisipasi aktif Bapenda Provinsi Jambi dalam Championship TP2DD juga menjadi bagian dari komitmen untuk mendorong implementasi Elektronifikasi Transaksi Pemerintah Daerah (ETPD), sehingga mampu meningkatkan kinerja digitalisasi daerah sekaligus mendukung transformasi layanan publik yang modern dan terintegrasi. (tim Sekretaiat Bapenda)",
+      "coverImageUrl": "https://ik.imagekit.io/bapendajambi/gallery/file-dsc07620-1jpg-1782459121_32WULx_MA",
+      "status": "PUBLISHED",
+      "publishedAt": "2026-06-26T00:52:32.889Z",
+      "authorUsername": "editor.profil",
+      "createdAt": "2026-06-17T04:25:59.252Z",
+      "updatedAt": "2026-06-26T00:52:32.889Z",
+      "deletedAt": null,
+      "items": [
+        {
+          "mediaType": "IMAGE",
+          "fileUrl": "https://ik.imagekit.io/o7kpef481o/bapenda/gallery-1.jpg",
+          "title": "Pembukaan Sosialisasi",
+          "description": null,
+          "sortOrder": 1,
+          "createdAt": "2026-06-17T04:25:59.341Z",
+          "deletedAt": "2026-06-22T07:22:11.115Z"
+        },
+        {
+          "mediaType": "IMAGE",
+          "fileUrl": "https://ik.imagekit.io/o7kpef481o/bapenda/gallery-2.jpg",
+          "title": "Penyampaian Materi",
+          "description": null,
+          "sortOrder": 2,
+          "createdAt": "2026-06-17T04:25:59.341Z",
+          "deletedAt": "2026-06-22T07:22:13.160Z"
+        },
+        {
+          "mediaType": "IMAGE",
+          "fileUrl": "https://ik.imagekit.io/o7kpef481o/bapenda/gallery-3.jpg",
+          "title": "Sesi Tanya Jawab",
+          "description": null,
+          "sortOrder": 3,
+          "createdAt": "2026-06-17T04:25:59.341Z",
+          "deletedAt": "2026-06-22T07:22:17.757Z"
+        },
+        {
+          "mediaType": "IMAGE",
+          "fileUrl": "https://ik.imagekit.io/bapendajambi/gallery/item_gallery2_BeBxmGw_c.png",
+          "title": null,
+          "description": null,
+          "sortOrder": 0,
+          "createdAt": "2026-06-22T07:22:29.744Z",
+          "deletedAt": "2026-06-26T00:50:02.954Z"
+        },
+        {
+          "mediaType": "IMAGE",
+          "fileUrl": "https://ik.imagekit.io/bapendajambi/gallery/item_gallery1_7OXeTiPoG.png",
+          "title": null,
+          "description": null,
+          "sortOrder": 0,
+          "createdAt": "2026-06-22T07:22:29.752Z",
+          "deletedAt": "2026-06-26T00:50:00.474Z"
+        },
+        {
+          "mediaType": "IMAGE",
+          "fileUrl": "https://ik.imagekit.io/bapendajambi/gallery/IMG_6684_47UECfFLR.JPG",
+          "title": null,
+          "description": null,
+          "sortOrder": 0,
+          "createdAt": "2026-06-26T00:51:09.786Z",
+          "deletedAt": null
+        },
+        {
+          "mediaType": "IMAGE",
+          "fileUrl": "https://ik.imagekit.io/bapendajambi/gallery/IMG_6630__2__QU8Ub4uJx.jpg",
+          "title": null,
+          "description": null,
+          "sortOrder": 0,
+          "createdAt": "2026-06-26T00:52:31.609Z",
+          "deletedAt": null
+        }
+      ]
+    },
+    {
+      "slug": "lorem",
+      "title": "lorem",
+      "description": "lorem",
+      "coverImageUrl": "https://ik.imagekit.io/bapendajambi/gallery/file-magnificfloating-glowing-puzzle-tiles-fo-1784776857_IA8ghXchB",
+      "status": "DRAFT",
+      "publishedAt": null,
+      "authorUsername": "editor.profil",
+      "createdAt": "2026-07-22T20:21:04.058Z",
+      "updatedAt": "2026-08-15T04:41:22.952Z",
+      "deletedAt": "2026-08-15T04:41:22.951Z",
+      "items": []
+    },
+    {
+      "slug": "lorem-2",
+      "title": "lorem",
+      "description": "lorem",
+      "coverImageUrl": "https://ik.imagekit.io/bapendajambi/gallery/file-magnificfloating-glowing-puzzle-tiles-fo-1784776857_IA8ghXchB",
+      "status": "DRAFT",
+      "publishedAt": null,
+      "authorUsername": "editor.profil",
+      "createdAt": "2026-07-22T20:21:07.546Z",
+      "updatedAt": "2026-08-15T04:41:20.879Z",
+      "deletedAt": "2026-08-15T04:41:20.878Z",
+      "items": []
+    }
+  ]
+}
