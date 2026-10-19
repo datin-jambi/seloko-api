@@ -38,6 +38,16 @@ export interface ArticleScope {
   entity: string;
   /** Label manusia untuk pesan, mis. "Berita". */
   label: string;
+  /**
+   * Batasi ke konten milik satu OPD (PRD 04 §G).
+   *
+   * `undefined` = perilaku lama: seluruh konten aplikasi (dipakai Bapenda).
+   * `string`  = hanya konten OPD tersebut (dipakai Lapak).
+   *
+   * Sengaja TIDAK memakai `null` sebagai nilai: `undefined`/absen berarti
+   * "tanpa filter", sehingga pemanggil lama tidak perlu diubah sama sekali.
+   */
+  organizationId?: string;
 }
 
 /** Pelaku request CMS. */
@@ -200,6 +210,16 @@ async function assertCategory(applicationId: string, type: ArticleType, category
   if (!category) throw new BadRequestError("Kategori tidak ditemukan untuk jenis konten ini");
 }
 
+/**
+ * Filter OPD untuk query konten.
+ *
+ * Mengembalikan objek kosong bila scope tidak membatasi OPD — sehingga query
+ * Bapenda tetap persis seperti sebelumnya (`organizationId` tidak disebut).
+ */
+function orgFilter(scope: ArticleScope): { organizationId?: string } {
+  return scope.organizationId ? { organizationId: scope.organizationId } : {};
+}
+
 // ─── Publik ───────────────────────────────────────────────────────────────────
 export async function listPublicArticles(scope: ArticleScope, query: PublicListArticlesQuery) {
   const applicationId = await getAppId(scope.appCode);
@@ -210,6 +230,7 @@ export async function listPublicArticles(scope: ArticleScope, query: PublicListA
     type: scope.type,
     status: "PUBLISHED",
     deletedAt: null,
+    ...orgFilter(scope),
     category: { isActive: true, deletedAt: null, ...(category && { slug: category }) },
     ...(search && {
       OR: [
@@ -237,7 +258,7 @@ export async function listPublicArticles(scope: ArticleScope, query: PublicListA
 export async function getPublicArticleBySlug(scope: ArticleScope, slug: string) {
   const applicationId = await getAppId(scope.appCode);
   const found = await prisma.article.findFirst({
-    where: { applicationId, type: scope.type, slug, status: "PUBLISHED", deletedAt: null },
+    where: { applicationId, type: scope.type, slug, status: "PUBLISHED", deletedAt: null, ...orgFilter(scope) },
     select: { id: true },
   });
   if (!found) throw new NotFoundError(scope.label);
@@ -267,6 +288,7 @@ export async function listArticles(scope: ArticleScope, actor: Actor, query: Lis
     applicationId,
     type: scope.type,
     deletedAt: null,
+    ...orgFilter(scope),
     ...(access.ownOnly && { authorId: actor.userId }),
     ...(status && { status }),
     ...(categoryId && { categoryId }),
@@ -302,6 +324,8 @@ async function findOwnedArticle(scope: ArticleScope, actor: Actor, id: string) {
       applicationId,
       type: scope.type,
       deletedAt: null,
+      // Tanpa ini, get/update/status/delete menemukan konten OPD lain lewat ID.
+      ...orgFilter(scope),
       ...(access.ownOnly && { authorId: actor.userId }),
     },
     include: ARTICLE_INCLUDE,
@@ -325,6 +349,8 @@ export async function createArticle(scope: ArticleScope, actor: Actor, body: Cre
       type: scope.type,
       categoryId: body.categoryId,
       authorId: actor.userId,
+      // Konten OPD melekat pada OPD pemiliknya; Bapenda tetap NULL.
+      organizationId: scope.organizationId ?? null,
       title: body.title,
       slug,
       excerpt: body.excerpt ?? null,

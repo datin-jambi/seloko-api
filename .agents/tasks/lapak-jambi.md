@@ -55,7 +55,7 @@ Legenda: `⏳` belum · `🟡` dikerjakan · `✅` selesai · `⛔` batal
 ## Fase 4 — Pasca-MVP (rencana; skema boleh disiapkan lebih awal)
 | ID | Tugas | Status |
 |---|---|---|
-| LJ-4.1 | Konten per OPD: berita/artikel (`shared/article` + `organizationId`), galeri, banner | ⏳ |
+| LJ-4.1 | Konten per OPD: berita/artikel (`shared/article` + `organizationId`), galeri, banner — **berita ✅** (smoke `lapak-news` 28/28); artikel/galeri/banner menyusul | 🟡 |
 | LJ-4.2 | Ulasan & rating produk (hanya dari pesanan selesai) + moderasi | ⏳ |
 | LJ-4.3 | Komentar berita | ⏳ |
 | LJ-4.4 | Wishlist & notifikasi | ⏳ |

@@ -24,7 +24,7 @@ async function scopeOf(request: FastifyRequest): Promise<string[] | null> {
   if (request.user.isSuperAdmin) return null;
   // Lingkup dihitung di service; controller hanya meneruskan identitas.
   const { accessibleOrganizationIds } = await import("./rates.service.js");
-  return accessibleOrganizationIds(request.user.sub, false);
+  return accessibleOrganizationIds(request.user.sub, request.user.isSuperAdmin);
 }
 
 async function productPermissions(request: FastifyRequest): Promise<string[]> {

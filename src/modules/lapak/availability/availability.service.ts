@@ -38,6 +38,7 @@ export async function accessibleOrganizationIds(
   isSuperAdmin: boolean,
 ): Promise<string[] | null> {
   if (isSuperAdmin) return null;
+
   const scopes = await prisma.userAppRoleOrganization.findMany({
     where: {
       userAppRole: {
@@ -48,6 +49,8 @@ export async function accessibleOrganizationIds(
     },
     select: { organizationId: true },
   });
+
+  // PRD 04 §B: penugasan TANPA baris lingkup = semua OPD (level Bapenda).
   return scopes.length === 0 ? null : [...new Set(scopes.map((s) => s.organizationId))];
 }
 

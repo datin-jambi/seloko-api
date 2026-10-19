@@ -7,6 +7,26 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-24 — Berita OPD (LJ-4.1, bagian 1/4)
+
+**Ditambah** — prefix `/api/lapak/news` (8 endpoint): 2 publik per kode OPD + 6 CMS.
+- DB: kolom nullable `organization_id` pada `articles`, `banners`, `galleries` + index
+  komposit; migrasi `20261024090000_add_organization_to_content`, drift 0. Baris Bapenda
+  tetap `NULL` — non-breaking.
+- `shared/article`: `ArticleScope.organizationId` opsional; filter OPD diterapkan di
+  daftar/detail publik, daftar CMS, `findOwnedArticle` (get/update/status/delete), dan
+  disimpan saat create. Pemanggil Bapenda tidak berubah; `article.check` tetap lolos.
+
+**Diperbaiki (keamanan, lintas modul)**
+- 8 controller Lapak (availability, dashboard, orders, payments, rates, reports, skrd,
+  tickets) memanggil `accessibleOrganizationIds(userId, false)` — hardcoded, bukan
+  `request.user.isSuperAdmin`. Diseragamkan.
+- `?organization=` pada CMS berita sempat **dibuang diam-diam** oleh validasi Fastify
+  karena tidak dideklarasikan di skema query — lingkup OPD terabaikan. Kini dideklarasikan
+  (`ListNewsQuerySchema`, `OrgQuerySchema`) dan diuji: admin BPSDM memilih DISBUDPAR → `404`.
+
+---
+
 ## 2026-10-23 — Transparansi PAD Publik (LJ-3.3) — **Fase 3 SELESAI**
 
 **Ditambah** — prefix `/api/lapak/public-stats` (1 endpoint)

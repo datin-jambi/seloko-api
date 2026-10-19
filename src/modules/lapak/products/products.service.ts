@@ -48,6 +48,7 @@ export async function accessibleOrganizationIds(
     select: { organizationId: true },
   });
   // Tanpa baris lingkup = penugasan level Bapenda (semua OPD).
+  // PRD 04 §B: penugasan TANPA baris lingkup = semua OPD (level Bapenda).
   return scopes.length === 0 ? null : [...new Set(scopes.map((s) => s.organizationId))];
 }
 

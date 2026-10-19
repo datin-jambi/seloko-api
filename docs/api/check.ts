@@ -51,6 +51,7 @@ const APP_MODULES: Record<string, Record<string, string>> = {
     dashboard: "src/modules/lapak/dashboard/dashboard.routes.ts",
     reports: "src/modules/lapak/reports/reports.routes.ts",
     "public-stats": "src/modules/lapak/public-stats/public-stats.routes.ts",
+    news: "src/modules/lapak/news/news.routes.ts",
   },
 };
 

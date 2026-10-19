@@ -93,10 +93,11 @@ ikhtisar + satu berkas per modul.
 | Dashboard & Target PAD | [lapak/dashboard.md](./lapak/dashboard.md) | 4 | `report:read` / `report:update` |
 | Daftar Transaksi & Ekspor | [lapak/reports.md](./lapak/reports.md) | 2 | `report:read` / `report:export` |
 | Transparansi PAD Publik | [lapak/public-stats.md](./lapak/public-stats.md) | 1 | publik (tanpa login) |
+| Berita OPD | [lapak/news.md](./lapak/news.md) | 8 | publik / `news:*` |
 
 **Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 179 endpoint.**
+**Total keseluruhan: 187 endpoint.**
 
 ---
 

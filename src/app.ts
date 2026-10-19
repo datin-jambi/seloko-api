@@ -319,6 +319,10 @@ export async function buildApp(): Promise<FastifyInstance> {
       const { lapakPublicStatsRoutes } = await import("~/modules/lapak/public-stats/public-stats.routes.js");
       await api.register(lapakPublicStatsRoutes, { prefix: "/lapak/public-stats" });
 
+      // Konten per OPD: berita (Fase 4).
+      const { lapakNewsRoutes } = await import("~/modules/lapak/news/news.routes.js");
+      await api.register(lapakNewsRoutes, { prefix: "/lapak/news" });
+
       // Lapak modules
       // await api.register(merchantsRoutes, { prefix: "/merchants" });
       // await api.register(productsRoutes, { prefix: "/products" });

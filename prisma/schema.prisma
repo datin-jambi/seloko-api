@@ -312,6 +312,9 @@ model Organization {
   lapakOrders       LapakOrder[]
   lapakSkrdSettings LapakSkrdSetting[]
   lapakTargets      LapakTarget[]
+  articles          Article[]
+  banners           Banner[]
+  galleries         Gallery[]
 
   @@index([parentId])
   @@index([type, isActive])
@@ -467,14 +470,20 @@ model Article {
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt       DateTime?     @map("deleted_at") @db.Timestamptz()
 
-  application Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  category    ArticleCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  author      User            @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  /// OPD pemilik konten. NULL = konten aplikasi/Bapenda (perilaku lama).
+  /// Additif: baris lama tidak terpengaruh, query Bapenda tetap tanpa filter ini.
+  organizationId  String?       @map("organization_id") @db.VarChar(36)
+
+  application  Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  category     ArticleCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  author       User            @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  organization Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([applicationId, type, slug], map: "uq_app_article_slug")
   @@index([applicationId, type, status, publishedAt])
   @@index([categoryId])
   @@index([authorId])
+  @@index([applicationId, organizationId, type, status], map: "idx_articles_app_org_type_status")
   @@map("articles")
 }
 
@@ -496,9 +505,14 @@ model Banner {
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt         DateTime? @map("deleted_at") @db.Timestamptz()
 
-  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  /// OPD pemilik banner. NULL = banner aplikasi/Bapenda (perilaku lama).
+  organizationId String? @map("organization_id") @db.VarChar(36)
+
+  application  Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([applicationId, isActive, sortOrder])
+  @@index([applicationId, organizationId, isActive], map: "idx_banners_app_org_active")
   @@map("banners")
 }
 
@@ -518,12 +532,17 @@ model Gallery {
   updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt        DateTime?     @map("deleted_at") @db.Timestamptz()
 
-  application Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  author      User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  items       GalleryItem[]
+  /// OPD pemilik galeri. NULL = galeri aplikasi/Bapenda (perilaku lama).
+  organizationId String? @map("organization_id") @db.VarChar(36)
+
+  application  Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  author       User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items        GalleryItem[]
 
   @@unique([applicationId, slug], map: "uq_app_gallery_slug")
   @@index([applicationId, status])
+  @@index([applicationId, organizationId, status], map: "idx_galleries_app_org_status")
   @@map("galleries")
 }
 

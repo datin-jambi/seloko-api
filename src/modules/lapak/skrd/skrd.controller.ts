@@ -24,7 +24,7 @@ import type {
 
 async function scopeOf(request: FastifyRequest): Promise<string[] | null> {
   if (request.user.isSuperAdmin) return null;
-  return accessibleOrganizationIds(request.user.sub, false);
+  return accessibleOrganizationIds(request.user.sub, request.user.isSuperAdmin);
 }
 
 // ─── Pengaturan ───────────────────────────────────────────────────────────────

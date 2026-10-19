@@ -6,7 +6,7 @@ import type { TransactionQuery, ExportQuery } from "./reports.schema.js";
 
 async function scopeOf(request: FastifyRequest): Promise<string[] | null> {
   if (request.user.isSuperAdmin) return null;
-  return accessibleOrganizationIds(request.user.sub, false);
+  return accessibleOrganizationIds(request.user.sub, request.user.isSuperAdmin);
 }
 
 export async function handleListTransactions(

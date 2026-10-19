@@ -90,7 +90,7 @@ export async function handleListOrdersCms(
   const query = request.query as ListOrdersQuery;
   const scope = request.user.isSuperAdmin
     ? null
-    : await accessibleOrganizationIds(request.user.sub, false);
+    : await accessibleOrganizationIds(request.user.sub, request.user.isSuperAdmin);
   const result = await listOrdersForCms(scope, query);
 
   return reply.status(HttpStatus.OK).send({

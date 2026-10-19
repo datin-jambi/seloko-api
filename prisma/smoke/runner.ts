@@ -33,6 +33,7 @@
  *   npm run db:smoke -- lapak-dashboard  → Hanya uji dashboard & target (LJ-3.1)
  *   npm run db:smoke -- lapak-reports    → Hanya uji daftar transaksi & ekspor CSV (LJ-3.2)
  *   npm run db:smoke -- lapak-public-stats → Hanya uji transparansi PAD publik (LJ-3.3)
+ *   npm run db:smoke -- lapak-news       → Hanya uji konten berita per OPD (LJ-4.1)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -3888,6 +3889,216 @@ async function runLapakPublicStatsSuite() {
   await prisma.lapakProduct.deleteMany({ where: { id: prod.id } });
 }
 
+// ─── Test Suite: Lapak — Konten Berita per OPD (LJ-4.1) ──────────────────────
+async function runLapakNewsSuite() {
+  console.log("\n\x1b[36m▶ [Suite 28: Lapak - Konten Berita per OPD]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  assert("Superadmin login", Boolean(saToken));
+
+  const prismaClient = prisma;
+  // Bersihkan berita uji Lapak (organizationId terisi = milik Lapak).
+  // Hapus artikel uji dulu (anak), baru kategori (induk) — FK RESTRICT.
+  await prismaClient.article.deleteMany({
+    where: { OR: [
+      { title: { startsWith: "Berita Uji" } },
+      { title: { startsWith: "Berita Milik Bapenda Uji" } },
+      { title: { startsWith: "Coba Ubah" } },
+    ] },
+  });
+  await prismaClient.articleCategory.deleteMany({ where: { name: { startsWith: "Kategori Uji" } } });
+
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+  const disbudpar = (orgs.data?.data ?? []).find((o: any) => o.code === "DISBUDPAR");
+  assert("Dua OPD tersedia", Boolean(bpsdm?.id && disbudpar?.id));
+
+  // ── 1. Kategori konten Lapak (per aplikasi + jenis).
+  const cat = await prismaClient.articleCategory.create({
+    data: {
+      applicationId: (await prismaClient.application.findUniqueOrThrow({
+        where: { code: "lapak-jambi-web" }, select: { id: true },
+      })).id,
+      type: "NEWS",
+      name: "Kategori Uji Berita OPD",
+      slug: `kategori-uji-berita-${Date.now()}`,
+      isActive: true,
+    },
+    select: { id: true },
+  });
+  assert("Kategori berita Lapak dibuat", Boolean(cat.id));
+
+  // ── 2. Bapenda membuat berita untuk BPSDM (via ?organization=).
+  const c1 = await request("/lapak/news?organization=BPSDM", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      categoryId: cat.id,
+      title: "Berita Uji BPSDM Satu",
+      content: "<p>Konten berita uji BPSDM.</p>",
+      excerpt: "Ringkasan uji",
+    },
+  });
+  assert("Buat berita BPSDM 201", c1.status === 201, c1.status, c1.data?.message);
+  const newsBpsdm = c1.data?.data;
+  assert("Status awal DRAFT", newsBpsdm?.status === "DRAFT", newsBpsdm?.status);
+
+  // ── 3. Berita untuk DISBUDPAR.
+  const c2 = await request("/lapak/news?organization=DISBUDPAR", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      categoryId: cat.id,
+      title: "Berita Uji DISBUDPAR Satu",
+      content: "<p>Konten berita uji DISBUDPAR.</p>",
+    },
+  });
+  assert("Buat berita DISBUDPAR 201", c2.status === 201, c2.status, c2.data?.message);
+  const newsDisbudpar = c2.data?.data;
+
+  // ── 4. INTI: isolasi OPD — daftar BPSDM tidak memuat berita DISBUDPAR.
+  const listBpsdm = await request("/lapak/news?organization=BPSDM&limit=100", {
+    token: saToken || undefined,
+  });
+  assert("Daftar berita BPSDM 200", listBpsdm.status === 200, listBpsdm.status, listBpsdm.data?.message);
+  const titlesBpsdm = (listBpsdm.data?.data ?? []).map((a: any) => a.title);
+  assert("Berita BPSDM terlihat", titlesBpsdm.some((t: string) => t.includes("BPSDM")), JSON.stringify(titlesBpsdm));
+  assert("Berita DISBUDPAR TIDAK muncul di BPSDM",
+    !titlesBpsdm.some((t: string) => t.includes("DISBUDPAR")), JSON.stringify(titlesBpsdm));
+
+  // ── 5. Publik: hanya berita PUBLISHED, terpisah per OPD.
+  // Sebelum publish → daftar publik kosong.
+  const pubBefore = await request("/lapak/news/public/BPSDM", { appCode: "lapak-jambi-web" });
+  assert("Publik 200 sebelum publish", pubBefore.status === 200, pubBefore.status, pubBefore.data?.message);
+  assert("DRAFT tidak tampil di publik", (pubBefore.data?.data ?? []).length === 0,
+    (pubBefore.data?.data ?? []).length);
+
+  // Publish berita BPSDM.
+  const publish = await request(`/lapak/news/${newsBpsdm.id}/status?organization=BPSDM`, {
+    method: "PATCH", token: saToken || undefined, body: { action: "publish" },
+  });
+  assert("Publish berita 200", publish.status === 200, publish.status, publish.data?.message);
+
+  const pubAfter = await request("/lapak/news/public/BPSDM", { appCode: "lapak-jambi-web" });
+  assert("Berita published tampil di publik", (pubAfter.data?.data ?? []).length === 1,
+    (pubAfter.data?.data ?? []).length);
+
+  // Publik DISBUDPAR tidak melihat berita BPSDM.
+  const pubOther = await request("/lapak/news/public/DISBUDPAR", { appCode: "lapak-jambi-web" });
+  assert("Publik OPD lain tidak melihat berita BPSDM",
+    (pubOther.data?.data ?? []).length === 0, (pubOther.data?.data ?? []).length);
+
+  // Detail publik lewat slug.
+  const detail = await request(`/lapak/news/public/BPSDM/${newsBpsdm.slug}`, { appCode: "lapak-jambi-web" });
+  assert("Detail publik 200", detail.status === 200, detail.status, detail.data?.message);
+  assert("Judul sesuai", detail.data?.data?.title === "Berita Uji BPSDM Satu", detail.data?.data?.title);
+
+  // Slug yang sama tapi OPD berbeda → 404 (tidak bocor).
+  const crossSlug = await request(`/lapak/news/public/DISBUDPAR/${newsBpsdm.slug}`, { appCode: "lapak-jambi-web" });
+  assert("Slug BPSDM di URL DISBUDPAR → 404", crossSlug.status === 404, crossSlug.status);
+
+  // Kode OPD tidak dikenal → 404.
+  const badOrg = await request("/lapak/news/public/OPD-TIDAK-ADA", { appCode: "lapak-jambi-web" });
+  assert("Kode OPD tidak dikenal → 404", badOrg.status === 404, badOrg.status);
+
+  // ── 6. INTI: admin OPD tidak boleh menyentuh berita OPD lain.
+  const adminBpsdm = await login("admin.bpsdm", DEFAULT_PASSWORD, "seloko");
+  if (adminBpsdm) {
+    // Admin BPSDM tanpa parameter → otomatis OPD-nya sendiri.
+    const ownList = await request("/lapak/news?limit=100", {
+      token: adminBpsdm, appCode: "seloko",
+    });
+    if (ownList.status === 200) {
+      const ownTitles = (ownList.data?.data ?? []).map((a: any) => a.title);
+      assert("Admin OPD melihat berita OPD-nya", ownTitles.some((t: string) => t.includes("BPSDM")),
+        JSON.stringify(ownTitles));
+      assert("Admin OPD TIDAK melihat berita OPD lain",
+        !ownTitles.some((t: string) => t.includes("DISBUDPAR")), JSON.stringify(ownTitles));
+    }
+
+    // Mencoba memilih OPD lain → 404.
+    const crossOrg = await request("/lapak/news?organization=DISBUDPAR", {
+      token: adminBpsdm, appCode: "seloko",
+    });
+    assert("Admin OPD ditolak memilih OPD lain (404)", crossOrg.status === 404,
+      `${crossOrg.status} ${JSON.stringify(crossOrg.data?.message ?? "")}`);
+
+    // Mencoba mengubah berita DISBUDPAR lewat id → 404.
+    const crossEdit = await request(`/lapak/news/${newsDisbudpar.id}?organization=BPSDM`, {
+      method: "PUT", token: adminBpsdm, appCode: "seloko",
+      body: { title: "Coba Ubah Berita OPD Lain" },
+    });
+    assert("Admin OPD tidak bisa mengubah berita OPD lain",
+      [403, 404].includes(crossEdit.status), crossEdit.status);
+  }
+
+  // ── 7. Update & status berita.
+  const upd = await request(`/lapak/news/${newsBpsdm.id}?organization=BPSDM`, {
+    method: "PUT", token: saToken || undefined,
+    body: { excerpt: "Ringkasan diperbarui" },
+  });
+  assert("Update berita 200", upd.status === 200, upd.status, upd.data?.message);
+  assert("Excerpt berubah", upd.data?.data?.excerpt === "Ringkasan diperbarui", upd.data?.data?.excerpt);
+
+  // ── 8. Tanpa izin ditolak.
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  const wargaCreate = await request("/lapak/news?organization=BPSDM", {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { categoryId: cat.id, title: "Berita Uji Warga", content: "<p>Konten berita warga uji.</p>" },
+  });
+  assert("Warga tidak boleh membuat berita (403)", wargaCreate.status === 403,
+    `${wargaCreate.status} ${JSON.stringify(wargaCreate.data?.message ?? "")}`);
+
+  // ── 9. Hapus berita.
+  const del = await request(`/lapak/news/${newsBpsdm.id}?organization=BPSDM`, {
+    method: "DELETE", token: saToken || undefined,
+  });
+  assert("Hapus berita 200", del.status === 200, del.status, del.data?.message);
+
+  const pubAfterDel = await request("/lapak/news/public/BPSDM", { appCode: "lapak-jambi-web" });
+  assert("Berita terhapus tidak tampil di publik", (pubAfterDel.data?.data ?? []).length === 0,
+    (pubAfterDel.data?.data ?? []).length);
+
+  // ── 10. INTI: berita Bapenda (organizationId NULL) tidak terpengaruh.
+  // Buat berita Bapenda tanpa organizationId, pastikan tidak muncul di Lapak.
+  const bapendaApp = await prismaClient.application.findFirst({
+    where: { code: "bapenda-profile" }, select: { id: true },
+  });
+  if (bapendaApp) {
+    const bapendaCat = await prismaClient.articleCategory.create({
+      data: {
+        applicationId: bapendaApp.id, type: "NEWS",
+        name: "Kategori Uji Berita Bapenda",
+        slug: `kategori-uji-bapenda-${Date.now()}`, isActive: true,
+      },
+      select: { id: true },
+    });
+    await prismaClient.article.create({
+      data: {
+        applicationId: bapendaApp.id, type: "NEWS", categoryId: bapendaCat.id,
+        authorId: (await prismaClient.user.findFirstOrThrow({ where: { username: "superadmin" }, select: { id: true } })).id,
+        title: "Berita Milik Bapenda Uji", slug: `berita-milik-bapenda-uji-${Date.now()}`,
+        content: "<p>Berita milik Bapenda.</p>", status: "PUBLISHED", publishedAt: new Date(),
+        organizationId: null,
+      },
+    });
+    const pubLapak = await request("/lapak/news/public/BPSDM", { appCode: "lapak-jambi-web" });
+    assert("Berita Bapenda TIDAK bocor ke publik Lapak",
+      !(pubLapak.data?.data ?? []).some((a: any) => a.title === "Berita Milik Bapenda Uji"),
+      JSON.stringify((pubLapak.data?.data ?? []).map((a: any) => a.title)));
+
+    await prismaClient.article.deleteMany({ where: { title: "Berita Milik Bapenda Uji" } });
+    await prismaClient.articleCategory.deleteMany({ where: { id: bapendaCat.id } });
+  }
+
+  // ── 11. Bersih-bersih (anak dulu, baru induk).
+  await prismaClient.article.deleteMany({
+    where: { OR: [
+      { title: { startsWith: "Berita Uji" } },
+      { title: { startsWith: "Berita Milik Bapenda Uji" } },
+      { title: { startsWith: "Coba Ubah" } },
+    ] },
+  });
+  await prismaClient.articleCategory.deleteMany({ where: { name: { startsWith: "Kategori Uji" } } });
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -3996,6 +4207,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-public-stats" || targetModule === "transparansi") {
       await runLapakPublicStatsSuite();
+    }
+    if (!targetModule || targetModule === "lapak-news" || targetModule === "berita") {
+      await runLapakNewsSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
