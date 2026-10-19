@@ -100,6 +100,8 @@ export const OrderItemShape = z.object({
   note: z.string().nullable(),
 });
 
+import { OrderPaymentShape } from "../payments/payments.schema.js";
+
 /** Ringkasan SKRD yang menempel pada pesanan (null bila belum terbit). */
 export const OrderSkrdShape = z.object({
   id: z.string().uuid(),
@@ -127,6 +129,8 @@ export const OrderShape = z.object({
   createdAt: z.string().datetime(),
   /** SKRD yang terbit saat checkout (PRD 04 §D); null bila belum terbit. */
   skrd: OrderSkrdShape.nullable(),
+  /** Riwayat pembayaran (LJ-2.6), terbaru lebih dulu. */
+  payments: z.array(OrderPaymentShape).default([]),
 });
 
 /** Detail pesanan menampilkan pemohon TERMASKING — PII tidak pernah utuh. */

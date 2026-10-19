@@ -7,6 +7,35 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+## 2026-10-22 — Pembayaran Transfer Manual (LJ-2.6)
+
+**Ditambah** — prefix `/api/lapak/payments` (6 endpoint)
+- `GET /order/:orderId`, `GET /:id`, `POST /:id/proof` (warga).
+- `GET /` (`payment:read`), `POST /:id/verify` & `POST /:id/reject` (`payment:approve`).
+- DB: `lapak_payments` + enum `PaymentMethod`/`PaymentStatus`, migrasi
+  `20261022140000_add_lapak_payments`, drift 0.
+
+**Keputusan kontrak**
+- **Bukti transfer WAJIB dari ImageKit** (`POST /api/storage/upload?module=lapak&subFolder=payments`).
+  URL eksternal ditolak: bukti bayar adalah lampiran resmi — harus tersimpan di storage
+  yang kita kendalikan, bukan tautan yang bisa hilang atau berubah isinya. `proofFileId`
+  wajib disertakan untuk audit & pembersihan berkas.
+- **Baris pembayaran dibuat otomatis saat checkout** (`MENUNGGU_BUKTI`), batas waktunya
+  mengikuti `dueAt` SKRD — satu tanggal yang dipakai warga & OPD.
+- **Konfirmasi atomik:** pembayaran `LUNAS` + pesanan `LUNAS` + SKRD `LUNAS` + log status
+  dalam satu transaksi. Setengah jadi = negara menganggap lunas tapi dokumennya belum.
+- **Nominal diperiksa:** admin tidak boleh menandai lunas bila uang diterima kurang dari
+  tagihan (`400`, pesan menyebut selisih). `amount` opsional untuk mencatat nominal riil.
+- **Konfirmasi idempoten** — konfirmasi ulang tidak menggandakan efek.
+- **Penolakan tidak menghapus riwayat:** pesanan kembali `MENUNGGU_PEMBAYARAN`, warga boleh
+  unggah ulang, `rejectReason` dibersihkan saat unggahan baru. Satu pesanan boleh punya
+  banyak baris pembayaran untuk audit.
+- **Rekening tujuan diambil dari snapshot SKRD**, bukan pengaturan hidup.
+- Kolom gateway (`provider`, `vaNumber`, `qrisPayload`, `externalRef`, `rawCallback`,
+  `expiresAt`) sudah disiapkan → VA/QRIS Bank Jambi nanti = adapter baru tanpa migrasi.
+
+---
+
 ## 2026-10-22 — Pengaturan & Penerbitan SKRD + Penomoran Gapless (LJ-2.5)
 
 **Ditambah** — prefix `/api/lapak/skrd` (10 endpoint)

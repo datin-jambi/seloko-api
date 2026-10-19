@@ -87,10 +87,11 @@ ikhtisar + satu berkas per modul.
 | Keranjang per OPD | [lapak/carts.md](./lapak/carts.md) | 8 | login (warga) |
 | Quote & Checkout Pesanan | [lapak/orders.md](./lapak/orders.md) | 5 | login + `order:read` |
 | SKRD & Penomoran Gapless | [lapak/skrd.md](./lapak/skrd.md) | 10 | publik (verify) + `order:*` |
+| Pembayaran Transfer Manual | [lapak/payments.md](./lapak/payments.md) | 6 | login + `payment:*` |
 
 **Total Lapak: 17 endpoint.**
 
-**Total keseluruhan: 156 endpoint.**
+**Total keseluruhan: 162 endpoint.**
 
 ---
 

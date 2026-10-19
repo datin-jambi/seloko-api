@@ -27,6 +27,7 @@
  *   npm run db:smoke -- lapak-cart       → Hanya uji keranjang per OPD (LJ-2.3)
  *   npm run db:smoke -- lapak-orders     → Hanya uji quote & checkout pesanan (LJ-2.4)
  *   npm run db:smoke -- lapak-skrd       → Hanya uji SKRD & penomoran gapless (LJ-2.5)
+ *   npm run db:smoke -- lapak-payments   → Hanya uji pembayaran transfer manual (LJ-2.6)
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -1129,6 +1130,7 @@ async function cleanupDebugArtefacts() {
       { slug: { startsWith: "jangan-judul" } },
       { slug: { startsWith: "jadwal-uji-" } },
       { slug: { startsWith: "keranjang-uji-" } },
+      { slug: { startsWith: "bayar-uji-" } },
     ],
   };
 
@@ -1140,6 +1142,20 @@ async function cleanupDebugArtefacts() {
     ],
   };
 
+  // Urutan hapus HARUS dari cucu ke induk: sejak LJ-2.4 produk direferensikan
+  // `lapak_order_items` (FK RESTRICT), jadi menghapus produk lebih dulu akan
+  // gagal P2003. Pesanan/keranjang/reservasi milik produk uji dibersihkan dulu.
+  await prisma.lapakPayment.deleteMany({ where: { order: { items: { some: { product: testProductWhere } } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { items: { some: { product: testProductWhere } } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { items: { some: { product: testProductWhere } } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { product: testProductWhere } });
+  await prisma.lapakOrder.deleteMany({ where: { items: { none: {} } } });
+  await prisma.lapakCartItem.deleteMany({ where: { product: testProductWhere } });
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM lapak_reservations WHERE product_id IN (SELECT id FROM lapak_products WHERE slug LIKE '%' AND (slug LIKE '%-prod' OR slug LIKE 'produk-%' OR slug LIKE 'aula-uji-%' OR slug LIKE 'skrd-uji-%' OR slug LIKE 'pesanan-uji-%' OR slug LIKE 'reservasi-uji-%' OR slug LIKE 'jadwal-uji-%' OR slug LIKE 'keranjang-uji-%' OR slug LIKE 'bayar-uji-%' OR slug LIKE 'tanpa-atribut-%'))`,
+  );
+  await prisma.lapakOperatingHour.deleteMany({ where: { product: testProductWhere } });
+  await prisma.lapakBlackoutDate.deleteMany({ where: { product: testProductWhere } });
   // Tarif lebih dulu (anak), lalu produk, terakhir kategori (induk).
   await prisma.lapakProductRate.deleteMany({ where: { product: testProductWhere } });
   await prisma.lapakProduct.deleteMany({ where: testProductWhere });
@@ -2416,6 +2432,256 @@ async function runLapakSkrdSuite() {
   await prisma.lapakProduct.deleteMany({ where: { id: productId } });
 }
 
+// ─── Test Suite: Lapak — Pembayaran Transfer Manual (LJ-2.6) ─────────────────
+async function runLapakPaymentsSuite() {
+  console.log("\n\x1b[36m▶ [Suite 22: Lapak - Pembayaran Transfer Manual]\x1b[0m");
+  const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  assert("Superadmin login", Boolean(saToken));
+  assert("Warga login lapak", Boolean(wargaToken));
+  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+
+  await cleanupDebugArtefacts();
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM"] }, year: { gte: 2020 } } });
+
+  const cats = await request("/lapak/categories/public", { appCode: "lapak-jambi-web" });
+  const gedung = (cats.data?.data ?? []).find((c: any) => c.slug === "sewa-gedung-ruangan");
+  const orgs = await request("/organizations/public", { appCode: "lapak-jambi-web" });
+  const bpsdm = (orgs.data?.data ?? []).find((o: any) => o.code === "BPSDM");
+
+  // Produk + tarif approved + terbit + pengaturan SKRD.
+  const prod = await request("/lapak/products", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      organizationId: bpsdm.id, categoryId: gedung.id,
+      name: "Bayar Uji Produk", description: "Produk uji pembayaran transfer manual.",
+      rates: [{ name: "Harian", unit: "DAY", price: 400_000 }],
+    },
+  });
+  const productId = prod.data?.data?.id;
+  const rateId = prod.data?.data?.rates?.[0]?.id;
+  await request(`/lapak/rates/${rateId}/status/submit`, { method: "PATCH", token: saToken || undefined, body: {} });
+  await request(`/lapak/rates/${rateId}/status/approve`, { method: "PATCH", token: saToken || undefined, body: {} });
+  await request(`/lapak/products/${productId}/status/publish`, { method: "PATCH", token: saToken || undefined });
+  await request("/lapak/skrd/settings", {
+    method: "POST", token: saToken || undefined,
+    body: {
+      issuer: "BAPENDA", numberFormat: "{seq6}/SKRD/{issuer}/{romanMonth}/{year}",
+      signerName: "H. Al Haris", signerPosition: "Gubernur Jambi",
+      bankName: "Bank Jambi", bankAccount: "001-02-000123-4",
+      bankHolder: "Kas Daerah Provinsi Jambi", dueDays: 7,
+    },
+  });
+
+  // Buat pesanan.
+  const cart = await request("/lapak/carts/opd/BPSDM", W);
+  const cartId = cart.data?.data?.id;
+  await request(`/lapak/carts/${cartId}/items`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { productId, rateId, qty: 2 },
+  });
+  const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { applicant: { name: "Budi Santoso", nik: "1234567890123456", phone: "081234567890" } },
+  });
+  assert("Checkout 201", co.status === 201, co.status, co.data?.message);
+  const order = co.data?.data ?? {};
+  assert("Total pesanan 800000", order.total === 800_000, order.total);
+
+  // ── 1. Baris pembayaran dibuat otomatis saat checkout.
+  assert("Pembayaran otomatis dibuat", (order.payments ?? []).length === 1, (order.payments ?? []).length);
+  const pay0 = order.payments?.[0] ?? {};
+  assert("Status awal MENUNGGU_BUKTI", pay0.status === "MENUNGGU_BUKTI", pay0.status);
+  assert("Metode MANUAL_TRANSFER", pay0.method === "MANUAL_TRANSFER", pay0.method);
+  assert("Jumlah pembayaran = total", pay0.amount === 800_000, pay0.amount);
+
+  // ── 2. Detail pembayaran memuat rekening dari snapshot SKRD.
+  const payList = await request(`/lapak/payments/order/${order.id}`, W);
+  assert("Daftar pembayaran pesanan 200", payList.status === 200, payList.status, payList.data?.message);
+  const payDetail = payList.data?.data?.[0] ?? {};
+  assert("Rekening tujuan dari SKRD", payDetail.bank?.account === "001-02-000123-4", payDetail.bank?.account);
+  assert("Bank tujuan dari SKRD", payDetail.bank?.name === "Bank Jambi", payDetail.bank?.name);
+  assert("Batas waktu ikut jatuh tempo SKRD", Boolean(payDetail.expiresAt), payDetail.expiresAt);
+
+  // ── 3. Unggah bukti — URL eksternal ditolak (wajib ImageKit).
+  const paymentId = payDetail.id;
+  const externalUrl = await request(`/lapak/payments/${paymentId}/proof`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: {
+      proofUrl: "ftp://evil.example.com/bukti.jpg", proofFileId: "abc123",
+      senderName: "Budi Santoso", senderBank: "Bank Jambi",
+      amount: 800_000, paidAt: new Date().toISOString(),
+    },
+  });
+  assert("URL non-http ditolak 400", externalUrl.status === 400, externalUrl.status);
+
+  const noFileId = await request(`/lapak/payments/${paymentId}/proof`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: {
+      proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti.jpg",
+      senderName: "Budi Santoso", senderBank: "Bank Jambi",
+      amount: 800_000, paidAt: new Date().toISOString(),
+    },
+  });
+  assert("Tanpa proofFileId ditolak 400", noFileId.status === 400, noFileId.status);
+
+  // ── 4. Unggah bukti valid → MENUNGGU_KONFIRMASI.
+  const proof = await request(`/lapak/payments/${paymentId}/proof`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: {
+      proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti-transfer.jpg",
+      proofFileId: "ik_file_abc123",
+      senderName: "Budi Santoso", senderBank: "Bank Jambi",
+      amount: 800_000, paidAt: new Date().toISOString(),
+      note: "Transfer via mobile banking",
+    },
+  });
+  assert("Unggah bukti 200", proof.status === 200, proof.status, proof.data?.message);
+  assert("Status jadi MENUNGGU_KONFIRMASI", proof.data?.data?.status === "MENUNGGU_KONFIRMASI",
+    proof.data?.data?.status);
+  assert("URL bukti tersimpan", proof.data?.data?.proofUrl?.includes("imagekit"), proof.data?.data?.proofUrl);
+  assert("fileId tersimpan", proof.data?.data?.proofFileId === "ik_file_abc123", proof.data?.data?.proofFileId);
+  assert("Nama pengirim tersimpan", proof.data?.data?.senderName === "Budi Santoso");
+
+  // ── 5. Pesanan ikut MENUNGGU_KONFIRMASI.
+  const orderAfterProof = await request(`/lapak/orders/${order.id}`, W);
+  assert("Pesanan jadi MENUNGGU_KONFIRMASI",
+    orderAfterProof.data?.data?.status === "MENUNGGU_KONFIRMASI", orderAfterProof.data?.data?.status);
+
+  // ── 6. Warga tidak bisa mengonfirmasi pembayarannya sendiri.
+  const selfConfirm = await request(`/lapak/payments/${paymentId}/verify`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web", body: {},
+  });
+  assert("Warga tidak boleh konfirmasi (403/401)", [401, 403].includes(selfConfirm.status), selfConfirm.status);
+
+  // ── 7. INTI: nominal kurang DITOLAK walau admin mencoba.
+  const underpay = await request(`/lapak/payments/${paymentId}/verify`, {
+    method: "POST", token: saToken || undefined, body: { amount: 500_000 },
+  });
+  assert("Nominal kurang ditolak 400", underpay.status === 400, underpay.status, underpay.data?.message);
+  assert("Pesan menyebut kurang", String(underpay.data?.message ?? "").toLowerCase().includes("kurang"),
+    underpay.data?.message);
+
+  // Pastikan belum ada efek samping.
+  const stillPending = await prisma.lapakPayment.findUnique({ where: { id: paymentId }, select: { status: true } });
+  assert("Gagal konfirmasi tidak mengubah status", stillPending?.status === "MENUNGGU_KONFIRMASI", stillPending?.status);
+
+  // ── 8. Konfirmasi valid → LUNAS (atomik: pembayaran + pesanan + SKRD).
+  const confirm = await request(`/lapak/payments/${paymentId}/verify`, {
+    method: "POST", token: saToken || undefined, body: { note: "Dana masuk rekening kas daerah" },
+  });
+  assert("Konfirmasi 200", confirm.status === 200, confirm.status, confirm.data?.message);
+  assert("Pembayaran LUNAS", confirm.data?.data?.status === "LUNAS", confirm.data?.data?.status);
+  assert("confirmedAt terisi", Boolean(confirm.data?.data?.confirmedAt));
+
+  const orderLunas = await request(`/lapak/orders/${order.id}`, W);
+  assert("Pesanan LUNAS", orderLunas.data?.data?.status === "LUNAS", orderLunas.data?.data?.status);
+  assert("SKRD LUNAS", orderLunas.data?.data?.skrd?.status === "LUNAS", orderLunas.data?.data?.skrd?.status);
+
+  // ── 9. Konfirmasi ulang idempoten (tidak menggandakan).
+  const reConfirm = await request(`/lapak/payments/${paymentId}/verify`, {
+    method: "POST", token: saToken || undefined, body: {},
+  });
+  assert("Konfirmasi ulang tetap 200 (idempoten)", reConfirm.status === 200, reConfirm.status);
+
+  // ── 10. Unggah bukti setelah LUNAS ditolak.
+  const proofAfterPaid = await request(`/lapak/payments/${paymentId}/proof`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: {
+      proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/lagi.jpg",
+      proofFileId: "ik_x", senderName: "Budi", senderBank: "Bank Jambi",
+      amount: 800_000, paidAt: new Date().toISOString(),
+    },
+  });
+  assert("Bukti setelah LUNAS ditolak 400", proofAfterPaid.status === 400, proofAfterPaid.status);
+
+  // ── 11. Pembayaran orang lain tidak bisa diakses (404).
+  const otherToken = await login("admin.bpsdm", DEFAULT_PASSWORD, "seloko");
+  const otherView = await request(`/lapak/payments/${paymentId}`, {
+    token: otherToken || undefined, appCode: "seloko",
+  });
+  assert("Pembayaran orang lain tidak 200", otherView.status !== 200, otherView.status);
+
+  // ── 12. Alur penolakan: buat pesanan baru, unggah, tolak, unggah ulang.
+  const cart2 = await request("/lapak/carts/opd/BPSDM", W);
+  await request(`/lapak/carts/${cart2.data?.data?.id}/items`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { productId, rateId, qty: 1 },
+  });
+  const co2 = await request(`/lapak/orders/cart/${cart2.data?.data?.id}/checkout`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
+  });
+  const order2 = co2.data?.data ?? {};
+  const pay2 = order2.payments?.[0]?.id;
+
+  await request(`/lapak/payments/${pay2}/proof`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: {
+      proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti2.jpg",
+      proofFileId: "ik_file_b2", senderName: "Budi Santoso", senderBank: "Bank Jambi",
+      amount: 400_000, paidAt: new Date().toISOString(),
+    },
+  });
+  const reject = await request(`/lapak/payments/${pay2}/reject`, {
+    method: "POST", token: saToken || undefined,
+    body: { reason: "Bukti tidak terbaca, mohon unggah ulang" },
+  });
+  assert("Tolak pembayaran 200", reject.status === 200, reject.status, reject.data?.message);
+  assert("Status DITOLAK", reject.data?.data?.status === "DITOLAK", reject.data?.data?.status);
+  assert("Alasan penolakan tersimpan",
+    reject.data?.data?.rejectReason?.includes("tidak terbaca"), reject.data?.data?.rejectReason);
+
+  const order2After = await request(`/lapak/orders/${order2.id}`, W);
+  assert("Pesanan kembali MENUNGGU_PEMBAYARAN",
+    order2After.data?.data?.status === "MENUNGGU_PEMBAYARAN", order2After.data?.data?.status);
+
+  // Unggah ulang setelah ditolak → boleh, alasan penolakan bersih.
+  const reupload = await request(`/lapak/payments/${pay2}/proof`, {
+    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    body: {
+      proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti2b.jpg",
+      proofFileId: "ik_file_b2b", senderName: "Budi Santoso", senderBank: "Bank Jambi",
+      amount: 400_000, paidAt: new Date().toISOString(),
+    },
+  });
+  assert("Unggah ulang setelah ditolak 200", reupload.status === 200, reupload.status, reupload.data?.message);
+  assert("Kembali MENUNGGU_KONFIRMASI",
+    reupload.data?.data?.status === "MENUNGGU_KONFIRMASI", reupload.data?.data?.status);
+  assert("Alasan penolakan dibersihkan", reupload.data?.data?.rejectReason === null,
+    reupload.data?.data?.rejectReason);
+
+  // ── 13. Daftar pembayaran CMS + filter status.
+  const cmsList = await request("/lapak/payments?limit=100", { token: saToken || undefined });
+  assert("Daftar pembayaran CMS 200", cmsList.status === 200, cmsList.status, cmsList.data?.message);
+  assert("Pembayaran muncul di CMS", (cmsList.data?.data ?? []).some((p: any) => p.id === paymentId));
+
+  const filtered = await request("/lapak/payments?status=LUNAS&limit=100", { token: saToken || undefined });
+  assert("Filter status LUNAS bekerja",
+    (filtered.data?.data ?? []).every((p: any) => p.status === "LUNAS"),
+    (filtered.data?.data ?? []).length);
+
+  // ── 14. Bersih-bersih.
+  await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakSkrd.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrderStatusLog.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakOrder.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakCartItem.deleteMany({ where: { cart: { user: { email: "warga.pedagang@gmail.com" } } } });
+  await prisma.lapakCart.deleteMany({ where: { user: { email: "warga.pedagang@gmail.com" } } });
+  await prisma.lapakSkrdSetting.deleteMany({});
+  await prisma.lapakSkrdSequence.deleteMany({ where: { issuerKey: { in: ["BAPENDA", "BPSDM"] }, year: { gte: 2020 } } });
+  await prisma.lapakProductRate.deleteMany({ where: { productId } });
+  await prisma.lapakProduct.deleteMany({ where: { id: productId } });
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const targetModule = args[0]?.toLowerCase().trim();
@@ -2506,6 +2772,9 @@ async function main() {
     }
     if (!targetModule || targetModule === "lapak-skrd" || targetModule === "skrd") {
       await runLapakSkrdSuite();
+    }
+    if (!targetModule || targetModule === "lapak-payments" || targetModule === "pembayaran") {
+      await runLapakPaymentsSuite();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

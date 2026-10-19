@@ -3,6 +3,7 @@ import { prisma } from "~/config/database.js";
 import { NotFoundError, BadRequestError, ConflictError } from "~/common/errors/index.js";
 import { APP_CODES } from "~/common/constants/index.js";
 import { issueSkrdInTx } from "../skrd/skrd.service.js";
+import { createInitialPaymentInTx } from "../payments/payments.service.js";
 import type {
   CheckoutBody,
   QuoteDto,
@@ -317,11 +318,19 @@ export async function checkoutCart(
       // SKRD terbit SAAT CHECKOUT (PRD 04 §D) — bukan saat pembayaran.
       // Nomor diambil dalam transaksi yang sama supaya nomor tidak terbuang
       // bila ada langkah berikutnya yang gagal (gapless = wajib).
-      await issueSkrdInTx(
+      const skrd = await issueSkrdInTx(
         tx,
         { orderId: created.id, organizationId: cart.organization.id, amount: total },
         { documentType: "SKRD" },
       );
+
+      // Baris pembayaran awal (MENUNGGU_BUKTI) — batas waktunya mengikuti
+      // jatuh tempo SKRD agar warga & OPD memakai satu tanggal yang sama.
+      await createInitialPaymentInTx(tx, {
+        orderId: created.id,
+        amount: total,
+        dueAt: new Date(skrd.dueAt),
+      });
 
       return created;
     });
@@ -358,6 +367,14 @@ const ORDER_INCLUDE = {
       id: true, number: true, documentType: true, issuer: true,
       issuerCode: true, issuerName: true, amount: true,
       issuedAt: true, dueAt: true, status: true,
+    },
+  },
+  payments: {
+    orderBy: { createdAt: "desc" as const },
+    select: {
+      id: true, status: true, method: true, amount: true, proofUrl: true,
+      senderName: true, senderBank: true, rejectReason: true,
+      paidAt: true, confirmedAt: true, createdAt: true,
     },
   },
 } as const;
@@ -402,6 +419,19 @@ function toBaseDto(row: OrderRow) {
           status: row.skrd.status,
         }
       : null,
+    payments: row.payments.map((p) => ({
+      id: p.id,
+      status: p.status,
+      method: p.method,
+      amount: p.amount,
+      proofUrl: p.proofUrl,
+      senderName: p.senderName,
+      senderBank: p.senderBank,
+      rejectReason: p.rejectReason,
+      paidAt: p.paidAt?.toISOString() ?? null,
+      confirmedAt: p.confirmedAt?.toISOString() ?? null,
+      createdAt: p.createdAt.toISOString(),
+    })),
   };
 }
 

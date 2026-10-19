@@ -1002,6 +1002,7 @@ model LapakOrder {
   items        LapakOrderItem[]
   statusLogs   LapakOrderStatusLog[]
   skrd         LapakSkrd?
+  payments     LapakPayment[]
 
   /// Kode pesanan unik per aplikasi — dipakai warga untuk melacak.
   @@unique([applicationId, code], map: "uq_lapak_orders_app_code")
@@ -1181,6 +1182,71 @@ model LapakSkrd {
   @@unique([issuerCode, number], map: "uq_lapak_skrds_issuer_number")
   @@index([status, dueAt], map: "idx_lapak_skrds_status_due")
   @@map("lapak_skrds")
+}
+
+/// Metode & status pembayaran (PRD 04 §E).
+enum PaymentMethod {
+  /// Fase awal: transfer bank + unggah bukti.
+  MANUAL_TRANSFER
+  /// Disiapkan untuk gateway (Bank Jambi VA/QRIS) — belum dipakai.
+  VIRTUAL_ACCOUNT
+  QRIS
+}
+
+enum PaymentStatus {
+  /// Menunggu bukti transfer diunggah.
+  MENUNGGU_BUKTI
+  /// Bukti sudah diunggah, menunggu konfirmasi OPD.
+  MENUNGGU_KONFIRMASI
+  LUNAS
+  DITOLAK
+  KEDALUWARSA
+}
+
+/// Pembayaran sebuah pesanan (PRD 04 §E).
+///
+/// Kolom gateway (`provider`, `vaNumber`, `qrisPayload`, `externalRef`,
+/// `rawCallback`) sudah ada sejak awal supaya integrasi Bank Jambi nanti hanya
+/// menambah adapter — bukan migrasi besar.
+///
+/// Satu pesanan boleh punya BEBERAPA baris pembayaran: bukti yang ditolak
+/// membuat warga mengunggah ulang, dan riwayatnya harus tetap utuh untuk audit.
+model LapakPayment {
+  id         String        @id @default(uuid(7)) @db.VarChar(36)
+  orderId    String        @map("order_id") @db.VarChar(36)
+  method     PaymentMethod @default(MANUAL_TRANSFER)
+  status     PaymentStatus @default(MENUNGGU_BUKTI)
+  amount     Int
+  /// Bukti transfer (ImageKit). `proofUrl` untuk ditampilkan, `proofFileId`
+  /// untuk menghapus berkas bila perlu.
+  proofUrl   String?       @map("proof_url") @db.VarChar(500)
+  proofFileId String?      @map("proof_file_id") @db.VarChar(200)
+  /// Catatan dari warga saat mengunggah bukti.
+  note       String?       @db.VarChar(500)
+  /// Alasan penolakan oleh OPD.
+  rejectReason String?     @map("reject_reason") @db.VarChar(500)
+  /// Nama pengirim sesuai mutasi bank — dipakai OPD mencocokkan.
+  senderName String?       @map("sender_name") @db.VarChar(150)
+  senderBank String?       @map("sender_bank") @db.VarChar(100)
+  paidAt     DateTime?     @map("paid_at") @db.Timestamptz()
+  /// Konfirmasi oleh admin OPD.
+  confirmedBy String?      @map("confirmed_by") @db.VarChar(36)
+  confirmedAt DateTime?    @map("confirmed_at") @db.Timestamptz()
+  // ─── Kolom gateway (disiapkan, belum dipakai fase awal) ─────────────────────
+  provider   String?       @db.VarChar(50)
+  vaNumber   String?       @map("va_number") @db.VarChar(50)
+  qrisPayload String?      @map("qris_payload") @db.Text
+  externalRef String?      @map("external_ref") @db.VarChar(120)
+  rawCallback Json?        @map("raw_callback")
+  expiresAt  DateTime?     @map("expires_at") @db.Timestamptz()
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+
+  order LapakOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, status], map: "idx_lapak_payments_order_status")
+  @@index([status, expiresAt], map: "idx_lapak_payments_status_expires")
+  @@map("lapak_payments")
 }
 
 /// Tarif per sesi/satuan. Punya status sendiri (PRD 04 §C): mengubah tarif
