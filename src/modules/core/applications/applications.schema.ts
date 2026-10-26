@@ -220,6 +220,9 @@ const MyApplicationShape = ApplicationShape.pick({
   id: true,
   code: true,
   name: true,
+  /// Wajib ada: launcher memisahkan CMS internal (INTERNAL) dari situs publik
+  /// (PUBLIC). Tanpa field ini klien harus menebak lewat baseUrl/kode.
+  audience: true,
   tagline: true,
   description: true,
   baseUrl: true,

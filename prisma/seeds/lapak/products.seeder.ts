@@ -23,7 +23,15 @@ const LAPAK_WEB_CODE = "lapak-jambi-web";
 
 /** Atribut bawaan untuk produk hasil seed (kategori bisa menimpanya). */
 const DEFAULT_AVAILABILITY = "DATE_RANGE";
-const DEFAULT_FULFILLMENT = "MANUAL_CONFIRM";
+/**
+ * WAJIB salah satu nilai FulfillmentTypeSchema di src/modules/lapak/products/
+ * products.schema.ts. Dulu berisi "MANUAL_CONFIRM" yang tidak ada di enum —
+ * akibatnya seluruh GET /api/lapak/products (CMS) membalas 500 "Response doesn't
+ * match the schema" karena produk seed tidak bisa diserialisasi.
+ * BOOKING = aset dipesan lalu dikonfirmasi manual oleh petugas, yang memang
+ * perilaku aset sewa di Lapak.
+ */
+const DEFAULT_FULFILLMENT = "BOOKING";
 
 /** Slug deterministik dari nama: hasil sama di setiap run, tanpa faker. */
 function slugify(name: string): string {

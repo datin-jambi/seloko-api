@@ -116,7 +116,12 @@ export const PublicOrganizationListResponseSchema = envelope(z.array(Organizatio
 export const ListOrganizationsResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
-  data: z.array(OrganizationShape),
+  data: z.array(
+    OrganizationShape.extend({
+      /** Jumlah sub-unit langsung — kolom "Bagian" di daftar CMS. */
+      counts: z.object({ children: z.number() }),
+    }),
+  ),
   meta: z.object({
     page: z.number(),
     limit: z.number(),

@@ -92,7 +92,9 @@ export async function listOrganizations(query: ListOrganizationsQuery) {
   const [rows, total] = await Promise.all([
     prisma.organization.findMany({
       where,
-      select: ORG_SELECT,
+      // `_count.children` dipakai kolom "Bagian" di daftar CMS supaya jumlah
+      // sub-unit tidak perlu satu request per baris.
+      select: { ...ORG_SELECT, _count: { select: { children: true } } },
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { [sortBy]: sortOrder },
@@ -100,7 +102,12 @@ export async function listOrganizations(query: ListOrganizationsQuery) {
     prisma.organization.count({ where }),
   ]);
 
-  const result = buildPaginatedResult(rows.map(iso), total, page, limit);
+  const result = buildPaginatedResult(
+    rows.map(({ _count, ...rest }) => ({ ...iso(rest), counts: { children: _count.children } })),
+    total,
+    page,
+    limit,
+  );
   return result;
 }
 

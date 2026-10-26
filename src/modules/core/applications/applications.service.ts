@@ -215,6 +215,8 @@ export async function listMyApplications(userId: string, isSuperAdmin: boolean) 
     id: true,
     code: true,
     name: true,
+    /// Dipakai launcher untuk memisahkan CMS internal dari situs publik.
+    audience: true,
     tagline: true,
     description: true,
     baseUrl: true,
