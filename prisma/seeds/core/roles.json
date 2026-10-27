@@ -13,11 +13,44 @@
     "import": "Mengimpor"
   },
   "actionGroups": {
-    "content": ["create", "read", "update", "delete", "list"],
-    "publishable": ["create", "read", "update", "delete", "list", "publish"],
-    "verifiable": ["create", "read", "update", "delete", "list", "approve", "reject"],
-    "reviewable": ["create", "read", "update", "delete", "list", "approve", "reject", "publish"],
-    "readonly": ["read", "list"]
+    "content": [
+      "create",
+      "read",
+      "update",
+      "delete",
+      "list"
+    ],
+    "publishable": [
+      "create",
+      "read",
+      "update",
+      "delete",
+      "list",
+      "publish"
+    ],
+    "verifiable": [
+      "create",
+      "read",
+      "update",
+      "delete",
+      "list",
+      "approve",
+      "reject"
+    ],
+    "reviewable": [
+      "create",
+      "read",
+      "update",
+      "delete",
+      "list",
+      "approve",
+      "reject",
+      "publish"
+    ],
+    "readonly": [
+      "read",
+      "list"
+    ]
   },
   "roles": [
     {
@@ -33,32 +66,68 @@
     {
       "name": "editor",
       "description": "Membuat dan mengubah konten, tanpa hapus/terbit",
-      "allowedActions": ["create", "read", "update", "list"],
+      "allowedActions": [
+        "create",
+        "read",
+        "update",
+        "list"
+      ],
       "allowedEntities": [
-        "news", "news-category", "page", "banner", "gallery", "faq", "faq-category", "regulation", "uptd",
-        "product", "order", "payment", "ticket", "article", "review", "report"
+        "news",
+        "news-category",
+        "page",
+        "banner",
+        "gallery",
+        "faq",
+        "faq-category",
+        "regulation",
+        "uptd",
+        "product",
+        "order",
+        "payment",
+        "ticket",
+        "article",
+        "review",
+        "report"
       ]
     },
     {
       "name": "verifikator",
       "description": "Memverifikasi pengajuan: setujui atau tolak",
-      "allowedActions": ["read", "list", "approve", "reject"]
+      "allowedActions": [
+        "read",
+        "list",
+        "approve",
+        "reject"
+      ]
     },
     {
       "name": "viewer",
       "description": "Hanya melihat data",
-      "allowedActions": ["readonly", "export"]
+      "allowedActions": [
+        "readonly",
+        "export"
+      ]
     },
     {
       "name": "operator-pengguna",
       "description": "Khusus tata kelola akun: buat user dan tugaskan role",
-      "apps": ["seloko"],
-      "allowedActions": ["create", "read", "list", "update"]
+      "apps": [
+        "seloko"
+      ],
+      "allowedActions": [
+        "create",
+        "read",
+        "list",
+        "update"
+      ]
     },
     {
       "name": "role-nonaktif",
       "description": "Sengaja isActive=false — untuk menguji role yang dimatikan tidak memberi permission",
-      "apps": ["seloko"],
+      "apps": [
+        "seloko"
+      ],
       "isActive": false,
       "allowedActions": null
     },
@@ -66,33 +135,139 @@
       "name": "warga",
       "description": "Masyarakat: memesan layanan, membayar, dan mengulas",
       "audience": "PUBLIC",
-      "apps": ["lapak-jambi-web"],
-      "allowedActions": ["create", "read", "list"],
-      "allowedEntities": ["order", "payment", "review"]
+      "apps": [
+        "bapenda-portal",
+        "lapak-jambi-app"
+      ],
+      "allowedActions": [
+        "create",
+        "read",
+        "list"
+      ],
+      "allowedEntities": [
+        "order",
+        "payment",
+        "review"
+      ]
     },
     {
       "name": "admin-opd",
       "description": "Pengelola operasional OPD: produk, pesanan, pembayaran, tiket, konten OPD",
-      "apps": ["lapak-jambi-web"],
-      "allowedActions": ["create", "read", "update", "list", "approve", "reject", "export"],
+      "apps": [
+        "lapak-jambi-web"
+      ],
+      "allowedActions": [
+        "create",
+        "read",
+        "update",
+        "list",
+        "approve",
+        "reject",
+        "export"
+      ],
       "allowedEntities": [
-        "product", "order", "payment", "ticket",
-        "news", "article", "gallery", "banner", "review", "report"
+        "product",
+        "order",
+        "payment",
+        "ticket",
+        "news",
+        "article",
+        "gallery",
+        "banner",
+        "review",
+        "report"
       ]
     },
     {
       "name": "manajer-opd",
       "description": "Kepala OPD: menyetujui & menerbitkan produk serta konten OPD",
-      "apps": ["lapak-jambi-web"],
-      "allowedActions": ["read", "list", "approve", "reject", "publish"],
-      "allowedEntities": ["product", "news", "article", "report"]
+      "apps": [
+        "lapak-jambi-web"
+      ],
+      "allowedActions": [
+        "read",
+        "list",
+        "approve",
+        "reject",
+        "publish"
+      ],
+      "allowedEntities": [
+        "product",
+        "news",
+        "article",
+        "report"
+      ]
     },
     {
       "name": "petugas-lokasi",
       "description": "Petugas di lokasi: memindai tiket dan mencatat pemakaian",
-      "apps": ["lapak-jambi-web"],
-      "allowedActions": ["read", "list", "update"],
-      "allowedEntities": ["ticket", "order"]
+      "apps": [
+        "lapak-jambi-web"
+      ],
+      "allowedActions": [
+        "read",
+        "list",
+        "update"
+      ],
+      "allowedEntities": [
+        "ticket",
+        "order"
+      ]
+    },
+    {
+      "name": "kasir",
+      "description": "Kasir loket: menerima dan memverifikasi pembayaran retribusi",
+      "apps": [
+        "lapak-jambi-web"
+      ],
+      "allowedActions": [
+        "create",
+        "read",
+        "update",
+        "list",
+        "approve",
+        "reject"
+      ],
+      "allowedEntities": [
+        "order",
+        "payment",
+        "ticket",
+        "report"
+      ]
+    },
+    {
+      "name": "bendahara",
+      "description": "Bendahara: menatausahakan penerimaan retribusi & laporan keuangan",
+      "apps": [
+        "lapak-jambi-web"
+      ],
+      "allowedActions": [
+        "read",
+        "list",
+        "export"
+      ],
+      "allowedEntities": [
+        "order",
+        "payment",
+        "report"
+      ]
+    },
+    {
+      "name": "pimpinan",
+      "description": "Pimpinan: hanya membaca dashboard, laporan, dan analitik",
+      "apps": [
+        "lapak-jambi-web"
+      ],
+      "allowedActions": [
+        "read",
+        "list",
+        "export"
+      ],
+      "allowedEntities": [
+        "report",
+        "order",
+        "product"
+      ]
     }
   ]
 }

@@ -60,7 +60,20 @@ npm run db:smoke -- uptds
 | `admin.seloko` | Administrator Seloko | Admin internal yang melewati guard `requirePermission` |
 | `operator.user` | Operator Pengguna | Memiliki izin kelola user tapi **tanpa** `user:delete` (403 pada DELETE) |
 | `viewer.only` | Viewer Only | Hanya memiliki izin read/list (403 pada semua endpoint mutasi/tulis) |
+| `kasir.lapak` | Kasir Loket (Lapak) | `payment:approve` untuk retribusi; tidak punya wewenang master (kategori/objek retribusi) |
+| `bendahara.lapak` | Bendahara (Lapak) | Baca & ekspor penerimaan (order/payment/report); semua mutasi ditolak 403 |
+| `pimpinan.lapak` | Pimpinan (Lapak) | Hanya laporan & analitik; sidebar Katalog/Transaksi tidak tampil |
 | `nonaktif` | User Inactive | `isActive = false` (harus ditolak 401 saat login) |
 
+* **Aplikasi aktif di seed:**
+  | code | audience |
+  |---|---|
+  | `seloko` | INTERNAL |
+  | `bapenda-profile` | INTERNAL (CMS) |
+  | `bapenda-portal` | PUBLIC (portal) |
+  | `lapak-jambi-web` | INTERNAL (CMS) |
+  | `lapak-jambi-app` | PUBLIC (portal) |
+* **Akun warga** (`warga.pedagang@gmail.com`) login lewat `lapak-jambi-app`, bukan CMS.
+  Token warga terikat `X-App-Code: lapak-jambi-app`.
 * **Password akun standar:** `Seloko@2025!`
 * **Password superadmin:** `SelokoBapenda@2025!` *(atau sesuai env `SEED_SUPER_ADMIN_PASSWORD`)*

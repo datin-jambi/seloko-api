@@ -10,32 +10,92 @@
       "audience": "INTERNAL",
       "logoUrl": "https://cdn.bapenda.jambiprov.go.id/logo/seloko.png",
       "settings": {
-        "branding": { "shortName": "SELOKO", "primaryColor": "#0F766E" },
+        "branding": {
+          "shortName": "SELOKO",
+          "primaryColor": "#0F766E"
+        },
         "contact": {
           "email": "admin.seloko@jambiprov.go.id",
           "address": "Gedung BPKPD Provinsi Jambi Lt. 3"
         }
       },
       "permissions": [
-        { "module": "Pengguna", "entity": "user", "label": "Pengguna", "actions": ["content"] },
-        { "module": "Akses", "entity": "role", "label": "Role", "actions": ["content"] },
-        { "module": "Akses", "entity": "permission", "label": "Permission", "actions": ["read", "list"] },
-        { "module": "Akses", "entity": "user-app-role", "label": "Penugasan Role", "actions": ["create", "list", "delete"] },
-        { "module": "Sistem", "entity": "application", "label": "Aplikasi", "actions": ["content"] },
-        { "module": "Sistem", "entity": "organization", "label": "Organisasi (OPD)", "actions": ["content"] },
-        { "module": "Sistem", "entity": "audit-log", "label": "Log Audit", "actions": ["read", "list", "export"] }
+        {
+          "module": "Pengguna",
+          "entity": "user",
+          "label": "Pengguna",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Akses",
+          "entity": "role",
+          "label": "Role",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Akses",
+          "entity": "permission",
+          "label": "Permission",
+          "actions": [
+            "read",
+            "list"
+          ]
+        },
+        {
+          "module": "Akses",
+          "entity": "user-app-role",
+          "label": "Penugasan Role",
+          "actions": [
+            "create",
+            "list",
+            "delete"
+          ]
+        },
+        {
+          "module": "Sistem",
+          "entity": "application",
+          "label": "Aplikasi",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Sistem",
+          "entity": "organization",
+          "label": "Organisasi (OPD)",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Sistem",
+          "entity": "audit-log",
+          "label": "Log Audit",
+          "actions": [
+            "read",
+            "list",
+            "export"
+          ]
+        }
       ]
     },
     {
       "code": "bapenda-profile",
-      "name": "Bapenda Profile Portal",
+      "name": "Bapenda Profile CMS",
       "tagline": "Portal Resmi Pengelolaan Pendapatan Daerah Provinsi Jambi",
       "description": "Portal profil dan informasi publik Bapenda Jambi",
       "isActive": true,
-      "audience": "PUBLIC",
+      "audience": "INTERNAL",
       "logoUrl": "https://cdn.bapenda.jambiprov.go.id/logo/bapenda.png",
       "settings": {
-        "branding": { "shortName": "Bapenda Jambi", "primaryColor": "#1D4ED8" },
+        "branding": {
+          "shortName": "Bapenda Jambi",
+          "primaryColor": "#1D4ED8"
+        },
         "contact": {
           "email": "bapenda@jambiprov.go.id",
           "phone": "0741-62021",
@@ -53,7 +113,13 @@
           "titleTemplate": "%s | BPKPD Provinsi Jambi",
           "metaTitle": "Badan Pengelola Keuangan dan Pendapatan Daerah Provinsi Jambi",
           "metaDescription": "Portal resmi BPKPD Provinsi Jambi - Layanan PKB, BBNKB, Pajak Bahan Bakar, Air Permukaan, dan Retribusi Daerah.",
-          "keywords": ["bapenda jambi", "bpkpd", "pajak jambi", "e-samsat", "pemprov jambi"],
+          "keywords": [
+            "bapenda jambi",
+            "bpkpd",
+            "pajak jambi",
+            "e-samsat",
+            "pemprov jambi"
+          ],
           "canonicalUrl": "https://bapenda.jambiprov.go.id"
         },
         "features": {
@@ -72,32 +138,176 @@
         }
       },
       "permissions": [
-        { "module": "Konten", "entity": "news", "label": "Berita", "actions": ["reviewable"] },
-        { "module": "Konten", "entity": "news-category", "label": "Kategori Berita", "actions": ["content"] },
-        { "module": "Konten", "entity": "page", "label": "Halaman", "actions": ["publishable"] },
-        { "module": "Media", "entity": "banner", "label": "Banner", "actions": ["content"] },
-        { "module": "Media", "entity": "gallery", "label": "Galeri", "actions": ["reviewable"] },
-        { "module": "Informasi", "entity": "faq", "label": "FAQ", "actions": ["publishable"] },
-        { "module": "Informasi", "entity": "faq-category", "label": "Kategori FAQ", "actions": ["content"] },
-        { "module": "Informasi", "entity": "regulation", "label": "Regulasi & Dokumen", "actions": ["publishable"] },
-        { "module": "Layanan", "entity": "uptd", "label": "UPTD Samsat", "actions": ["content"] }
+        {
+          "module": "Konten",
+          "entity": "news",
+          "label": "Berita",
+          "actions": [
+            "reviewable"
+          ]
+        },
+        {
+          "module": "Konten",
+          "entity": "news-category",
+          "label": "Kategori Berita",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Konten",
+          "entity": "page",
+          "label": "Halaman",
+          "actions": [
+            "publishable"
+          ]
+        },
+        {
+          "module": "Media",
+          "entity": "banner",
+          "label": "Banner",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Media",
+          "entity": "gallery",
+          "label": "Galeri",
+          "actions": [
+            "reviewable"
+          ]
+        },
+        {
+          "module": "Informasi",
+          "entity": "faq",
+          "label": "FAQ",
+          "actions": [
+            "publishable"
+          ]
+        },
+        {
+          "module": "Informasi",
+          "entity": "faq-category",
+          "label": "Kategori FAQ",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Informasi",
+          "entity": "regulation",
+          "label": "Regulasi & Dokumen",
+          "actions": [
+            "publishable"
+          ]
+        },
+        {
+          "module": "Layanan",
+          "entity": "uptd",
+          "label": "UPTD Samsat",
+          "actions": [
+            "content"
+          ]
+        }
+      ]
+    },
+    {
+      "code": "bapenda-portal",
+      "name": "Bapenda Profile Portal",
+      "tagline": "Portal Publik BPKPD Provinsi Jambi",
+      "description": "Situs publik profil & informasi Bapenda Jambi",
+      "isActive": true,
+      "audience": "PUBLIC",
+      "logoUrl": "https://cdn.bapenda.jambiprov.go.id/logo/bapenda.png",
+      "settings": {
+        "branding": {
+          "shortName": "Bapenda Jambi",
+          "primaryColor": "#1D4ED8"
+        },
+        "contact": {
+          "email": "bapenda@jambiprov.go.id",
+          "phone": "0741-62021",
+          "whatsapp": "08117400001",
+          "address": "Jl. K.H. Agus Salim No. 1, Kota Baru, Kota Jambi",
+          "googleMapsUrl": "https://maps.google.com/?q=Bapenda+Jambi",
+          "workingHours": "Senin - Jumat, 08.00 - 16.00 WIB",
+          "socialMedia": {
+            "instagram": "https://instagram.com/bapendajambi",
+            "facebook": "https://facebook.com/bapendajambi",
+            "youtube": "https://youtube.com/@bapendajambi"
+          }
+        },
+        "seo": {
+          "titleTemplate": "%s | BPKPD Provinsi Jambi",
+          "metaTitle": "Badan Pengelola Keuangan dan Pendapatan Daerah Provinsi Jambi",
+          "metaDescription": "Portal resmi BPKPD Provinsi Jambi - Layanan PKB, BBNKB, Pajak Bahan Bakar, Air Permukaan, dan Retribusi Daerah.",
+          "keywords": [
+            "bapenda jambi",
+            "bpkpd",
+            "pajak jambi",
+            "e-samsat",
+            "pemprov jambi"
+          ],
+          "canonicalUrl": "https://bapenda.jambiprov.go.id"
+        },
+        "features": {
+          "maintenanceMode": false,
+          "enablePayment": true,
+          "enableRegistration": true,
+          "announcement": {
+            "isActive": true,
+            "message": "Program Pemutihan Pajak Kendaraan Bermotor Periode 2026 sedang berlangsung!",
+            "type": "info"
+          }
+        },
+        "legal": {
+          "termsUrl": "/syarat-ketentuan",
+          "privacyPolicyUrl": "/kebijakan-privasi"
+        }
+      },
+      "permissions": [
+        {
+          "module": "Katalog",
+          "entity": "news",
+          "label": "Berita",
+          "actions": [
+            "read",
+            "list"
+          ]
+        },
+        {
+          "module": "Katalog",
+          "entity": "gallery",
+          "label": "Galeri",
+          "actions": [
+            "read",
+            "list"
+          ]
+        }
       ]
     },
     {
       "code": "lapak-jambi-web",
-      "name": "Lapak Jambi Web",
+      "name": "Lapak Jambi CMS",
       "tagline": "Pasar Digital UMKM Provinsi Jambi",
       "description": "Marketplace UMKM Jambi — antarmuka web",
       "isActive": true,
-      "audience": "PUBLIC",
+      "audience": "INTERNAL",
       "logoUrl": "https://cdn.bapenda.jambiprov.go.id/logo/lapak.png",
       "settings": {
-        "branding": { "shortName": "Lapak Jambi", "primaryColor": "#EA580C" },
+        "branding": {
+          "shortName": "Lapak Jambi",
+          "primaryColor": "#EA580C"
+        },
         "contact": {
           "email": "bantuan@lapak.jambiprov.go.id",
           "whatsapp": "081234567890"
         },
-        "seo": { "titleTemplate": "%s | Lapak Jambi", "description": "Marketplace UMKM Provinsi Jambi" },
+        "seo": {
+          "titleTemplate": "%s | Lapak Jambi",
+          "description": "Marketplace UMKM Provinsi Jambi"
+        },
         "features": {
           "maintenanceMode": false,
           "enablePayment": true,
@@ -105,42 +315,173 @@
         }
       },
       "permissions": [
-        { "module": "Master", "entity": "category", "label": "Kategori Layanan", "actions": ["content"] },
-        { "module": "Master", "entity": "retribution-object", "label": "Objek Retribusi", "actions": ["content"] },
-        { "module": "Master", "entity": "skrd-setting", "label": "Pengaturan SKRD", "actions": ["content"] },
-        { "module": "Katalog", "entity": "product", "label": "Produk & Layanan", "actions": ["reviewable"] },
-        { "module": "Transaksi", "entity": "order", "label": "Pesanan", "actions": ["verifiable", "export"] },
-        { "module": "Transaksi", "entity": "payment", "label": "Pembayaran", "actions": ["verifiable"] },
-        { "module": "Transaksi", "entity": "ticket", "label": "Tiket & Check-in", "actions": ["read", "list", "update"] },
-        { "module": "Konten", "entity": "news", "label": "Berita", "actions": ["reviewable"] },
-        { "module": "Konten", "entity": "article", "label": "Artikel", "actions": ["reviewable"] },
-        { "module": "Media", "entity": "gallery", "label": "Galeri", "actions": ["content"] },
-        { "module": "Media", "entity": "banner", "label": "Banner", "actions": ["content"] },
-        { "module": "Keterlibatan", "entity": "review", "label": "Ulasan", "actions": ["read", "list", "update"] },
-        { "module": "Laporan", "entity": "report", "label": "Laporan Penerimaan", "actions": ["read", "list", "export"] }
+        {
+          "module": "Master",
+          "entity": "category",
+          "label": "Kategori Layanan",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Master",
+          "entity": "retribution-object",
+          "label": "Objek Retribusi",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Master",
+          "entity": "skrd-setting",
+          "label": "Pengaturan SKRD",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Katalog",
+          "entity": "product",
+          "label": "Produk & Layanan",
+          "actions": [
+            "reviewable"
+          ]
+        },
+        {
+          "module": "Transaksi",
+          "entity": "order",
+          "label": "Pesanan",
+          "actions": [
+            "verifiable",
+            "export"
+          ]
+        },
+        {
+          "module": "Transaksi",
+          "entity": "payment",
+          "label": "Pembayaran",
+          "actions": [
+            "verifiable"
+          ]
+        },
+        {
+          "module": "Transaksi",
+          "entity": "ticket",
+          "label": "Tiket & Check-in",
+          "actions": [
+            "read",
+            "list",
+            "update"
+          ]
+        },
+        {
+          "module": "Konten",
+          "entity": "news",
+          "label": "Berita",
+          "actions": [
+            "reviewable"
+          ]
+        },
+        {
+          "module": "Konten",
+          "entity": "article",
+          "label": "Artikel",
+          "actions": [
+            "reviewable"
+          ]
+        },
+        {
+          "module": "Media",
+          "entity": "gallery",
+          "label": "Galeri",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Media",
+          "entity": "banner",
+          "label": "Banner",
+          "actions": [
+            "content"
+          ]
+        },
+        {
+          "module": "Keterlibatan",
+          "entity": "review",
+          "label": "Ulasan",
+          "actions": [
+            "read",
+            "list",
+            "update"
+          ]
+        },
+        {
+          "module": "Laporan",
+          "entity": "report",
+          "label": "Laporan Penerimaan",
+          "actions": [
+            "read",
+            "list",
+            "export"
+          ]
+        }
       ]
     },
     {
       "code": "lapak-jambi-app",
-      "name": "Lapak Jambi Mobile",
-      "description": "Lapak Jambi versi mobile — menyusul, akan digabung ke lapak-jambi-web (LJ-5.2)",
+      "name": "Lapak Jambi Portal",
+      "description": "Situs publik Lapak Jambi: jelajah katalog, pesan, dan bayar retribusi",
       "isActive": true,
       "audience": "PUBLIC",
-      "settings": { "branding": { "shortName": "Lapak Jambi", "primaryColor": "#EA580C" } },
+      "settings": {
+        "branding": {
+          "shortName": "Lapak Jambi",
+          "primaryColor": "#EA580C"
+        }
+      },
       "permissions": [
-        { "module": "Katalog", "entity": "product", "label": "Produk & Layanan", "actions": ["read", "list"] },
-        { "module": "Transaksi", "entity": "order", "label": "Pesanan", "actions": ["read", "list"] }
-      ]
-    },
-    {
-      "code": "seloko-nonaktif",
-      "name": "Aplikasi Uji Nonaktif",
-      "description": "Sengaja isActive=false — untuk menguji penolakan login pada aplikasi yang dimatikan",
-      "isActive": false,
-      "audience": "INTERNAL",
-      "permissions": [
-        { "module": "Sistem", "entity": "dummy", "label": "Dummy", "actions": ["read", "list"] }
-      ]
+        {
+          "module": "Katalog",
+          "entity": "product",
+          "label": "Produk & Layanan",
+          "actions": [
+            "read",
+            "list"
+          ]
+        },
+        {
+          "module": "Transaksi",
+          "entity": "order",
+          "label": "Pesanan",
+          "actions": [
+            "create",
+            "read",
+            "list"
+          ]
+        },
+        {
+          "module": "Transaksi",
+          "entity": "payment",
+          "label": "Pembayaran",
+          "actions": [
+            "create",
+            "read",
+            "list"
+          ]
+        },
+        {
+          "module": "Keterlibatan",
+          "entity": "review",
+          "label": "Ulasan",
+          "actions": [
+            "create",
+            "read",
+            "list"
+          ]
+        }
+      ],
+      "tagline": "Portal publik Lapak Jambi — katalog & reservasi aset daerah"
     }
   ]
 }

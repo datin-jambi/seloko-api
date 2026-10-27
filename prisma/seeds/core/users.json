@@ -257,7 +257,12 @@
       "isActive": true,
       "emailVerified": true,
       "$note": "Warga terdaftar di lapak-jambi-web sebagai pemesan (role warga). Uji: login lapak 200; login seloko & bapenda-profile 403; token lapak tidak bisa menyentuh modul inti seloko.",
-      "roles": [{ "app": "lapak-jambi-web", "role": "warga" }]
+      "roles": [
+        {
+          "app": "lapak-jambi-app",
+          "role": "warga"
+        }
+      ]
     },
     {
       "accountType": "PUBLIC",
@@ -266,7 +271,12 @@
       "isActive": true,
       "emailVerified": true,
       "$note": "Email SAMA dengan pegawai viewer.only — akun warga terpisah. Uji: email identik di dua accountType tidak bentrok, dan login di aplikasi publik mengambil baris warga, bukan pegawai.",
-      "roles": [{ "app": "lapak-jambi-web", "role": "warga" }]
+      "roles": [
+        {
+          "app": "lapak-jambi-app",
+          "role": "warga"
+        }
+      ]
     },
     {
       "username": "admin.bpsdm",
@@ -278,7 +288,13 @@
       "emailVerified": true,
       "$note": "Admin OPD di lapak-jambi-web, DIBATASI ke OPD BPSDM. Uji: hanya melihat produk/pesanan BPSDM; OPD lain 403.",
       "roles": [
-        { "app": "lapak-jambi-web", "role": "admin-opd", "organizationCodes": ["BPSDM"] }
+        {
+          "app": "lapak-jambi-web",
+          "role": "admin-opd",
+          "organizationCodes": [
+            "BPSDM"
+          ]
+        }
       ]
     },
     {
@@ -291,7 +307,13 @@
       "emailVerified": true,
       "$note": "Manajer OPD BPSDM. Uji: boleh product:publish untuk BPSDM, tidak boleh menghapus.",
       "roles": [
-        { "app": "lapak-jambi-web", "role": "manajer-opd", "organizationCodes": ["BPSDM"] }
+        {
+          "app": "lapak-jambi-web",
+          "role": "manajer-opd",
+          "organizationCodes": [
+            "BPSDM"
+          ]
+        }
       ]
     },
     {
@@ -304,7 +326,14 @@
       "emailVerified": true,
       "$note": "Satu penugasan, DUA OPD (BPSDM + DISBUDPAR). Uji: lingkup gabungan (union) pada user_app_role_organizations.",
       "roles": [
-        { "app": "lapak-jambi-web", "role": "admin-opd", "organizationCodes": ["BPSDM", "DISBUDPAR"] }
+        {
+          "app": "lapak-jambi-web",
+          "role": "admin-opd",
+          "organizationCodes": [
+            "BPSDM",
+            "DISBUDPAR"
+          ]
+        }
       ]
     },
     {
@@ -317,7 +346,58 @@
       "emailVerified": true,
       "$note": "Petugas lokasi lintas OPD (tanpa organizationCodes) — hanya ticket/order read+update.",
       "roles": [
-        { "app": "lapak-jambi-web", "role": "petugas-lokasi" }
+        {
+          "app": "lapak-jambi-web",
+          "role": "petugas-lokasi"
+        }
+      ]
+    },
+    {
+      "username": "kasir.lapak",
+      "email": "kasir.lapak@gmail.com",
+      "fullName": "Siti Aminah (Kasir Loket)",
+      "nip": "199403152019012007",
+      "phoneNumber": "0813-7500-106",
+      "isActive": true,
+      "emailVerified": true,
+      "$note": "Kasir loket lintas OPD — order/payment/ticket/report read+update+approve.",
+      "roles": [
+        {
+          "app": "lapak-jambi-web",
+          "role": "kasir"
+        }
+      ]
+    },
+    {
+      "username": "bendahara.lapak",
+      "email": "bendahara.lapak@gmail.com",
+      "fullName": "Hendra Wijaya (Bendahara)",
+      "nip": "198809202014011008",
+      "phoneNumber": "0813-7500-107",
+      "isActive": true,
+      "emailVerified": true,
+      "$note": "Bendahara penerimaan retribusi — order/payment/report baca & ekspor, tanpa mutasi.",
+      "roles": [
+        {
+          "app": "lapak-jambi-web",
+          "role": "bendahara"
+        }
+      ]
+    },
+    {
+      "username": "pimpinan.lapak",
+      "email": "pimpinan.lapak@gmail.com",
+      "fullName": "Drs. Mahmud Ismail (Pimpinan)",
+      "nip": "197505101999031004",
+      "phoneNumber": "0813-7500-108",
+      "isActive": true,
+      "emailVerified": true,
+      "$note": "Pimpinan — hanya dashboard, laporan, dan analitik (read/list/export).",
+      "roles": [
+        {
+          "app": "lapak-jambi-web",
+          "role": "pimpinan"
+        }
       ]
     },
     {
@@ -330,8 +410,14 @@
       "emailVerified": true,
       "$note": "Admin level Bapenda: SELURUH OPD (tanpa organizationCodes) + wewenang master (kategori, objek retribusi, SKRD).",
       "roles": [
-        { "app": "seloko", "role": "viewer" },
-        { "app": "lapak-jambi-web", "role": "admin" }
+        {
+          "app": "seloko",
+          "role": "viewer"
+        },
+        {
+          "app": "lapak-jambi-web",
+          "role": "admin"
+        }
       ]
     }
   ],

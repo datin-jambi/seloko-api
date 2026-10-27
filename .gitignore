@@ -25,3 +25,6 @@ Thumbs.db
 # IDE
 .vscode/settings.json
 .idea/
+
+# Scratch / draft kerja
+.tmp/

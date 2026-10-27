@@ -191,7 +191,8 @@ Memakai tabel universal `articles` / `article_categories` dengan `type = NEWS` (
 - Tanpa review workflow: halaman baru selalu draft, terbit/tarik via `PATCH /:id/publish` `{ isPublished }` (`publishedAt` diisi saat terbit, dikosongkan saat ditarik).
 - Slug = URL tetap `/profil/<slug>`: bentrok → `ConflictError` (tanpa akhiran otomatis).
 - **Publik:** `GET /public` (daftar terbit tanpa isi, untuk menu), `GET /public/:slug`. **CMS:** list (filter `isPublished`, search), detail, create, update, publish, soft-delete.
-- Permission: `page` (grup `publishable`); menu `konten.halaman` (`page:list`).
+- Permission: `page` (grup `publishable`); menu `halaman` (`page:list`) — menu akar, awalnya
+  berstatus Draft (`isActive=false`) sampai modulnya siap tayang di sidebar.
 - Konten HTML disanitasi lewat `src/common/utils/html.ts` (dipakai bersama berita): tabel `colspan/rowspan` & `style` aman (`color`, `background-color`, `text-align`, `width`, `min-width`) dipertahankan agar tabel halaman Pejabat utuh.
 - Uji: `npm run db:smoke -- pages` (20 skenario), `src/common/utils/html.check.ts`.
 

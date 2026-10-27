@@ -19,7 +19,7 @@ Tiap tabel parameter mencantumkan **Nama · Wajib · Tipe · Aturan validasi · 
 
 | Header | Wajib | Nilai | Keterangan |
 |---|:--:|---|---|
-| `X-App-Code` | ✓ ¹ | `seloko` \| `bapenda-profile` \| `lapak-jambi-web` \| `lapak-jambi-app` | Kode aplikasi tenant. Pola `^[a-z0-9_-]{2,50}$`. Tanpa header → `400` |
+| `X-App-Code` | ✓ ¹ | `seloko` \| `bapenda-profile` \| `bapenda-portal` \| `lapak-jambi-web` \| `lapak-jambi-app` | Kode aplikasi tenant. Pola `^[a-z0-9_-]{2,50}$`. Tanpa header → `400` |
 | `Authorization` | ✓ ² | `Bearer <accessToken>` | Token dari `POST /api/auth/login` |
 | `Content-Type` | ✓ ³ | `application/json` | `multipart/form-data` untuk `POST /api/storage/upload` |
 | `Cookie` | — | `seloko_rt=...` | Refresh token, diset otomatis oleh server |

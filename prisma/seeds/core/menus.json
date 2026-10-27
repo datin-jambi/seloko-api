@@ -1,6 +1,5 @@
 {
-  "$comment": "Sidebar per aplikasi. 'code' adalah kunci upsert dalam lingkup aplikasi — ubah label sesuka hati, jangan ubah code. 'items' bersarang tanpa batas kedalaman; urutan array menentukan sortOrder. 'permission' diisi kode permission milik aplikasi yang sama (lihat applications.json) — menu hanya tampil bagi pemegang izin itu; absen berarti bebas izin. 'roles' mempersempit ke role tertentu; absen/kosong berarti seluruh role. 'path' relatif digabung dengan baseUrl aplikasi dan WAJIB diawali prefix aplikasi (/seloko, /bapenda, /lapak, …), mis. /bapenda/dashboard; absen berarti parent grup saja. 'icon' memakai nama ikon lucide.",
-
+  "$comment": "Sidebar per aplikasi. 'code' adalah kunci upsert dalam lingkup aplikasi — ubah label sesuka hati, JANGAN ubah code. 'items' bersarang tanpa batas kedalaman; urutan array menentukan sortOrder. 'permission' diisi kode permission milik aplikasi yang sama — menu hanya tampil bagi pemegang izin itu; absen berarti bebas izin. 'roles' mempersempit ke role tertentu; absen/kosong berarti seluruh role. 'isActive': true = Aktif, false = Draft. 'path' relatif digabung dengan baseUrl aplikasi. 'icon' memakai nama ikon lucide yang dikenali seloko-web.",
   "applications": [
     {
       "code": "seloko",
@@ -9,36 +8,41 @@
       "items": [
         {
           "code": "dasbor",
-          "label": "Dasbor",
+          "label": "Dashboard",
+          "path": "/seloko/dashboard",
           "icon": "layout-dashboard",
-          "path": "/seloko/dashboard"
+          "roles": [
+            "superadmin",
+            "admin"
+          ]
         },
         {
           "code": "pengguna",
           "label": "Pengguna",
           "icon": "users",
+          "roles": [
+            "superadmin"
+          ],
           "items": [
             {
               "code": "pengguna.daftar",
               "label": "Daftar Pengguna",
-              "icon": "user",
               "path": "/seloko/pengguna",
-              "permission": "user:list"
+              "icon": "user",
+              "permission": "user:list",
+              "roles": [
+                "superadmin"
+              ]
             },
             {
               "code": "pengguna.tambah",
               "label": "Tambah Pengguna",
-              "icon": "user-plus",
               "path": "/seloko/pengguna/tambah",
-              "permission": "user:create"
-            },
-            {
-              "code": "pengguna.penugasan",
-              "label": "Penugasan Role",
-              "icon": "user-cog",
-              "path": "/seloko/pengguna/penugasan",
-              "permission": "user-app-role:list",
-              "roles": ["superadmin", "admin", "operator-pengguna"]
+              "icon": "user-plus",
+              "permission": "user:create",
+              "roles": [
+                "superadmin"
+              ]
             }
           ]
         },
@@ -46,69 +50,91 @@
           "code": "akses",
           "label": "Hak Akses",
           "icon": "shield",
+          "roles": [
+            "superadmin"
+          ],
           "items": [
             {
               "code": "akses.role",
               "label": "Role",
-              "icon": "shield-check",
               "path": "/seloko/akses/role",
-              "permission": "role:list"
+              "icon": "shield-check",
+              "permission": "role:list",
+              "roles": [
+                "superadmin"
+              ]
             },
             {
               "code": "akses.permission",
               "label": "Permission",
-              "icon": "key",
               "path": "/seloko/akses/permission",
-              "permission": "permission:list"
+              "icon": "key",
+              "permission": "permission:list",
+              "roles": [
+                "superadmin"
+              ]
             }
+          ]
+        },
+        {
+          "code": "organisasi",
+          "label": "Organisasi",
+          "path": "/seloko/organisasi",
+          "icon": "building-2",
+          "permission": "organization:list",
+          "roles": [
+            "superadmin",
+            "admin"
           ]
         },
         {
           "code": "sistem",
           "label": "Sistem",
           "icon": "settings",
+          "roles": [
+            "superadmin"
+          ],
           "items": [
             {
               "code": "sistem.aplikasi",
               "label": "Aplikasi",
-              "icon": "layout-grid",
               "path": "/seloko/sistem/aplikasi",
-              "permission": "application:list"
-            },
-            {
-              "code": "sistem.organisasi",
-              "label": "Organisasi (OPD)",
-              "icon": "building-2",
-              "path": "/seloko/sistem/organisasi",
-              "permission": "organization:list"
+              "icon": "layout-grid",
+              "permission": "application:list",
+              "roles": [
+                "superadmin"
+              ]
             },
             {
               "code": "sistem.menu",
               "label": "Menu Sidebar",
-              "icon": "list-tree",
               "path": "/seloko/sistem/menu",
+              "icon": "list-tree",
               "permission": "application:update",
-              "roles": ["superadmin"]
+              "roles": [
+                "superadmin"
+              ]
             },
             {
               "code": "sistem.audit",
               "label": "Log Audit",
-              "icon": "scroll-text",
               "path": "/seloko/sistem/audit",
-              "permission": "audit-log:list"
+              "icon": "scroll-text",
+              "permission": "audit-log:list",
+              "roles": [
+                "superadmin"
+              ]
             }
           ]
         },
         {
-          "code": "tautan.bapenda",
-          "label": "Portal Bapenda",
-          "icon": "external-link",
-          "path": "http://localhost:3002",
-          "isExternal": true
+          "code": "profil",
+          "label": "Profile Saya",
+          "path": "/seloko/profile",
+          "icon": "user-cog"
         }
       ]
     },
-
     {
       "code": "bapenda-profile",
       "baseUrl": "http://localhost:3002",
@@ -116,183 +142,358 @@
       "items": [
         {
           "code": "dasbor",
-          "label": "Dasbor",
+          "label": "Dashboard",
+          "path": "/bapenda/dashboard",
           "icon": "layout-dashboard",
-          "path": "/bapenda/dashboard"
+          "roles": [
+            "admin",
+            "editor"
+          ]
         },
         {
           "code": "konten",
-          "label": "Konten",
+          "label": "Content",
           "icon": "file-text",
+          "roles": [
+            "admin",
+            "editor"
+          ],
           "items": [
             {
               "code": "konten.berita",
               "label": "Berita",
+              "path": "/bapenda/kontent/berita",
               "icon": "newspaper",
-              "path": "/bapenda/berita",
-              "permission": "news:list"
+              "permission": "news:list",
+              "roles": [
+                "admin",
+                "editor"
+              ]
             },
             {
-              "code": "konten.berita.review",
-              "label": "Antrian Review",
-              "icon": "send",
-              "path": "/bapenda/berita/review",
-              "permission": "news:approve"
+              "code": "konten.galeri",
+              "label": "Gallery",
+              "path": "/bapenda/content/gallery",
+              "icon": "images",
+              "permission": "gallery:list",
+              "roles": [
+                "admin",
+                "editor"
+              ]
             },
             {
               "code": "konten.berita.kategori",
               "label": "Kategori Berita",
-              "icon": "tags",
               "path": "/bapenda/berita/kategori",
-              "permission": "news-category:list"
-            },
-            {
-              "code": "konten.halaman",
-              "label": "Halaman Profil",
-              "icon": "file",
-              "path": "/bapenda/halaman",
-              "permission": "page:list"
-            }
-          ]
-        },
-        {
-          "code": "media",
-          "label": "Media",
-          "icon": "image",
-          "items": [
-            {
-              "code": "media.banner",
-              "label": "Banner",
-              "icon": "panel-top",
-              "path": "/bapenda/banner",
-              "permission": "banner:list"
-            },
-            {
-              "code": "media.galeri",
-              "label": "Galeri",
-              "icon": "images",
-              "path": "/bapenda/galeri",
-              "permission": "gallery:list"
-            }
-          ]
-        },
-        {
-          "code": "informasi",
-          "label": "Informasi",
-          "icon": "info",
-          "items": [
-            {
-              "code": "informasi.faq",
-              "label": "FAQ",
-              "icon": "circle-help",
-              "path": "/bapenda/faq",
-              "permission": "faq:list"
-            },
-            {
-              "code": "informasi.faq.kategori",
-              "label": "Kategori FAQ",
               "icon": "tags",
-              "path": "/bapenda/faq/kategori",
-              "permission": "faq-category:list"
-            },
+              "permission": "news-category:list",
+              "roles": [
+                "admin"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "faq",
+          "label": "FAQ",
+          "path": "/bapenda/faq",
+          "icon": "file-text",
+          "permission": "faq:list",
+          "roles": [
+            "admin",
+            "editor"
+          ],
+          "isActive": false
+        },
+        {
+          "code": "faq.kategori",
+          "label": "Kategori FAQ",
+          "path": "/bapenda/faq/kategori",
+          "icon": "tags",
+          "permission": "faq-category:list",
+          "roles": [
+            "admin"
+          ],
+          "isActive": false
+        },
+        {
+          "code": "halaman",
+          "label": "Halaman",
+          "path": "/bapenda/halaman",
+          "icon": "file",
+          "permission": "page:list",
+          "roles": [
+            "admin"
+          ],
+          "isActive": false
+        },
+        {
+          "code": "regulasi",
+          "label": "Regulasi",
+          "path": "/bapenda/regulasi",
+          "icon": "file-down",
+          "permission": "regulation:list",
+          "roles": [
+            "admin"
+          ],
+          "isActive": false
+        },
+        {
+          "code": "banner",
+          "label": "Banner",
+          "path": "/bapenda/banner",
+          "icon": "panel-top",
+          "permission": "banner:list",
+          "roles": [
+            "admin",
+            "editor"
+          ],
+          "isActive": false
+        },
+        {
+          "code": "uptd",
+          "label": "UPTD",
+          "path": "/bapenda/uptd",
+          "icon": "map-pin",
+          "permission": "uptd:list",
+          "roles": [
+            "admin"
+          ],
+          "isActive": false
+        },
+        {
+          "code": "pengguna",
+          "label": "Pengguna",
+          "path": "/bapenda/pengguna",
+          "icon": "users",
+          "roles": [
+            "superadmin"
+          ],
+          "isActive": false
+        },
+        {
+          "code": "pengaturan",
+          "label": "Pengaturan",
+          "path": "/bapenda/pengaturan",
+          "icon": "settings",
+          "roles": [
+            "superadmin"
+          ],
+          "isActive": false
+        },
+        {
+          "code": "profil",
+          "label": "Profile Saya",
+          "path": "/bapenda/profile",
+          "icon": "user-cog",
+          "isActive": false
+        }
+      ]
+    },
+    {
+      "code": "bapenda-portal",
+      "baseUrl": "https://bapenda.jambiprov.go.id",
+      "icon": "globe",
+      "items": [
+        {
+          "code": "portal",
+          "label": "Portal Publik",
+          "icon": "external-link",
+          "roles": [
+            "warga"
+          ],
+          "items": [
             {
-              "code": "informasi.regulasi",
-              "label": "Regulasi & Dokumen",
-              "icon": "file-text",
-              "path": "/bapenda/regulasi",
-              "permission": "regulation:list"
+              "code": "portal.beranda",
+              "label": "Beranda Portal",
+              "path": "/",
+              "icon": "home",
+              "roles": [
+                "warga"
+              ]
             }
           ]
         }
       ]
     },
-
     {
       "code": "lapak-jambi-web",
       "baseUrl": "http://localhost:3003",
-      "icon": "shopping-bag",
+      "icon": "store",
       "items": [
         {
           "code": "dasbor",
-          "label": "Dasbor",
+          "label": "Dashboard",
+          "path": "/lapak-jambi/dashboard",
           "icon": "layout-dashboard",
-          "path": "/lapak/dashboard"
+          "roles": [
+            "admin",
+            "admin-opd"
+          ]
+        },
+        {
+          "code": "retribusi",
+          "label": "Management Retribusi",
+          "icon": "handshake",
+          "roles": [
+            "admin",
+            "admin-opd",
+            "petugas-lokasi"
+          ],
+          "items": [
+            {
+              "code": "retribusi.opd",
+              "label": "OPD Pengelola",
+              "path": "/lapak-jambi/opd",
+              "icon": "building-2",
+              "roles": [
+                "admin"
+              ]
+            },
+            {
+              "code": "master.objek-retribusi",
+              "label": "Objek Retribusi",
+              "path": "/lapak-jambi/objek-retribusi",
+              "icon": "map-pin",
+              "roles": [
+                "admin"
+              ]
+            },
+            {
+              "code": "katalog.kategori",
+              "label": "Kategori",
+              "path": "/lapak-jambi/kategori",
+              "icon": "tags",
+              "permission": "category:list",
+              "roles": [
+                "admin"
+              ]
+            },
+            {
+              "code": "master.skrd",
+              "label": "Pengaturan SKRD",
+              "icon": "settings",
+              "path": "/lapak-jambi/pengaturan-skrd",
+              "roles": [
+                "admin"
+              ]
+            },
+            {
+              "code": "reservasi",
+              "label": "Reservasi & Pemesanan",
+              "path": "/lapak-jambi/reservasi",
+              "icon": "shopping-cart",
+              "roles": [
+                "admin-opd",
+                "petugas-lokasi"
+              ]
+            }
+          ]
         },
         {
           "code": "katalog",
           "label": "Katalog",
           "icon": "package",
+          "roles": [
+            "admin",
+            "admin-opd",
+            "manajer-opd"
+          ],
           "items": [
             {
               "code": "katalog.produk",
               "label": "Produk & Layanan",
               "icon": "package",
-              "path": "/lapak/produk",
-              "permission": "product:list"
+              "path": "/lapak-jambi/produk",
+              "permission": "product:list",
+              "roles": [
+                "admin",
+                "admin-opd",
+                "manajer-opd"
+              ]
             },
             {
               "code": "katalog.produk.review",
               "label": "Persetujuan Produk",
               "icon": "badge-check",
-              "path": "/lapak/produk/persetujuan",
+              "path": "/lapak-jambi/produk/persetujuan",
               "permission": "product:approve",
-              "roles": ["superadmin", "admin", "manajer-opd"]
-            },
-            {
-              "code": "katalog.kategori",
-              "label": "Kategori Layanan",
-              "icon": "tags",
-              "path": "/lapak/kategori",
-              "permission": "category:list"
+              "roles": [
+                "admin",
+                "manajer-opd"
+              ]
             }
           ]
         },
         {
-          "code": "transaksi",
-          "label": "Transaksi",
+          "code": "transaksi-penerimaan",
+          "label": "Transaksi & Penerimaan",
           "icon": "receipt",
+          "roles": [
+            "kasir",
+            "bendahara"
+          ],
           "items": [
+            {
+              "code": "transaksi",
+              "label": "Transaksi",
+              "path": "/lapak-jambi/transaksi",
+              "icon": "receipt",
+              "roles": [
+                "kasir",
+                "bendahara"
+              ],
+              "isActive": false
+            },
             {
               "code": "transaksi.pesanan",
               "label": "Pesanan",
               "icon": "shopping-cart",
-              "path": "/lapak/pesanan",
-              "permission": "order:list"
+              "path": "/lapak-jambi/pesanan",
+              "permission": "order:list",
+              "roles": [
+                "admin",
+                "admin-opd",
+                "kasir",
+                "bendahara",
+                "petugas-lokasi"
+              ]
             },
             {
               "code": "transaksi.pembayaran",
               "label": "Pembayaran",
-              "icon": "wallet",
-              "path": "/lapak/pembayaran",
-              "permission": "payment:list"
+              "icon": "receipt",
+              "path": "/lapak-jambi/pembayaran",
+              "permission": "payment:list",
+              "roles": [
+                "admin",
+                "admin-opd",
+                "kasir",
+                "bendahara"
+              ]
             },
             {
               "code": "transaksi.tiket",
               "label": "Tiket & Check-in",
-              "icon": "ticket",
-              "path": "/lapak/tiket",
-              "permission": "ticket:list"
-            }
-          ]
-        },
-        {
-          "code": "master",
-          "label": "Master",
-          "icon": "database",
-          "items": [
-            {
-              "code": "master.objek-retribusi",
-              "label": "Objek Retribusi",
-              "icon": "landmark",
-              "path": "/lapak/objek-retribusi",
-              "permission": "retribution-object:list"
+              "icon": "badge-check",
+              "path": "/lapak-jambi/tiket",
+              "permission": "ticket:list",
+              "roles": [
+                "admin",
+                "admin-opd",
+                "kasir",
+                "petugas-lokasi"
+              ]
             },
             {
-              "code": "master.skrd",
-              "label": "Pengaturan SKRD",
-              "icon": "file-signature",
-              "path": "/lapak/pengaturan-skrd",
-              "permission": "skrd-setting:list"
+              "code": "penerimaan.retribusi",
+              "label": "Penerima Retribusi",
+              "path": "/lapak-jambi/penerima",
+              "icon": "receipt",
+              "roles": [
+                "bendahara"
+              ],
+              "isActive": false
             }
           ]
         },
@@ -300,85 +501,164 @@
           "code": "konten",
           "label": "Konten OPD",
           "icon": "newspaper",
+          "roles": [
+            "admin",
+            "admin-opd",
+            "manajer-opd",
+            "editor"
+          ],
           "items": [
             {
               "code": "konten.berita",
               "label": "Berita",
-              "icon": "file-text",
-              "path": "/lapak/berita",
-              "permission": "news:list"
+              "icon": "newspaper",
+              "path": "/lapak-jambi/berita",
+              "permission": "news:list",
+              "roles": [
+                "admin",
+                "admin-opd",
+                "manajer-opd",
+                "editor"
+              ]
             },
             {
               "code": "konten.artikel",
               "label": "Artikel",
-              "icon": "book-open",
-              "path": "/lapak/artikel",
-              "permission": "article:list"
+              "icon": "file-text",
+              "path": "/lapak-jambi/artikel",
+              "permission": "article:list",
+              "roles": [
+                "admin",
+                "admin-opd",
+                "manajer-opd",
+                "editor"
+              ]
             },
             {
               "code": "konten.galeri",
               "label": "Galeri",
               "icon": "images",
-              "path": "/lapak/galeri",
-              "permission": "gallery:list"
+              "path": "/lapak-jambi/galeri",
+              "permission": "gallery:list",
+              "roles": [
+                "admin",
+                "admin-opd",
+                "editor"
+              ]
             },
             {
               "code": "konten.banner",
               "label": "Banner",
               "icon": "panel-top",
-              "path": "/lapak/banner",
-              "permission": "banner:list"
+              "path": "/lapak-jambi/banner",
+              "permission": "banner:list",
+              "roles": [
+                "admin",
+                "admin-opd",
+                "editor"
+              ]
             }
           ]
         },
         {
-          "code": "laporan",
-          "label": "Laporan",
-          "icon": "chart-column",
+          "code": "monitoring",
+          "label": "Monitoring",
+          "icon": "file-down",
+          "roles": [
+            "pimpinan",
+            "admin-opd",
+            "superadmin"
+          ],
+          "isActive": false,
           "items": [
             {
               "code": "laporan.penerimaan",
-              "label": "Penerimaan",
-              "icon": "trending-up",
-              "path": "/lapak/laporan",
-              "permission": "report:list"
+              "label": "Laporan & Analitik",
+              "path": "/lapak-jambi/laporan",
+              "icon": "file-down",
+              "permission": "report:list",
+              "roles": [
+                "pimpinan",
+                "admin-opd"
+              ],
+              "isActive": false
+            },
+            {
+              "code": "monitoring.audit",
+              "label": "Audit Log",
+              "path": "/lapak-jambi/audit",
+              "icon": "scroll-text",
+              "roles": [
+                "superadmin"
+              ],
+              "isActive": false
             }
           ]
         },
         {
-          "code": "menu.nonaktif",
-          "label": "Menu Uji Nonaktif",
-          "icon": "eye-off",
-          "path": "/lapak/nonaktif",
+          "code": "konfigurasi",
+          "label": "Konfigurasi",
+          "icon": "settings",
+          "roles": [
+            "superadmin",
+            "admin"
+          ],
+          "isActive": false,
+          "items": [
+            {
+              "code": "konfigurasi.pengguna",
+              "label": "Pengguna & Akses",
+              "path": "/lapak-jambi/pengguna",
+              "icon": "users",
+              "roles": [
+                "superadmin"
+              ],
+              "isActive": false
+            },
+            {
+              "code": "konfigurasi.pengaturan",
+              "label": "Pengaturan Lapak",
+              "path": "/lapak-jambi/pengaturan",
+              "icon": "settings",
+              "roles": [
+                "admin"
+              ],
+              "isActive": false
+            }
+          ]
+        },
+        {
+          "code": "profil",
+          "label": "Profile Saya",
+          "path": "/lapak-jambi/profile",
+          "icon": "user-cog",
           "isActive": false
         }
       ]
     },
-
     {
       "code": "lapak-jambi-app",
       "baseUrl": "https://lapak.jambiprov.go.id",
-      "icon": "smartphone",
+      "icon": "store",
       "items": [
         {
-          "code": "beranda",
-          "label": "Beranda",
-          "icon": "home",
-          "path": "/beranda"
-        },
-        {
-          "code": "produk",
-          "label": "Produk",
-          "icon": "package",
-          "path": "/produk",
-          "permission": "product:list"
-        },
-        {
-          "code": "pesanan",
-          "label": "Pesanan",
-          "icon": "shopping-cart",
-          "path": "/pesanan",
-          "permission": "order:list"
+          "code": "portal",
+          "label": "Portal Publik",
+          "icon": "external-link",
+          "roles": [
+            "warga"
+          ],
+          "items": [
+            {
+              "code": "portal.katalog",
+              "label": "Katalog & Reservasi Lapak",
+              "path": "/lapak-jambi",
+              "icon": "store",
+              "roles": [
+                "warga"
+              ]
+            }
+          ]
         }
       ]
     }

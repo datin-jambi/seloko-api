@@ -279,5 +279,6 @@ Semua field `POST` **kecuali `applicationId` dan `code`** (keduanya tidak dapat 
   hati, **jangan ubah `code`**.
 - `path` relatif digabung dengan `Application.baseUrl` saat frontend merender tautan, jadi menu
   Bapenda `/bapenda/berita` menjadi `http://localhost:3002/bapenda/berita`.
-- Pengecekan awalan path diuji otomatis: `prisma/smoke/menus.check.ts` (22 pemeriksaan).
+- Pengecekan awalan path diuji otomatis: `prisma/smoke/menus.check.ts` (51 pemeriksaan), yang juga
+  memverifikasi status Aktif/Draft, pembatas role tiap menu, dan struktur sidebar Lapak.
 - Tautan eksternal (`isExternal: true`) dikecualikan dari aturan awalan.

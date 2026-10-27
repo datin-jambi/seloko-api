@@ -39,6 +39,9 @@ import { PrismaClient } from "@prisma/client";
 
 const BASE = process.env["API_BASE_URL"] || "http://localhost:3000/api";
 const DEFAULT_PASSWORD = process.env["SEED_DEFAULT_PASSWORD"] || "Seloko@2025!";
+// Portal publik Lapak — rumah akun warga (role `warga` hanya hidup di app PUBLIC).
+// CMS Lapak (`lapak-jambi-web`) kini INTERNAL: pegawai saja, tanpa akun warga.
+const WARGA_APP = "lapak-jambi-app";
 const SUPERADMIN_PASSWORD = process.env["SEED_SUPER_ADMIN_PASSWORD"] || "SelokoBapenda@2025!";
 
 const prisma = new PrismaClient();
@@ -807,7 +810,7 @@ async function runLapakRbacSuite() {
     await prisma.permission.findMany({ where: { applicationId: lapakApp.id }, select: { code: true } })
   ).map((p) => p.code);
 
-  assert("Aplikasi Lapak aktif & PUBLIC", lapakApp.isActive && lapakApp.audience === "PUBLIC");
+  assert("Aplikasi Lapak CMS aktif & INTERNAL", lapakApp.isActive && lapakApp.audience === "INTERNAL");
   assert("Permission lama 'merchant:*' sudah tidak ada", !codes.some((c) => c.startsWith("merchant:")), codes.filter((c) => c.startsWith("merchant:")));
   assert("Permission 'product:publish' tersedia", codes.includes("product:publish"), codes.includes("product:publish"));
   assert("Permission 'skrd-setting:create' tersedia (master Bapenda)", codes.includes("skrd-setting:create"));
@@ -816,7 +819,7 @@ async function runLapakRbacSuite() {
   const roleNames = (
     await prisma.role.findMany({ where: { applicationId: lapakApp.id }, select: { name: true } })
   ).map((r) => r.name);
-  for (const expected of ["admin-opd", "manajer-opd", "petugas-lokasi", "warga", "admin", "superadmin"]) {
+  for (const expected of ["admin-opd", "manajer-opd", "petugas-lokasi", "admin", "superadmin"]) {
     assert(`Role '${expected}' ada`, roleNames.includes(expected), roleNames);
   }
   assert("Role lama 'pedagang' sudah tidak ada", !roleNames.includes("pedagang"), roleNames);
@@ -832,15 +835,28 @@ async function runLapakRbacSuite() {
 
   const adminOpd = await permsOf("admin-opd");
   const manajer = await permsOf("manajer-opd");
-  const warga = await permsOf("warga");
+
   assert("admin-opd TIDAK boleh category:create (master Bapenda)", !adminOpd.includes("category:create"), adminOpd.filter((c) => c.startsWith("category:")));
   assert("admin-opd TIDAK boleh retribution-object:create", !adminOpd.includes("retribution-object:create"));
   assert("admin-opd boleh product:approve", adminOpd.includes("product:approve"));
   assert("admin-opd TIDAK boleh product:publish", !adminOpd.includes("product:publish"), adminOpd.filter((c) => c.startsWith("product:")));
   assert("manajer-opd boleh product:publish", manajer.includes("product:publish"));
   assert("manajer-opd TIDAK boleh delete", !manajer.some((c) => c.endsWith(":delete")));
+
+  // `warga` hidup di portal publik, bukan CMS — izinnya dibaca dari sana.
+  const portalApp = await prisma.application.findUniqueOrThrow({
+    where: { code: WARGA_APP },
+    select: { id: true },
+  });
+  const warga = (
+    await prisma.rolePermission.findMany({
+      where: { role: { applicationId: portalApp.id, name: "warga" } },
+      select: { permission: { select: { code: true } } },
+    })
+  ).map((r) => r.permission.code);
   assert("warga hanya order/payment/review", warga.every((c) => /^(order|payment|review):/.test(c)), warga);
   assert("warga TIDAK boleh product:list", !warga.includes("product:list"));
+  assert("role 'warga' TIDAK ada di CMS Lapak", !roleNames.includes("warga"), roleNames);
 
   // 4. Lingkup OPD tersimpan benar.
   const scoped = await prisma.user.findFirstOrThrow({
@@ -859,8 +875,8 @@ async function runLapakRbacSuite() {
   assert("bapenda.lapak berlaku seluruh OPD (tanpa lingkup)", global.userAppRoles[0]?.organizations.length === 0, global.userAppRoles[0]?.organizations.length);
 
   // 5. Login & gerbang akses nyata.
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, LAPAK);
-  assert("Akun PUBLIC bisa login ke Lapak", Boolean(wargaToken));
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
+  assert("Akun PUBLIC bisa login ke portal Lapak", Boolean(wargaToken));
   const wargaSeloko = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "seloko");
   assert("Akun PUBLIC ditolak login ke seloko", wargaSeloko === null, wargaSeloko);
 
@@ -871,7 +887,7 @@ async function runLapakRbacSuite() {
   assert("Pegawai admin OPD login lewat seloko", Boolean(adminOpdToken));
 
   const adminOpdLapak = await login("admin.bpsdm", DEFAULT_PASSWORD, LAPAK);
-  assert("Pegawai DITOLAK login langsung ke aplikasi publik Lapak", adminOpdLapak === null, adminOpdLapak);
+  assert("Pegawai boleh login langsung ke CMS INTERNAL Lapak", Boolean(adminOpdLapak), adminOpdLapak);
 
   const mine = await request(`/permissions/${lapakApp.id}/me`, { token: adminOpdToken || undefined });
   assert("Izin Lapak terbaca dari aplikasi pemilik (200)", mine.status === 200, mine.status, 200);
@@ -885,7 +901,7 @@ async function runLapakRbacSuite() {
 // ─── Test Suite: Registrasi akun warga (PUBLIC) ───────────────────────────────
 async function runRegisterSuite() {
   console.log("\n\x1b[36m▶ [Suite 12: Auth - Registrasi Akun Warga]\x1b[0m");
-  const LAPAK = "lapak-jambi-web";
+  const LAPAK = WARGA_APP;
   const email = "warga.baru@contoh.id";
   const nik = "1501010101900001";
 
@@ -1008,8 +1024,8 @@ async function runLapakCategoriesSuite() {
   assert("Slug tak dikenal 404", pubGone.status === 404, pubGone.status, 404);
 
   // 2. CMS tanpa izin: warga ditolak.
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
-  const forbidden = await request("/lapak/categories", { token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
+  const forbidden = await request("/lapak/categories", { token: wargaToken || undefined, appCode: WARGA_APP });
   assert("Warga (PUBLIC) ditolak 403", forbidden.status === 403, forbidden.status, 403);
 
   // Admin OPD punya category:list? Tidak — allowedEntities admin-opd TIDAK memuat 'category'.
@@ -1912,9 +1928,9 @@ async function runLapakReservationsSuite() {
 async function runLapakCartSuite() {
   console.log("\n\x1b[36m▶ [Suite 19: Lapak - Keranjang per OPD]\x1b[0m");
   const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
   assert("Superadmin login", Boolean(saToken));
-  assert("Warga login ke lapak", Boolean(wargaToken));
+  assert("Warga login ke portal Lapak", Boolean(wargaToken));
 
   await cleanupDebugArtefacts();
   // Bersihkan keranjang warga dari run sebelumnya.
@@ -1957,7 +1973,7 @@ async function runLapakCartSuite() {
   assert("Tanpa token ditolak 401", anon.status === 401, anon.status);
 
   // ── 2. Ambil/buat keranjang per OPD.
-  const cartA = await request("/lapak/carts/opd/BPSDM", { token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  const cartA = await request("/lapak/carts/opd/BPSDM", { token: wargaToken || undefined, appCode: WARGA_APP });
   assert("Keranjang OPD BPSDM 200", cartA.status === 200, cartA.status, cartA.data?.message);
   assert("Keranjang memuat organisasi", cartA.data?.data?.organization?.code === "BPSDM",
     cartA.data?.data?.organization?.code);
@@ -1965,13 +1981,13 @@ async function runLapakCartSuite() {
   const cartAId = cartA.data?.data?.id;
 
   // Idempoten: meminta lagi mengembalikan keranjang yang SAMA.
-  const cartA2 = await request("/lapak/carts/opd/BPSDM", { token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  const cartA2 = await request("/lapak/carts/opd/BPSDM", { token: wargaToken || undefined, appCode: WARGA_APP });
   assert("Keranjang OPD sama dipakai ulang", cartA2.data?.data?.id === cartAId, cartA2.data?.data?.id);
 
   // ── 3. Tambah produk OPD yang sama → berhasil.
   const addA = await request(`/lapak/carts/${cartAId}/items`, {
     method: "POST", token: wargaToken || undefined,
-    appCode: "lapak-jambi-web",
+    appCode: WARGA_APP,
     body: { productId: prodA.id, rateId: prodA.rateId, qty: 2 },
   });
   assert("Tambah produk OPD sama 201", addA.status === 201, addA.status, addA.data?.message);
@@ -1985,26 +2001,26 @@ async function runLapakCartSuite() {
   // ── 4. INTI: produk OPD LAIN ditolak 409 (satu pesanan = satu OPD).
   const addCross = await request(`/lapak/carts/${cartAId}/items`, {
     method: "POST", token: wargaToken || undefined,
-    appCode: "lapak-jambi-web",
+    appCode: WARGA_APP,
     body: { productId: prodB.id, qty: 1 },
   });
   assert("Produk OPD lain ditolak 409", addCross.status === 409, addCross.status, addCross.data?.message);
 
   // ── 5. Keranjang terpisah untuk OPD kedua → berhasil.
-  const cartB = await request("/lapak/carts/opd/DISBUDPAR", { token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  const cartB = await request("/lapak/carts/opd/DISBUDPAR", { token: wargaToken || undefined, appCode: WARGA_APP });
   assert("Keranjang OPD kedua dibuat", cartB.status === 200, cartB.status);
   assert("Keranjang OPD kedua berbeda", cartB.data?.data?.id !== cartAId);
   const cartBId = cartB.data?.data?.id;
 
   const addB = await request(`/lapak/carts/${cartBId}/items`, {
     method: "POST", token: wargaToken || undefined,
-    appCode: "lapak-jambi-web",
+    appCode: WARGA_APP,
     body: { productId: prodB.id, qty: 1 },
   });
   assert("Produk OPD kedua masuk keranjangnya sendiri", addB.status === 201, addB.status, addB.data?.message);
 
   // ── 6. Daftar keranjang: dua keranjang, satu per OPD.
-  const listCarts = await request("/lapak/carts", { token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  const listCarts = await request("/lapak/carts", { token: wargaToken || undefined, appCode: WARGA_APP });
   assert("Daftar keranjang 200", listCarts.status === 200, listCarts.status);
   assert("Tepat 2 keranjang (satu per OPD)", (listCarts.data?.data ?? []).length === 2,
     (listCarts.data?.data ?? []).length);
@@ -2012,7 +2028,7 @@ async function runLapakCartSuite() {
   // ── 7. Duplikat item identik → qty bertambah, bukan baris baru.
   const addDup = await request(`/lapak/carts/${cartAId}/items`, {
     method: "POST", token: wargaToken || undefined,
-    appCode: "lapak-jambi-web",
+    appCode: WARGA_APP,
     body: { productId: prodA.id, rateId: prodA.rateId, qty: 1 },
   });
   assert("Item duplikat menambah qty", (addDup.data?.data?.items ?? []).length === 1,
@@ -2022,7 +2038,7 @@ async function runLapakCartSuite() {
   // ── 8. Ubah qty & hapus item.
   const itemId = addDup.data?.data?.items?.[0]?.id;
   const upd = await request(`/lapak/carts/${cartAId}/items/${itemId}`, {
-    method: "PUT", token: wargaToken || undefined, appCode: "lapak-jambi-web", body: { qty: 5, note: "Tolong siapkan kursi" },
+    method: "PUT", token: wargaToken || undefined, appCode: WARGA_APP, body: { qty: 5, note: "Tolong siapkan kursi" },
   });
   assert("Ubah qty 200", upd.status === 200, upd.status, upd.data?.message);
   assert("Qty jadi 5", upd.data?.data?.items?.[0]?.qty === 5, upd.data?.data?.items?.[0]?.qty);
@@ -2030,7 +2046,7 @@ async function runLapakCartSuite() {
 
   const del = await request(`/lapak/carts/${cartAId}/items/${itemId}`, {
     method: "DELETE", token: wargaToken || undefined,
-  appCode: "lapak-jambi-web",
+  appCode: WARGA_APP,
   });
   assert("Hapus item 200", del.status === 200, del.status);
   assert("Keranjang kosong setelah hapus", (del.data?.data?.items ?? []).length === 0);
@@ -2046,7 +2062,7 @@ async function runLapakCartSuite() {
   });
   const draftId = draftProd.data?.data?.id;
   const addDraft = await request(`/lapak/carts/${cartAId}/items`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web", body: { productId: draftId, qty: 1 },
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP, body: { productId: draftId, qty: 1 },
   });
   assert("Produk DRAFT ditolak 400", addDraft.status === 400, addDraft.status, addDraft.data?.message);
 
@@ -2055,11 +2071,11 @@ async function runLapakCartSuite() {
   assert("Keranjang orang lain 404", otherCart.status === 404, otherCart.status);
 
   // ── 11. Kosongkan & hapus keranjang.
-  const cleared = await request(`/lapak/carts/${cartBId}/clear`, { method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  const cleared = await request(`/lapak/carts/${cartBId}/clear`, { method: "POST", token: wargaToken || undefined, appCode: WARGA_APP });
   assert("Kosongkan keranjang 200", cleared.status === 200, cleared.status);
   assert("Keranjang kosong", (cleared.data?.data?.items ?? []).length === 0);
 
-  const delCart = await request(`/lapak/carts/${cartBId}`, { method: "DELETE", token: wargaToken || undefined, appCode: "lapak-jambi-web" });
+  const delCart = await request(`/lapak/carts/${cartBId}`, { method: "DELETE", token: wargaToken || undefined, appCode: WARGA_APP });
   assert("Hapus keranjang 200", delCart.status === 200, delCart.status);
   assert("Hapus mengembalikan deleted:true", delCart.data?.data?.deleted === true);
 
@@ -2076,10 +2092,10 @@ async function runLapakCartSuite() {
 async function runLapakOrdersSuite() {
   console.log("\n\x1b[36m▶ [Suite 20: Lapak - Quote & Checkout Pesanan]\x1b[0m");
   const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
   assert("Superadmin login", Boolean(saToken));
-  assert("Warga login lapak", Boolean(wargaToken));
-  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+  assert("Warga login ke portal Lapak", Boolean(wargaToken));
+  const W = { token: wargaToken || undefined, appCode: WARGA_APP };
 
   await cleanupDebugArtefacts();
   await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
@@ -2123,7 +2139,7 @@ async function runLapakOrdersSuite() {
   const cart = await request("/lapak/carts/opd/BPSDM", W);
   const cartId = cart.data?.data?.id;
   await request(`/lapak/carts/${cartId}/items`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { productId, rateId, qty: 2 },
   });
   const withItem = await request(`/lapak/carts/${cartId}`, W);
@@ -2141,13 +2157,13 @@ async function runLapakOrdersSuite() {
 
   // ── 2. Checkout tanpa data pemohon → 400.
   const noApplicant = await request(`/lapak/orders/cart/${cartId}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web", body: {},
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP, body: {},
   });
   assert("Checkout tanpa pemohon ditolak 400", noApplicant.status === 400, noApplicant.status);
 
   // ── 3. Checkout berhasil → pesanan + snapshot.
   const checkout = await request(`/lapak/orders/cart/${cartId}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       applicant: {
         name: "Budi Santoso", nik: "1234567890123456", phone: "081234567890",
@@ -2227,7 +2243,7 @@ async function runLapakOrdersSuite() {
 
   // ── 11. Checkout keranjang kosong ditolak.
   const emptyCheckout = await request(`/lapak/orders/cart/${cartId}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
   });
   assert("Checkout keranjang kosong 400", emptyCheckout.status === 400, emptyCheckout.status);
@@ -2247,10 +2263,10 @@ async function runLapakOrdersSuite() {
 async function runLapakSkrdSuite() {
   console.log("\n\x1b[36m▶ [Suite 21: Lapak - SKRD & Penomoran Gapless]\x1b[0m");
   const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
   assert("Superadmin login", Boolean(saToken));
-  assert("Warga login lapak", Boolean(wargaToken));
-  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+  assert("Warga login ke portal Lapak", Boolean(wargaToken));
+  const W = { token: wargaToken || undefined, appCode: WARGA_APP };
 
   await cleanupDebugArtefacts();
   await prisma.lapakOrderItem.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
@@ -2288,14 +2304,14 @@ async function runLapakSkrdSuite() {
     const cart = await request("/lapak/carts/opd/BPSDM", W);
     const cartId = cart.data?.data?.id;
     const added = await request(`/lapak/carts/${cartId}/items`, {
-      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
       body: { productId, rateId, qty: 1 },
     });
     assert("Item masuk keranjang (prasyarat)", added.status === 201, added.status, added.data?.message);
     return cartId;
   };
   const checkout = async (cartId: string) => request(`/lapak/orders/cart/${cartId}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { applicant: { name: "Budi Santoso", nik: "1234567890123456", phone: "081234567890" } },
   });
 
@@ -2453,10 +2469,10 @@ async function runLapakSkrdSuite() {
 async function runLapakPaymentsSuite() {
   console.log("\n\x1b[36m▶ [Suite 22: Lapak - Pembayaran Transfer Manual]\x1b[0m");
   const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
   assert("Superadmin login", Boolean(saToken));
-  assert("Warga login lapak", Boolean(wargaToken));
-  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+  assert("Warga login ke portal Lapak", Boolean(wargaToken));
+  const W = { token: wargaToken || undefined, appCode: WARGA_APP };
 
   await cleanupDebugArtefacts();
   await prisma.lapakPayment.deleteMany({ where: { order: { user: { email: "warga.pedagang@gmail.com" } } } });
@@ -2501,11 +2517,11 @@ async function runLapakPaymentsSuite() {
   const cart = await request("/lapak/carts/opd/BPSDM", W);
   const cartId = cart.data?.data?.id;
   await request(`/lapak/carts/${cartId}/items`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { productId, rateId, qty: 2 },
   });
   const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { applicant: { name: "Budi Santoso", nik: "1234567890123456", phone: "081234567890" } },
   });
   assert("Checkout 201", co.status === 201, co.status, co.data?.message);
@@ -2530,7 +2546,7 @@ async function runLapakPaymentsSuite() {
   // ── 3. Unggah bukti — URL eksternal ditolak (wajib ImageKit).
   const paymentId = payDetail.id;
   const externalUrl = await request(`/lapak/payments/${paymentId}/proof`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       proofUrl: "ftp://evil.example.com/bukti.jpg", proofFileId: "abc123",
       senderName: "Budi Santoso", senderBank: "Bank Jambi",
@@ -2540,7 +2556,7 @@ async function runLapakPaymentsSuite() {
   assert("URL non-http ditolak 400", externalUrl.status === 400, externalUrl.status);
 
   const noFileId = await request(`/lapak/payments/${paymentId}/proof`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti.jpg",
       senderName: "Budi Santoso", senderBank: "Bank Jambi",
@@ -2551,7 +2567,7 @@ async function runLapakPaymentsSuite() {
 
   // ── 4. Unggah bukti valid → MENUNGGU_KONFIRMASI.
   const proof = await request(`/lapak/payments/${paymentId}/proof`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti-transfer.jpg",
       proofFileId: "ik_file_abc123",
@@ -2574,7 +2590,7 @@ async function runLapakPaymentsSuite() {
 
   // ── 6. Warga tidak bisa mengonfirmasi pembayarannya sendiri.
   const selfConfirm = await request(`/lapak/payments/${paymentId}/verify`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web", body: {},
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP, body: {},
   });
   assert("Warga tidak boleh konfirmasi (403/401)", [401, 403].includes(selfConfirm.status), selfConfirm.status);
 
@@ -2610,7 +2626,7 @@ async function runLapakPaymentsSuite() {
 
   // ── 10. Unggah bukti setelah LUNAS ditolak.
   const proofAfterPaid = await request(`/lapak/payments/${paymentId}/proof`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/lagi.jpg",
       proofFileId: "ik_x", senderName: "Budi", senderBank: "Bank Jambi",
@@ -2629,18 +2645,18 @@ async function runLapakPaymentsSuite() {
   // ── 12. Alur penolakan: buat pesanan baru, unggah, tolak, unggah ulang.
   const cart2 = await request("/lapak/carts/opd/BPSDM", W);
   await request(`/lapak/carts/${cart2.data?.data?.id}/items`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { productId, rateId, qty: 1 },
   });
   const co2 = await request(`/lapak/orders/cart/${cart2.data?.data?.id}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
   });
   const order2 = co2.data?.data ?? {};
   const pay2 = order2.payments?.[0]?.id;
 
   await request(`/lapak/payments/${pay2}/proof`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti2.jpg",
       proofFileId: "ik_file_b2", senderName: "Budi Santoso", senderBank: "Bank Jambi",
@@ -2662,7 +2678,7 @@ async function runLapakPaymentsSuite() {
 
   // Unggah ulang setelah ditolak → boleh, alasan penolakan bersih.
   const reupload = await request(`/lapak/payments/${pay2}/proof`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti2b.jpg",
       proofFileId: "ik_file_b2b", senderName: "Budi Santoso", senderBank: "Bank Jambi",
@@ -2703,10 +2719,10 @@ async function runLapakPaymentsSuite() {
 async function runLapakTicketsSuite() {
   console.log("\n\x1b[36m▶ [Suite 23: Lapak - Tiket QR & Check-in]\x1b[0m");
   const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
   assert("Superadmin login", Boolean(saToken));
-  assert("Warga login lapak", Boolean(wargaToken));
-  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+  assert("Warga login ke portal Lapak", Boolean(wargaToken));
+  const W = { token: wargaToken || undefined, appCode: WARGA_APP };
 
   await cleanupDebugArtefacts();
   await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
@@ -2753,11 +2769,11 @@ async function runLapakTicketsSuite() {
   const cart = await request("/lapak/carts/opd/BPSDM", W);
   const cartId = cart.data?.data?.id;
   await request(`/lapak/carts/${cartId}/items`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { productId, rateId, qty: 3 },
   });
   const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { applicant: { name: "Budi Santoso", nik: "1234567890123456", phone: "081234567890" } },
   });
   const order = co.data?.data ?? {};
@@ -2768,7 +2784,7 @@ async function runLapakTicketsSuite() {
 
   const paymentId = order.payments?.[0]?.id;
   await request(`/lapak/payments/${paymentId}/proof`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti-tiket.jpg",
       proofFileId: "ik_tiket_1", senderName: "Budi Santoso", senderBank: "Bank Jambi",
@@ -2815,7 +2831,7 @@ async function runLapakTicketsSuite() {
 
   // ── 5. Warga tidak boleh menandai tiket terpakai.
   const wargaUse = await request(`/lapak/tickets/${ticket.id}/use`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web", body: {},
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP, body: {},
   });
   assert("Warga tidak boleh pakai tiket (401/403)", [401, 403].includes(wargaUse.status), wargaUse.status);
 
@@ -2843,17 +2859,17 @@ async function runLapakTicketsSuite() {
   // ── 8. INTI: dua scan PARALEL → hanya satu berhasil.
   // Buat pesanan kedua untuk diuji konkurensi.
   await request(`/lapak/carts/${cartId}/items`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { productId, rateId, qty: 1 },
   });
   const co2 = await request(`/lapak/orders/cart/${cartId}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
   });
   const order2 = co2.data?.data ?? {};
   const pay2 = order2.payments?.[0]?.id;
   await request(`/lapak/payments/${pay2}/proof`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti-tiket2.jpg",
       proofFileId: "ik_tiket_2", senderName: "Budi Santoso", senderBank: "Bank Jambi",
@@ -2997,8 +3013,8 @@ async function runLapakExpirySuite() {
   assert("Reservasi HOLD lampau disiapkan", Boolean(resvId), resvId);
 
   // Pembayaran lampau: pesanan + pembayaran dengan expiresAt mundur.
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
-  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
+  const W = { token: wargaToken || undefined, appCode: WARGA_APP };
   await request("/lapak/skrd/settings", {
     method: "POST", token: saToken || undefined,
     body: {
@@ -3009,11 +3025,11 @@ async function runLapakExpirySuite() {
   const cart = await request("/lapak/carts/opd/BPSDM", W);
   const cartId = cart.data?.data?.id;
   await request(`/lapak/carts/${cartId}/items`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { productId, rateId, qty: 1 },
   });
   const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
   });
   const order = co.data?.data ?? {};
@@ -3026,7 +3042,7 @@ async function runLapakExpirySuite() {
   // Tiket lampau: terbitkan lewat LUNAS lalu mundurkan validUntil.
   const paymentId = order.payments?.[0]?.id;
   await request(`/lapak/payments/${paymentId}/proof`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/bukti-exp.jpg",
       proofFileId: "ik_exp_1", senderName: "Budi Santoso", senderBank: "Bank Jambi",
@@ -3047,11 +3063,11 @@ async function runLapakExpirySuite() {
   }
   // Buat pesanan kedua yang belum dibayar supaya ada pembayaran menggantung.
   await request(`/lapak/carts/${cartId}/items`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { productId, rateId, qty: 1 },
   });
   const co2 = await request(`/lapak/orders/cart/${cartId}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
   });
   const order2 = co2.data?.data ?? {};
@@ -3113,11 +3129,11 @@ async function runLapakExpirySuite() {
   // ── 8. Nomor SKRD yang dibatalkan TIDAK dipakai ulang (gapless tetap).
   const co3cart = await request("/lapak/carts/opd/BPSDM", W);
   await request(`/lapak/carts/${co3cart.data?.data?.id}/items`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { productId, rateId, qty: 1 },
   });
   const co3 = await request(`/lapak/orders/cart/${co3cart.data?.data?.id}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
   });
   const newNumber = co3.data?.data?.skrd?.number;
@@ -3166,7 +3182,7 @@ async function runLapakExpirySuite() {
 
   // ── 12. Tanpa izin ditolak.
   const noPerm = await request("/lapak/expiry/run", {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web", body: {},
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP, body: {},
   });
   assert("Warga tidak boleh menjalankan worker (403)", noPerm.status === 403, noPerm.status);
 
@@ -3300,18 +3316,18 @@ async function runLapakDashboardSuite() {
   const pB = await mkProduct(disbudpar.id, "Dashboard Uji DISBUDPAR", 3_000_000);
   assert("Dua produk dashboard siap", Boolean(pA.id && pB.id));
 
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
-  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
+  const W = { token: wargaToken || undefined, appCode: WARGA_APP };
 
   const checkoutPaid = async (orgCode: string, productId: string, rateId: string) => {
     const cart = await request(`/lapak/carts/opd/${orgCode}`, W);
     const cartId = cart.data?.data?.id;
     await request(`/lapak/carts/${cartId}/items`, {
-      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
       body: { productId, rateId, qty: 1 },
     });
     const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
-      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
       body: { applicant: { name: "Budi Santoso", phone: "081234567890" } },
     });
     return co.data?.data ?? {};
@@ -3320,7 +3336,7 @@ async function runLapakDashboardSuite() {
   // Pesanan 1: BPSDM, dibayar → LUNAS (5 juta).
   const orderA = await checkoutPaid("BPSDM", pA.id, pA.rateId);
   await request(`/lapak/payments/${orderA.payments?.[0]?.id}/proof`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/dash1.jpg",
       proofFileId: "ik_dash_1", senderName: "Budi Santoso", senderBank: "Bank Jambi",
@@ -3335,7 +3351,7 @@ async function runLapakDashboardSuite() {
   // Pesanan 2: DISBUDPAR, dibayar → LUNAS (3 juta).
   const orderB = await checkoutPaid("DISBUDPAR", pB.id, pB.rateId);
   await request(`/lapak/payments/${orderB.payments?.[0]?.id}/proof`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: {
       proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/dash2.jpg",
       proofFileId: "ik_dash_2", senderName: "Budi Santoso", senderBank: "Bank Jambi",
@@ -3456,9 +3472,9 @@ async function runLapakDashboardSuite() {
 async function runLapakReportsSuite() {
   console.log("\n\x1b[36m▶ [Suite 26: Lapak - Daftar Transaksi & Ekspor CSV]\x1b[0m");
   const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
   assert("Superadmin login", Boolean(saToken));
-  assert("Warga login lapak", Boolean(wargaToken));
+  assert("Warga login ke portal Lapak", Boolean(wargaToken));
 
   await cleanupDebugArtefacts();
   await prisma.lapakTarget.deleteMany({});
@@ -3507,16 +3523,16 @@ async function runLapakReportsSuite() {
   const pB = await mkProduct(disbudpar.id, "Laporan Uji DISBUDPAR", 4_000_000);
   assert("Dua produk laporan siap", Boolean(pA.id && pB.id));
 
-  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+  const W = { token: wargaToken || undefined, appCode: WARGA_APP };
   const checkout = async (orgCode: string, productId: string, rateId: string, applicant: any) => {
     const cart = await request(`/lapak/carts/opd/${orgCode}`, W);
     const cartId = cart.data?.data?.id;
     await request(`/lapak/carts/${cartId}/items`, {
-      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
       body: { productId, rateId, qty: 1 },
     });
     const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
-      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
       body: { applicant },
     });
     return co.data?.data ?? {};
@@ -3524,7 +3540,7 @@ async function runLapakReportsSuite() {
   const payOrder = async (order: any, amount: number, fileId: string) => {
     const payId = order.payments?.[0]?.id;
     await request(`/lapak/payments/${payId}/proof`, {
-      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
       body: {
         proofUrl: `https://ik.imagekit.io/seloko/lapak/payments/${fileId}.jpg`,
         proofFileId: fileId, senderName: "Budi Santoso", senderBank: "Bank Jambi",
@@ -3712,9 +3728,9 @@ async function runLapakReportsSuite() {
 async function runLapakPublicStatsSuite() {
   console.log("\n\x1b[36m▶ [Suite 27: Lapak - Transparansi PAD Publik]\x1b[0m");
   const saToken = await login("superadmin", SUPERADMIN_PASSWORD, "seloko");
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
   assert("Superadmin login", Boolean(saToken));
-  assert("Warga login lapak", Boolean(wargaToken));
+  assert("Warga login ke portal Lapak", Boolean(wargaToken));
 
   await cleanupDebugArtefacts();
   await prisma.lapakTicket.deleteMany({ where: { orderItem: { order: { user: { email: "warga.pedagang@gmail.com" } } } } });
@@ -3758,23 +3774,23 @@ async function runLapakPublicStatsSuite() {
   });
 
   const prod = await mkProduct("Stats Uji Produk", 1_000_000);
-  const W = { token: wargaToken || undefined, appCode: "lapak-jambi-web" };
+  const W = { token: wargaToken || undefined, appCode: WARGA_APP };
 
   const makePaidOrder = async (applicant: any) => {
     const cart = await request("/lapak/carts/opd/BPSDM", W);
     const cartId = cart.data?.data?.id;
     await request(`/lapak/carts/${cartId}/items`, {
-      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
       body: { productId: prod.id, rateId: prod.rateId, qty: 1 },
     });
     const co = await request(`/lapak/orders/cart/${cartId}/checkout`, {
-      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
       body: { applicant },
     });
     const order = co.data?.data ?? {};
     const payId = order.payments?.[0]?.id;
     await request(`/lapak/payments/${payId}/proof`, {
-      method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+      method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
       body: {
         proofUrl: "https://ik.imagekit.io/seloko/lapak/payments/pub.jpg",
         proofFileId: `ik_pub_${Math.random().toString(36).slice(2, 8)}`,
@@ -3827,11 +3843,11 @@ async function runLapakPublicStatsSuite() {
   // ── 5. Pesanan belum dibayar TIDAK dihitung.
   const cartUnpaid = await request("/lapak/carts/opd/BPSDM", W);
   await request(`/lapak/carts/${cartUnpaid.data?.data?.id}/items`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { productId: prod.id, rateId: prod.rateId, qty: 1 },
   });
   await request(`/lapak/orders/cart/${cartUnpaid.data?.data?.id}/checkout`, {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { applicant: { name: "Belum Bayar", phone: "081200002222" } },
   });
   const stUnpaid = await request("/lapak/public-stats", { appCode: "lapak-jambi-web" });
@@ -4038,9 +4054,9 @@ async function runLapakNewsSuite() {
   assert("Excerpt berubah", upd.data?.data?.excerpt === "Ringkasan diperbarui", upd.data?.data?.excerpt);
 
   // ── 8. Tanpa izin ditolak.
-  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, "lapak-jambi-web");
+  const wargaToken = await login("warga.pedagang@gmail.com", DEFAULT_PASSWORD, WARGA_APP);
   const wargaCreate = await request("/lapak/news?organization=BPSDM", {
-    method: "POST", token: wargaToken || undefined, appCode: "lapak-jambi-web",
+    method: "POST", token: wargaToken || undefined, appCode: WARGA_APP,
     body: { categoryId: cat.id, title: "Berita Uji Warga", content: "<p>Konten berita warga uji.</p>" },
   });
   assert("Warga tidak boleh membuat berita (403)", wargaCreate.status === 403,

@@ -7,6 +7,159 @@ Format tanggal: `YYYY-MM-DD`. Urut terbaru di atas.
 
 ---
 
+# 2026-10-27 (lanjutan) — Audience CMS diperbaiki: INTERNAL vs PUBLIC
+
+**Diperbaiki** — `bapenda-profile` & `lapak-jambi-web` sebelumnya ber-`audience: PUBLIC`
+(warisan saat CMS dan portal publik masih satu aplikasi). Setelah dipisah, keduanya **INTERNAL**.
+
+## Audience final
+
+| Aplikasi | Audience | Isi |
+|---|---|---|
+| `seloko` | INTERNAL | konsol inti, 13 menu |
+| `bapenda-profile` | **INTERNAL** | CMS Bapenda, 14 menu |
+| `bapenda-portal` | PUBLIC | portal publik Bapenda, 2 menu |
+| `lapak-jambi-web` | **INTERNAL** | CMS Lapak, 28 menu |
+| `lapak-jambi-app` | PUBLIC | portal publik Lapak, 2 menu |
+
+**Kenapa ini penting:** `assertUserCanAccessApp` menolak akun PUBLIC masuk aplikasi INTERNAL
+(dan sebaliknya). Dengan audience PUBLIC, aplikasi CMS tidak bisa menolak akun warga — dan
+`POST /auth/register` terbuka di sana.
+
+## Akibat berantai yang ikut dibereskan
+
+- **`warga` hanya hidup di aplikasi PUBLIC** (`apps: ["bapenda-portal", "lapak-jambi-app"]`).
+  Sebelumnya `warga` dibuat di `lapak-jambi-web`. Seeder menolak keras role PUBLIC di aplikasi
+  INTERNAL, jadi ini wajib.
+- **Akun uji warga pindah app:** `warga.pedagang@gmail.com` & `viewer.only@gmail.com` kini
+  ber-role `warga` di `lapak-jambi-app`.
+- **`lapak-jambi-app` mendapat permission `order`/`payment`/`review`** (create/read/list) agar
+  `warga` tetap punya izin yang bermakna di sana.
+- **`users.seeder.ts`**: penugasan role `warga` ke 5 pegawai massal dihapus — pegawai INTERNAL
+  tak pernah memegang role PUBLIC.
+- **`prisma/smoke/runner.ts`**: token warga memakai `X-App-Code: lapak-jambi-app` (token terikat
+  appCode); assertion audience CMS dibalik jadi INTERNAL; `login` pegawai langsung ke CMS
+  sekarang **diizinkan** (dulu ditolak karena CMS ber-audience PUBLIC).
+- `prisma/smoke/menus.check.ts`: 46 → **51 pemeriksaan** (audience tiap aplikasi + `warga`
+  wajib 0 di CMS).
+
+## Catatan arsitektur
+
+`lapak-jambi-web` **tetap pemilik permission modul Lapak** (`APP_CODES.LAPAK_JAMBI_WEB` dipakai
+13 file route). Izin dibaca dari aplikasi pemilik lewat `requirePermission(..., { app })`, bukan
+dari header `X-App-Code` — sehingga CMS INTERNAL tetap bisa menjadi sumber izin tanpa membuat
+akun warga bisa login ke sana. Alur warga (`/lapak/carts`, checkout, bayar) hanya memakai
+`authenticate`, tanpa `requirePermission`, jadi tidak terpengaruh.
+
+---
+
+# 2026-10-27 — Restrukturisasi sidebar: 5 aplikasi (CMS ↔ portal publik dipisah)
+
+**Diubah** — `prisma/seeds/core/{applications,menus,roles,users}.json` disusun ulang dari
+`data.json`. **Tidak ada perubahan kontrak endpoint**; murni data seed + penyesuaian smoke test.
+
+## Pemisahan CMS ↔ portal publik
+
+Sebelumnya satu aplikasi menampung sidebar CMS *dan* tautan "Portal Publik". Kini dipisah:
+
+| Aplikasi | Sebelum | Sesudah |
+|---|---|---|
+| `seloko` | SELOKO CMS | **SELOKO CMS** (tidak berubah, 13 menu) |
+| `bapenda-profile` | Bapenda Profile Portal (CMS + portal) | **Bapenda Profile CMS** (14 menu) |
+| `bapenda-portal` | — | **Bapenda Profile Portal** (baru, 2 menu) |
+| `lapak-jambi-web` | Lapak Jambi Web (CMS + portal) | **Lapak Jambi CMS** (28 menu) |
+| `lapak-jambi-app` | Lapak Jambi Mobile (4 menu) | **Lapak Jambi Portal** (2 menu) |
+
+- Aplikasi uji `seloko-nonaktif` dihapus dari seed.
+- Aplikasi sampah hasil eksperimen CMS (`bapenda-cms`, `lapak-jambi-web-cms`, `lorem`) dihapus
+  dari database — semuanya 0 menu/permission/role.
+- `warga` kini hidup di **tiga** aplikasi publik (`bapenda-portal`, `lapak-jambi-app`,
+  `lapak-jambi-web`) agar penugasan role lintas aplikasi tetap sah.
+
+## Prefix path Lapak
+
+`/lapak/…` → **`/lapak-jambi/…`** (22 path). `menus.check.ts` ikut memverifikasi prefix baru.
+
+## Role
+
+- Label `Admin Sistem` (4 menu) dipetakan ke `superadmin`.
+- `admin-opd` **tetap tidak** memegang `retribution-object:*` / `skrd-setting:*` (master Bapenda).
+  Menu *Objek Retribusi* & *Pengaturan SKRD* dibatasi `admin` saja.
+- `petugas-lokasi` tidak memegang `product:read`; menu *Reservasi & Pemesanan* tidak lagi
+  mensyaratkan permission itu (cukup batas role).
+
+## Status Draft
+
+- Grup **Monitoring** & **Konfigurasi** → Draft (semua anaknya belum tayang).
+- **Laporan & Analitik**, **Transaksi**, **Penerima Retribusi**, **Audit Log**, **Pengguna &
+  Akses**, **Pengaturan Lapak**, **Profile Saya** (Bapenda & Lapak) → Draft.
+- Grup **Transaksi & Penerimaan** tetap **Aktif** karena berisi modul jadi (Pesanan, Pembayaran,
+  Tiket & Check-in) — grup Draft akan dipangkas service sehingga menu jadi ikut hilang.
+
+## Modul yang dipertahankan
+
+10 menu Lapak yang tidak ada di `data.json` dikembalikan karena backend-nya sudah jadi:
+*Pengaturan SKRD*, grup *Katalog* (Produk & Layanan, Persetujuan Produk), *Pesanan*,
+*Pembayaran*, *Tiket & Check-in*, grup *Konten OPD* (Berita, Artikel, Galeri, Banner).
+
+## Smoke test
+
+`prisma/smoke/menus.check.ts`: 40 → **46 pemeriksaan** (aplikasi portal publik, jumlah menu portal,
+isi Portal Publik, keberadaan role `warga` di 3 aplikasi publik, prefix `/lapak-jambi`).
+Full smoke API: **801 lolos, 0 gagal**.
+
+---
+
+## 2026-10-26 — Struktur sidebar Lapak Jambi (CMS) & role baru
+
+**Diubah** — sidebar `lapak-jambi-web` disusun ulang; **tidak ada perubahan kontrak endpoint**.
+
+- **Grup baru:** `Reservasi & Pemesanan` (menu tunggal), `Transaksi & Penerimaan`,
+  `Monitoring`, `Konfigurasi`, `Portal Publik` (tautan eksternal ke web publik).
+- **Modul yang sudah jadi dipindahkan, bukan dihapus:**
+  - Pesanan / Pembayaran / Tiket & Check-in → grup **Transaksi & Penerimaan**
+  - Laporan Penerimaan → **Monitoring → Laporan & Analitik**
+  - Katalog (Produk, Persetujuan Produk) & Konten OPD tetap sebagai grup sendiri
+- **Draft (`isActive=false`)** untuk menu yang halamannya belum dibangun:
+  `Transaksi`, `Penerima Retribusi`, `Audit Log`, `Konfigurasi` beserta isinya, `Profile Saya`.
+- **Role baru (hanya aplikasi `lapak-jambi-web`):** `kasir` (order/payment/ticket/report —
+  termasuk `payment:approve`), `bendahara` (order/payment/report — baca & ekspor),
+  `pimpinan` (report/order/product — baca saja). Akun uji: `kasir.lapak`, `bendahara.lapak`,
+  `pimpinan.lapak` (password standar seed).
+- **Pembatas role:** grup `Katalog` kini dibatasi `admin`/`admin-opd`/`manajer-opd` supaya
+  `pimpinan` tidak melihat menu produk; grup `Transaksi & Penerimaan` juga mencakup
+  `petugas-lokasi` agar menu Pesanan/Tiket lama tetap terlihat olehnya.
+- **`lapak-jambi-app`**: item dibungkus grup `Portal Publik` (Beranda, Katalog & Reservasi Lapak,
+  Pesanan Saya).
+- `prisma/smoke/menus.check.ts` naik ke **40 pemeriksaan** (struktur akar Lapak, status Draft
+  per grup, dan wewenang role baru).
+
+---
+
+## 2026-10-26 — Penataan ulang seed sidebar (`menus.json`)
+
+**Diubah** — struktur sidebar seluruh aplikasi CMS diselaraskan dengan rancangan menu baru.
+**Tidak ada perubahan kontrak endpoint**; ini murni data seed.
+
+- **`seloko`** (6 menu akar): `Dashboard`, `Pengguna` (Daftar/Tambah), `Hak Akses` (Role/Permission),
+  `Organisasi` (kini menu akar, sebelumnya `sistem.organisasi`), `Sistem` (Aplikasi/Menu Sidebar/Log Audit),
+  `Profile Saya`. Menu uji `tautan.bapenda` & `pengguna.penugasan` dihapus.
+- **`bapenda-profile`**: grup `Konten` kini menampung Berita, Antrian Review, Galeri, Kategori Berita;
+  `FAQ`, `Kategori FAQ`, `Halaman`, `Regulasi`, `Banner`, `UPTD`, `Pengguna`, `Pengaturan`,
+  `Profile Saya` menjadi menu akar bertanda **Draft** (`isActive=false`) — disiapkan, belum tayang.
+  Grup `Media`/`Informasi` dibubarkan; halaman/FAQ/regulasi/banner/UPTD dinaikkan ke akar.
+- **`lapak-jambi-web`**: grup baru `Management Retribusi` (OPD Pengelola, Objek Retribusi,
+  Kategori, Pengaturan SKRD) sesuai wewenang `admin` vs `admin-opd`; grup `Katalog`
+  (Produk, Persetujuan Produk), `Transaksi`, `Konten OPD`, `Laporan`, plus `Profile Saya`.
+  Menu uji `menu.nonaktif` dihapus.
+- **Role pembatas** kini memakai slug `roles.json` (`superadmin`, `admin`, `editor`, `admin-opd`,
+  `manajer-opd`, `petugas-lokasi`) — sebelumnya beberapa menu memakai nama tampilan.
+  `roles` kosong = semua role, padanan "Semua Pengguna".
+- **`prisma/smoke/menus.check.ts`** diperbarui: 26 pemeriksaan (kini juga memverifikasi status
+  Aktif/Draft dan bahwa `roles` kosong benar-benar tanpa `menu_roles`).
+
+---
+
 ## 2026-10-24 — Regulasi & Dokumen Bapenda (Modul 7)
 
 **Ditambah** — prefix `/api/bapenda/regulations` (8 endpoint): 2 publik + 6 CMS.

@@ -177,7 +177,8 @@ async function seedBulkUsers(
   const bapendaViewer = requireRole(roleIndex, "bapenda-profile", "viewer", "pegawai multi-app");
   const lapakWebAdminOpd = requireRole(roleIndex, "lapak-jambi-web", "admin-opd", "pegawai multi-app");
   const lapakWebManajerOpd = requireRole(roleIndex, "lapak-jambi-web", "manajer-opd", "pegawai multi-app");
-  const lapakAppViewer = requireRole(roleIndex, "lapak-jambi-app", "viewer", "pegawai multi-app");
+  // `lapak-jambi-app` & `bapenda-portal` kini portal publik: role `warga` milik
+  // akun PUBLIC, jadi tidak pernah ditugaskan ke pegawai di sini.
 
   for (let i = 1; i <= bulk.count; i++) {
     const first = bulk.firstNames[i % bulk.firstNames.length] ?? "Pegawai";
@@ -223,11 +224,6 @@ async function seedBulkUsers(
         await assignRole(user.id, lapakWebManajerOpd, null);
       } else if (i <= 10) {
         await assignRole(user.id, lapakWebAdminOpd, null);
-      }
-
-      // Akses tambahan ke lapak-jambi-app untuk 5 user pertama (i <= 5)
-      if (i <= 5) {
-        await assignRole(user.id, lapakAppViewer, null);
       }
 
       // Kasus multi-role dalam 1 aplikasi: pegawai001 & pegawai002 merangkap editor + verifikator di bapenda-profile

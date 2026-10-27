@@ -168,7 +168,23 @@ DRAFT → [MENUNGGU_VERIFIKASI bila produk butuh persetujuan OPD]
 | Keterlibatan | `review` | read, list, update (moderasi) | ya |
 | Laporan | `report` | read, list, export | ya |
 
-Role bawaan (data, bisa diubah lewat CMS): `superadmin`, `admin` (Bapenda), `admin-opd`, `manajer-opd`, `petugas-lokasi`, `viewer`, `warga` (PUBLIC). Role `pedagang` & entity merchant/product/category/order lama di seed dihapus.
+Role bawaan (data, bisa diubah lewat CMS): `superadmin`, `admin` (Bapenda), `admin-opd`, `manajer-opd`, `petugas-lokasi`, `kasir`, `bendahara`, `pimpinan`, `viewer`, `warga` (PUBLIC). Role `pedagang` & entity merchant/product/category/order lama di seed dihapus.
+
+**Pembagian tugas operasional (sejak 2026-10-26):**
+
+| Role | Wewenang inti | Menu sidebar yang tampil |
+|---|---|---|
+| `admin` | Seluruh OPD + wewenang master Bapenda | Dashboard, Management Retribusi, Katalog, Transaksi & Penerimaan, Konten OPD, Monitoring |
+| `admin-opd` | Operasional OPD (produk, pesanan, pembayaran, tiket, konten) | Dashboard, Reservasi & Pemesanan, Transaksi & Penerimaan, Katalog, Konten OPD, Monitoring |
+| `manajer-opd` | Menyetujui & menerbitkan produk/konten OPD | Katalog, Konten OPD, Monitoring |
+| `petugas-lokasi` | Pindai tiket & catat pemakaian | Reservasi & Pemesanan, Transaksi & Penerimaan (Pesanan & Tiket) |
+| `kasir` | Terima & verifikasi pembayaran retribusi | Transaksi & Penerimaan |
+| `bendahara` | Tata usaha penerimaan & ekspor laporan | Transaksi & Penerimaan, Monitoring |
+| `pimpinan` | Baca laporan & analitik saja | Monitoring |
+
+Menu **Draft** (`isActive=false`) di sidebar Lapak: `Transaksi`, `Penerima Retribusi`, `Audit Log`,
+`Konfigurasi` (Pengguna & Akses, Pengaturan Lapak), dan `Profile Saya` — halamannya belum dibangun
+di `lapak-jambi-web`.
 
 ---
 
